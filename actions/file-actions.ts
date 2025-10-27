@@ -63,7 +63,7 @@ export async function uploadFile(formData: FormData) {
     // Get document to verify ownership and get document number
     const { data: document, error: docError } = await supabase
       .from('documents')
-      .select('*, document_type:document_types(prefix)')
+      .select('*')
       .eq('id', documentId)
       .single()
 
