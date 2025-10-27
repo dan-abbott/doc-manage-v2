@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 // ==========================================
@@ -44,7 +44,7 @@ async function logAudit(
 
 export async function uploadFile(formData: FormData) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -202,7 +202,7 @@ export async function uploadFile(formData: FormData) {
 
 export async function deleteFile(fileId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -289,7 +289,7 @@ export async function deleteFile(fileId: string) {
 
 export async function getFileDownloadUrl(fileId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -338,7 +338,7 @@ export async function getFileDownloadUrl(fileId: string) {
 
 export async function uploadMultipleFiles(formData: FormData) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()

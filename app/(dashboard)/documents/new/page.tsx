@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { CreateDocumentForm } from '@/components/documents/CreateDocumentForm'
 
@@ -8,7 +8,7 @@ export const metadata = {
 }
 
 export default async function NewDocumentPage() {
-  const supabase = await createServerClient()
+  const supabase = await createClient()
 
   // Check authentication
   const { data: { user }, error: authError } = await supabase.auth.getUser()

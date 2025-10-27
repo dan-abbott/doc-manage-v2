@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { redirect } from 'next/navigation'
 
@@ -124,7 +124,7 @@ async function logAudit(
 
 export async function createDocument(input: CreateDocumentInput) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -205,7 +205,7 @@ export async function createDocument(input: CreateDocumentInput) {
 
 export async function getDocument(documentId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -272,7 +272,7 @@ export async function updateDocument(
   input: UpdateDocumentInput
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -369,7 +369,7 @@ export async function updateDocument(
 
 export async function deleteDocument(documentId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -444,7 +444,7 @@ export async function deleteDocument(documentId: string) {
 
 export async function releaseDocument(documentId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -546,7 +546,7 @@ export interface GetDocumentsFilters {
 
 export async function getDocuments(filters: GetDocumentsFilters = {}) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
