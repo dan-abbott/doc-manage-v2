@@ -93,14 +93,26 @@ export function CreateDocumentForm({ documentTypes }: CreateDocumentFormProps) {
 
       // Step 2: Upload files if any
       if (selectedFiles.length > 0) {
+        console.log('📁 Starting file upload...')
+        console.log('Number of files:', selectedFiles.length)
+        console.log('File names:', selectedFiles.map(f => f.name))
+        console.log('Document ID:', docResult.document.id)
+
         const fileFormData = new FormData()
         fileFormData.append('documentId', docResult.document.id)
         
         selectedFiles.forEach((file, index) => {
+          console.log(`Adding file ${index}:`, file.name, file.size, 'bytes')
           fileFormData.append(`file-${index}`, file)
         })
 
+        console.log('FormData keys:', Array.from(fileFormData.keys()))
+        console.log('Calling uploadMultipleFiles...')
+
         const uploadResult = await uploadMultipleFiles(fileFormData)
+
+        console.log('Upload result:', uploadResult)
+        console.log('Upload result full:', JSON.stringify(uploadResult, null, 2))
 
         if (uploadResult.success) {
           if (uploadResult.failed && uploadResult.failed > 0) {
