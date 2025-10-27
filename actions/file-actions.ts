@@ -374,10 +374,11 @@ export async function uploadMultipleFiles(formData: FormData) {
 
     // Verify document access once
     const { data: document, error: docError } = await supabase
-      .from('documents')
-      .select('*, document_type:document_types(prefix)')
-      .eq('id', documentId)
-      .single()
+    .from('documents')
+    .select('*')
+    .eq('id', documentId)
+    .single()
+
 
     if (docError || !document) {
       return { success: false, error: 'Document not found' }
