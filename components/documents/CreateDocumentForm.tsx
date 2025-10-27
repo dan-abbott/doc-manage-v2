@@ -115,8 +115,24 @@ export function CreateDocumentForm({ documentTypes }: CreateDocumentFormProps) {
         }
       }
 
-      // Navigate to document detail page
-      router.push(`/documents/${docResult.document.id}`)
+            // Navigate to document detail page (TEMPORARILY DISABLED - page doesn't exist yet)
+      console.log('✅ Document created successfully!')
+      console.log('Document ID:', docResult.document.id)
+      console.log('Document Number:', docResult.document.document_number + docResult.document.version)
+      
+      if (selectedFiles.length > 0) {
+        console.log('Files uploaded:', selectedFiles.map(f => f.name))
+      }
+      
+      toast.success(
+        `Document ${docResult.document.document_number}${docResult.document.version} created! Check console for details.`
+      )
+      
+      // TODO: Uncomment after building document detail page (Step 6)
+      // router.push(`/documents/${docResult.document.id}`)
+      
+      setLoading(false)  // Re-enable form so you can create another document
+      
     } catch (error: any) {
       console.error('Form submission error:', error)
       toast.error(error.message || 'An unexpected error occurred')
