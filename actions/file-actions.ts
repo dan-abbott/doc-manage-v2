@@ -162,13 +162,13 @@ export async function uploadFile(formData: FormData) {
         mime_type: file.type,
         uploaded_by: user.id
       })
+      .select()
+      .single()
+
       console.log('=== DATABASE INSERT DEBUG ===')
       console.log('DB Error:', dbError)
       console.log('DB Error details:', JSON.stringify(dbError, null, 2))
       
-      .select()
-      .single()
-
     if (dbError) {
       console.error('Database insert error:', dbError)
       
