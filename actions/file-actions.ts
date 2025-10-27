@@ -63,7 +63,7 @@ export async function uploadFile(formData: FormData) {
     // Get document to verify ownership and get document number
     const { data: document, error: docError } = await supabase
       .from('documents')
-      .select('*')
+      .select('id, created_by, status, document_number, version')
       .eq('id', documentId)
       .single()
 
@@ -148,7 +148,7 @@ export async function uploadFile(formData: FormData) {
     }
 
     // Create display name with document number prefix
-    const displayName = `${document.document_number}${document.version} ${originalFileName}`
+    const displayName = `${document.document_number}${document.version}_${originalFileName}`
 
     // Save file metadata to database
     const { data: fileRecord, error: dbError } = await supabase
