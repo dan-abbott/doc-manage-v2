@@ -124,6 +124,11 @@ export async function uploadFile(formData: FormData) {
         cacheControl: '3600',
         upsert: false // Don't overwrite existing files
       })
+      console.log('=== UPLOAD DEBUG ===')
+      console.log('File path:', filePath)
+      console.log('Upload error:', uploadError)
+      console.log('Upload error details:', JSON.stringify(uploadError, null, 2))
+
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
@@ -157,6 +162,10 @@ export async function uploadFile(formData: FormData) {
         mime_type: file.type,
         uploaded_by: user.id
       })
+      console.log('=== DATABASE INSERT DEBUG ===')
+      console.log('DB Error:', dbError)
+      console.log('DB Error details:', JSON.stringify(dbError, null, 2))
+      
       .select()
       .single()
 
