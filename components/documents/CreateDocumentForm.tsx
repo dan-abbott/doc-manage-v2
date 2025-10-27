@@ -103,7 +103,7 @@ export function CreateDocumentForm({ documentTypes }: CreateDocumentFormProps) {
         const uploadResult = await uploadMultipleFiles(fileFormData)
 
         if (uploadResult.success) {
-          if (uploadResult.failed > 0) {
+          if (uploadResult.failed && uploadResult.failed > 0) {
             toast.warning(
               `Uploaded ${uploadResult.uploaded} of ${selectedFiles.length} files. ${uploadResult.failed} failed.`
             )
