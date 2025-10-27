@@ -115,7 +115,9 @@ export async function uploadFile(formData: FormData) {
 
     // Generate file path: documents/{document-id}/{filename}
     const originalFileName = file.name
-    const filePath = `${documentId}/${originalFileName}`
+    const displayName = `${document.document_number}${document.version}_${originalFileName}`
+    const filePath = `${documentId}/${displayName}`  
+
 
     // Upload to storage
     const { error: uploadError } = await supabase.storage
@@ -146,9 +148,6 @@ export async function uploadFile(formData: FormData) {
         error: uploadError.message || 'Failed to upload file' 
       }
     }
-
-    // Create display name with document number prefix
-    const displayName = `${document.document_number}${document.version}_${originalFileName}`
 
     // Save file metadata to database
     const { data: fileRecord, error: dbError } = await supabase
