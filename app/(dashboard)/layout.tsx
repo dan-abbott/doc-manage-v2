@@ -1,33 +1,35 @@
-import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
-import { Navigation } from '@/components/dashboard/Navigation'
+import { redirect } from 'next/navigation';
+import { createClient } from '@/lib/supabase/server';
+import Navigation from '@/components/dashboard/Navigation';
 
 export default async function DashboardLayout({
   children,
 }: {
-  children: React.ReactNode
+  children: React.ReactNode;
 }) {
-  const supabase = await createClient()
-  
-  const { data: { user } } = await supabase.auth.getUser()
-  
+  const supabase = await createClient();
+
+  const {
+    data: { user },
+  } = await supabase.auth.getUser();
+
   if (!user) {
-    redirect('/')
+    redirect('/');
   }
 
-  // Get user data from public.users table
+  // Get user's admin status
   const { data: userData } = await supabase
     .from('users')
-    .select('email, is_admin, created_at')
+    .select('is_admin')
     .eq('id', user.id)
-    .single()
+    .single();
+
+  const isAdmin = userData?.is_admin || false;
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      <Navigation user={user} isAdmin={userData?.is_admin ?? false} />
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        {children}
-      </main>
+    <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+      <Navigation user={{ email: user.email || '' }} isAdmin={isAdmin} />
+      {children}
     </div>
-  )
+  );
 }
