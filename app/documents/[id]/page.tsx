@@ -23,21 +23,12 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
-  
-  // Try simple query first
-  const { data: simpleDoc, error: simpleError } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('id', params.id)
-    .single()
-  
-  console.log('Simple query result:', simpleDoc)
-  console.log('Simple query error:', simpleError)
-  console.log('=== END DEBUG ===')  
-  
   if (!user) {
     redirect('/auth/login')
   }
+
+  console.log('User:', user?.email)
+
 
   // Get document with related data
   const { data: document, error } = await supabase
@@ -53,7 +44,12 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     .eq('id', params.id)
     .single()
 
+  console.log('Complex query result:', document)
+  console.log('Complex query error:', error)
+  console.log('=== END DETAIL DEBUG ===')
+
   if (error || !document) {
+    console.error('Query failed, returning 404')
     notFound()
   }
 
