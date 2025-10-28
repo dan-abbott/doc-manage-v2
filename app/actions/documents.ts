@@ -1,6 +1,6 @@
 'use server'
 
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 // ==========================================
@@ -15,7 +15,7 @@ export async function createDocument(data: {
   project_code: string | null
 }, files: File[]) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -151,7 +151,7 @@ export async function updateDocument(
   newFiles: File[] = []
 ) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -252,7 +252,7 @@ export async function updateDocument(
 
 export async function deleteDocument(documentId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -324,7 +324,7 @@ export async function deleteDocument(documentId: string) {
 
 export async function deleteFile(documentId: string, fileId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
@@ -399,7 +399,7 @@ export async function deleteFile(documentId: string, fileId: string) {
 
 export async function releaseDocument(documentId: string) {
   try {
-    const supabase = await createServerClient()
+    const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
