@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
@@ -18,7 +18,7 @@ interface PageProps {
 }
 
 export default async function DocumentsPage({ searchParams }: PageProps) {
-  const supabase = await createServerClient()
+  const supabase = await createClient()
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()

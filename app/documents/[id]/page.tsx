@@ -1,4 +1,4 @@
-import { createServerClient } from '@/lib/supabase/server'
+import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
@@ -16,7 +16,7 @@ interface PageProps {
 }
 
 export default async function DocumentDetailPage({ params }: PageProps) {
-  const supabase = await createServerClient()
+  const supabase = await createClient()
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
