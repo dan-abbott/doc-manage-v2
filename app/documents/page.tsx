@@ -22,6 +22,22 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
+ 
+ // DEBUG: Log user info
+  console.log('=== DEBUG ===')
+  console.log('User ID:', user?.id)
+  console.log('User email:', user?.email)
+
+   // Try a direct query without RLS to test
+  const { data: testData, error: testError } = await supabase
+    .from('documents')
+    .select('id, document_number, status, created_by')
+    .limit(5)
+  
+  console.log('Test query result:', testData)
+  console.log('Test query error:', testError)
+  console.log('=== END DEBUG ===')
+ 
   if (!user) {
     redirect('/auth/login')
   }
