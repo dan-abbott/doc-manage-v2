@@ -16,10 +16,25 @@ interface PageProps {
 }
 
 export default async function DocumentDetailPage({ params }: PageProps) {
+  console.log('=== DETAIL PAGE DEBUG ===')
+  console.log('Document ID:', params.id)
+  
   const supabase = await createClient()
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
+  
+  // Try simple query first
+  const { data: simpleDoc, error: simpleError } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('id', params.id)
+    .single()
+  
+  console.log('Simple query result:', simpleDoc)
+  console.log('Simple query error:', simpleError)
+  console.log('=== END DEBUG ===')  
+  
   if (!user) {
     redirect('/auth/login')
   }
@@ -29,10 +44,11 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     .from('documents')
     .select(`
       *,
-      document_type:document_types(name, prefix),
-      creator:created_by(full_name, email),
-      releaser:released_by(full_name, email),
-      document_files(*)
+    document_type:document_types(name, prefix),
+    creator:users!documents_created_by_fkey(email),
+    releaser:users!documents_released_by_fkey(email),
+    document_files(*)
+
     `)
     .eq('id', params.id)
     .single()
