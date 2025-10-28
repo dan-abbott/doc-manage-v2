@@ -5,13 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Button } from '@/components/ui/button'
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select'
 import { Search, X } from 'lucide-react'
 
 interface DocumentsFiltersProps {
@@ -86,24 +79,40 @@ export default function DocumentsFilters({
 
       {/* Filters Grid */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-        {/* Document Type */}
+        {/* Document Type - Native Select */}
         <div>
           <Label htmlFor="type">Document Type</Label>
-          <Select value={type} onValueChange={setType}>
-            <SelectTrigger id="type">
-              <SelectValue placeholder="All types" />
-            </SelectTrigger>
-          </Select>
+          <select
+            id="type"
+            value={type}
+            onChange={(e) => setType(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">All types</option>
+            {documentTypes.map((dt) => (
+              <option key={dt.id} value={dt.id}>
+                {dt.name}
+              </option>
+            ))}
+          </select>
         </div>
 
-        {/* Status */}
+        {/* Status - Native Select */}
         <div>
           <Label htmlFor="status">Status</Label>
-          <Select value={status} onValueChange={setStatus}>
-            <SelectTrigger id="status">
-              <SelectValue placeholder="All statuses" />
-            </SelectTrigger>
-          </Select>
+          <select
+            id="status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            className="flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <option value="">All statuses</option>
+            {STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
         </div>
 
         {/* Project Code */}
