@@ -93,14 +93,6 @@ export default function DocumentsFilters({
             <SelectTrigger id="type">
               <SelectValue placeholder="All types" />
             </SelectTrigger>
-            //<SelectContent>
-            //  <SelectItem value="">All types</SelectItem>
-            //  {documentTypes.map((dt) => (
-            //    <SelectItem key={dt.id} value={dt.id}>
-            //      {dt.name}
-            //    </SelectItem>
-            //  ))}
-            //</SelectContent>
           </Select>
         </div>
 
@@ -111,14 +103,6 @@ export default function DocumentsFilters({
             <SelectTrigger id="status">
               <SelectValue placeholder="All statuses" />
             </SelectTrigger>
-            //<SelectContent>
-            //  <SelectItem value="">All statuses</SelectItem>
-            //  {STATUS_OPTIONS.map((option) => (
-            //    <SelectItem key={option.value} value={option.value}>
-            //      {option.label}
-            //    </SelectItem>
-            //  ))}
-            //</SelectContent>
           </Select>
         </div>
 
