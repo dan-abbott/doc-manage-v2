@@ -205,7 +205,6 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
             files={files}
             onFilesChange={setFiles}
             maxFiles={20}
-            maxSize={50 * 1024 * 1024}
           />
         </div>
       </div>
