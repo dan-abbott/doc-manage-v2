@@ -253,7 +253,10 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         )}
 
         {canRelease && (
-          <ReleaseDocumentButton documentId={document.id} />
+          <ReleaseDocumentButton 
+            documentId={document.id}
+            isProduction={document.is_production}
+          />
         )}
 
         {canDelete && (
