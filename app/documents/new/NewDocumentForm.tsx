@@ -7,7 +7,15 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Button } from '@/components/ui/button'
 import { FileUpload } from '@/components/documents/FileUpload'
+import { ApproverSelector } from '@/components/documents/ApproverSelector'
 import { createDocument } from '@/app/actions/documents'
+import { addApprover } from '@/app/actions/approvals'
+
+interface User {
+  id: string
+  email: string
+  full_name: string | null
+}
 
 interface NewDocumentFormProps {
   documentTypes: Array<{ id: string; name: string; is_active: boolean }>
@@ -25,6 +33,7 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
   const [isProduction, setIsProduction] = useState(false)
   const [projectCode, setProjectCode] = useState('')
   const [files, setFiles] = useState<File[]>([])
+  const [selectedApprovers, setSelectedApprovers] = useState<User[]>([])
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -52,6 +61,18 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         return
       }
 
+      // Warning for production without approvers (not blocking)
+      if (isProduction && selectedApprovers.length === 0) {
+        const confirmed = confirm(
+          'Production documents should have at least one approver. ' +
+          'Are you sure you want to create this without approvers?'
+        )
+        if (!confirmed) {
+          setIsSubmitting(false)
+          return
+        }
+      }
+
       // Create document
       const result = await createDocument(
         {
@@ -64,13 +85,31 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         files
       )
 
-      if (result.success && result.documentId) {
-        // Redirect to the new document's detail page
-        router.push(`/documents/${result.documentId}`)
-      } else {
+      if (!result.success || !result.documentId) {
         setError(result.error || 'Failed to create document')
         setIsSubmitting(false)
+        return
       }
+
+      // Add approvers if any selected
+      if (selectedApprovers.length > 0) {
+        const approverPromises = selectedApprovers.map(approver =>
+          addApprover(result.documentId!, approver.id, approver.email)
+        )
+        
+        const approverResults = await Promise.all(approverPromises)
+        
+        // Check if any approver additions failed
+        const failedApprovers = approverResults.filter(r => !r.success)
+        if (failedApprovers.length > 0) {
+          console.error('Some approvers failed to add:', failedApprovers)
+          // Continue anyway - document was created successfully
+        }
+      }
+
+      // Redirect to the new document's detail page
+      router.push(`/documents/${result.documentId}`)
+      
     } catch (err: any) {
       setError(err.message || 'An unexpected error occurred')
       setIsSubmitting(false)
@@ -195,6 +234,15 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         <p className="mt-1 text-sm text-gray-500">
           Format: P-##### (e.g., P-12345)
         </p>
+      </div>
+
+      {/* Approver Selection */}
+      <div>
+        <ApproverSelector
+          selectedApprovers={selectedApprovers}
+          onApproversChange={setSelectedApprovers}
+          disabled={isSubmitting}
+        />
       </div>
 
       {/* File Upload */}

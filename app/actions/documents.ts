@@ -407,10 +407,10 @@ export async function releaseDocument(documentId: string) {
       return { success: false, error: 'Not authenticated' }
     }
 
-    // Get document to check ownership and status
+    // Get document with approvers count
     const { data: document, error: getError } = await supabase
       .from('documents')
-      .select('*')
+      .select('*, approvers:approvers(count)')
       .eq('id', documentId)
       .single()
 
@@ -429,7 +429,16 @@ export async function releaseDocument(documentId: string) {
     if (document.is_production) {
       return { 
         success: false, 
-        error: 'Production documents require approval workflow (Phase 5)' 
+        error: 'Production documents require approval workflow' 
+      }
+    }
+
+    // Check if there are approvers - if yes, must use submitForApproval instead
+    const approverCount = document.approvers?.[0]?.count || 0
+    if (approverCount > 0) {
+      return {
+        success: false,
+        error: 'This document has approvers assigned. Use "Submit for Approval" instead of "Release".'
       }
     }
 
