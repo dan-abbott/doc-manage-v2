@@ -6,8 +6,10 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, Calendar, User, Package } from 'lucide-react'
 import ReleaseDocumentButton from './ReleaseDocumentButton'
+import SubmitForApprovalButton from './SubmitForApprovalButton'
 import DeleteDocumentButton from './DeleteDocumentButton'
 import ChangeOwnerButton from './ChangeOwnerButton'
+import ApprovalWorkflow from './ApprovalWorkflow'
 
 interface PageProps {
   params: { id: string }
@@ -40,7 +42,8 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       document_type:document_types(name, prefix),
       creator:users!documents_created_by_fkey(email),
       releaser:users!documents_released_by_fkey(email),
-      document_files(*)
+      document_files(*),
+      approvers(*)
     `)
     .eq('id', params.id)
     .single()
@@ -53,16 +56,25 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   // Check if current user is the creator
   const isCreator = document.created_by === user.id
 
-  // Determine if document can be edited
+  // Get approver count
+  const approverCount = document.approvers?.length || 0
+  const hasApprovers = approverCount > 0
+
+  // Determine button visibility and actions
   const canEdit = (isCreator || isAdmin) && document.status === 'Draft'
-
-  // Determine if document can be released
-  const canRelease = (isCreator || isAdmin) && 
-                     document.status === 'Draft' && 
-                     !document.is_production
-
-  // Determine if document can be deleted
   const canDelete = (isCreator || isAdmin) && document.status === 'Draft'
+  
+  // Determine release/submit logic
+  const canRelease = 
+    (isCreator || isAdmin) && 
+    document.status === 'Draft' && 
+    !document.is_production &&
+    !hasApprovers // Only show Release if no approvers
+  
+  const canSubmitForApproval = 
+    (isCreator || isAdmin) && 
+    document.status === 'Draft' &&
+    hasApprovers // Only show Submit if has approvers
 
   // Status badge colors
   const statusColors: Record<string, string> = {
@@ -110,6 +122,18 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             />
           </CardContent>
         </Card>
+      )}
+
+      {/* Approval Workflow Section */}
+      {hasApprovers && (
+        <ApprovalWorkflow
+          approvers={document.approvers}
+          documentId={document.id}
+          documentNumber={`${document.document_number}${document.version}`}
+          documentStatus={document.status}
+          currentUserId={user.id}
+          currentUserEmail={user.email || ''}
+        />
       )}
 
       {/* Document Information */}
@@ -243,7 +267,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       </Card>
 
       {/* Action Buttons */}
-      <div className="flex gap-4">
+      <div className="flex gap-4 flex-wrap">
         {canEdit && (
           <Button asChild>
             <Link href={`/documents/${document.id}/edit`}>
@@ -259,14 +283,36 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           />
         )}
 
+        {canSubmitForApproval && (
+          <SubmitForApprovalButton
+            documentId={document.id}
+            documentNumber={`${document.document_number}${document.version}`}
+            approverCount={approverCount}
+          />
+        )}
+
         {canDelete && (
           <DeleteDocumentButton documentId={document.id} />
         )}
 
-        {!canEdit && !canRelease && !canDelete && document.status === 'Released' && (
-          <p className="text-sm text-gray-500 italic">
-            This document is released and read-only
-          </p>
+        {!canEdit && !canRelease && !canSubmitForApproval && !canDelete && (
+          <>
+            {document.status === 'Released' && (
+              <p className="text-sm text-gray-500 italic">
+                This document is released and read-only
+              </p>
+            )}
+            {document.status === 'In Approval' && !hasApprovers && (
+              <p className="text-sm text-gray-500 italic">
+                This document is awaiting approval
+              </p>
+            )}
+            {document.status === 'Obsolete' && (
+              <p className="text-sm text-gray-500 italic">
+                This document version has been superseded
+              </p>
+            )}
+          </>
         )}
       </div>
     </div>
