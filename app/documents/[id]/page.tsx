@@ -56,8 +56,9 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   // Check if current user is the creator
   const isCreator = document.created_by === user.id
 
-  // Get approver count
-  const approverCount = document.approvers?.length || 0
+  // Get approver count - be explicit about empty array vs null
+  const approvers = document.approvers || []
+  const approverCount = approvers.length
   const hasApprovers = approverCount > 0
 
   // Determine button visibility and actions
@@ -65,16 +66,19 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   const canDelete = (isCreator || isAdmin) && document.status === 'Draft'
   
   // Determine release/submit logic
+  // Release button shows for: Prototype + No Approvers + Draft + Creator
   const canRelease = 
     (isCreator || isAdmin) && 
     document.status === 'Draft' && 
     !document.is_production &&
-    !hasApprovers // Only show Release if no approvers
+    !hasApprovers
   
+  // Submit button shows for: Draft + Has Approvers + Creator
+  // OR: Production + Draft + Creator (always requires approval)
   const canSubmitForApproval = 
     (isCreator || isAdmin) && 
     document.status === 'Draft' &&
-    hasApprovers // Only show Submit if has approvers
+    (hasApprovers || document.is_production)
 
   // Status badge colors
   const statusColors: Record<string, string> = {
@@ -164,6 +168,19 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             <div>
               <p className="text-sm font-medium text-gray-500 mb-1">Description</p>
               <p className="text-base text-gray-700">{document.description}</p>
+            </div>
+          )}
+
+          {/* Show approver count if any */}
+          {approverCount > 0 && (
+            <div className="flex items-start gap-2">
+              <User className="h-5 w-5 text-gray-400 mt-0.5" />
+              <div>
+                <p className="text-sm font-medium text-gray-500">Approvers</p>
+                <p className="text-base">
+                  {approverCount} approver{approverCount > 1 ? 's' : ''} assigned
+                </p>
+              </div>
             </div>
           )}
 
@@ -297,12 +314,23 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
         {!canEdit && !canRelease && !canSubmitForApproval && !canDelete && (
           <>
+            {document.status === 'Draft' && (
+              <div className="text-sm space-y-1">
+                <p className="text-gray-500 italic">Draft document</p>
+                {!isCreator && !isAdmin && (
+                  <p className="text-gray-500">Only the creator can edit or release this document.</p>
+                )}
+                {(isCreator || isAdmin) && hasApprovers && (
+                  <p className="text-gray-500">This document has {approverCount} approver{approverCount > 1 ? 's' : ''}. Use "Submit for Approval" to proceed.</p>
+                )}
+              </div>
+            )}
             {document.status === 'Released' && (
               <p className="text-sm text-gray-500 italic">
                 This document is released and read-only
               </p>
             )}
-            {document.status === 'In Approval' && !hasApprovers && (
+            {document.status === 'In Approval' && (
               <p className="text-sm text-gray-500 italic">
                 This document is awaiting approval
               </p>

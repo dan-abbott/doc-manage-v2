@@ -236,6 +236,14 @@ export default function EditDocumentForm({ document, availableUsers }: EditDocum
 
         {/* Add Approver */}
         <div className="relative">
+          {/* Click outside to close - render first so it's behind dropdown */}
+          {showApproverDropdown && (
+            <div
+              className="fixed inset-0 z-[5]"
+              onClick={() => setShowApproverDropdown(false)}
+            />
+          )}
+
           <div className="flex gap-2">
             <Input
               type="text"
@@ -259,7 +267,7 @@ export default function EditDocumentForm({ document, availableUsers }: EditDocum
 
           {/* Dropdown */}
           {showApproverDropdown && filteredUsers.length > 0 && (
-            <div className="absolute z-10 w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
+            <div className="absolute z-[15] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg max-h-60 overflow-auto">
               {filteredUsers.map(user => (
                 <button
                   key={user.id}
@@ -267,21 +275,24 @@ export default function EditDocumentForm({ document, availableUsers }: EditDocum
                   onClick={() => handleAddApprover(user)}
                   className="w-full px-3 py-2 text-left hover:bg-gray-100 focus:bg-gray-100 focus:outline-none"
                 >
-                  <div className="font-medium">{user.email}</div>
-                  {user.full_name && (
-                    <div className="text-sm text-gray-500">{user.full_name}</div>
+                  {user.full_name ? (
+                    <>
+                      <div className="font-medium">{user.full_name}</div>
+                      <div className="text-sm text-gray-500">{user.email}</div>
+                    </>
+                  ) : (
+                    <div className="font-medium">{user.email}</div>
                   )}
                 </button>
               ))}
             </div>
           )}
 
-          {/* Click outside to close */}
-          {showApproverDropdown && (
-            <div
-              className="fixed inset-0 z-0"
-              onClick={() => setShowApproverDropdown(false)}
-            />
+          {/* No results message */}
+          {showApproverDropdown && approverSearch && filteredUsers.length === 0 && (
+            <div className="absolute z-[15] w-full mt-1 bg-white border border-gray-300 rounded-md shadow-lg p-3 text-sm text-gray-500">
+              No users found matching &quot;{approverSearch}&quot;
+            </div>
           )}
         </div>
 
