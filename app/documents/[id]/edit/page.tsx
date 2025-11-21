@@ -18,13 +18,14 @@ export default async function EditDocumentPage({ params }: PageProps) {
     redirect('/auth/login')
   }
 
-  // Get document
+  // Get document with approvers
   const { data: document, error } = await supabase
     .from('documents')
     .select(`
       *,
       document_type:document_types(id, name, prefix),
-      document_files(*)
+      document_files(*),
+      approvers!approvers_document_id_fkey(*)
     `)
     .eq('id', params.id)
     .single()
@@ -42,17 +43,27 @@ export default async function EditDocumentPage({ params }: PageProps) {
     redirect(`/documents/${params.id}`)
   }
 
+  // Get all users for approver selection (exclude current user)
+  const { data: allUsers } = await supabase
+    .from('users')
+    .select('id, email, full_name')
+    .neq('id', user.id)
+    .order('email')
+
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <Card>
         <CardHeader>
           <CardTitle>Edit Document</CardTitle>
           <CardDescription>
-            Modify document details and manage file attachments
+            Modify document details, manage approvers, and file attachments
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <EditDocumentForm document={document} />
+          <EditDocumentForm 
+            document={document} 
+            availableUsers={allUsers || []}
+          />
         </CardContent>
       </Card>
     </div>
