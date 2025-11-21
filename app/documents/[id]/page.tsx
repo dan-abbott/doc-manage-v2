@@ -43,7 +43,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
       creator:users!documents_created_by_fkey(email),
       releaser:users!documents_released_by_fkey(email),
       document_files(*),
-      approvers(*)
+      approvers!approvers_document_id_fkey(*)
     `)
     .eq('id', params.id)
     .single()
