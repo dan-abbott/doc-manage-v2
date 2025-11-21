@@ -5,6 +5,17 @@ import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Send } from 'lucide-react'
 import { submitForApproval } from '@/app/actions/approvals'
+import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface SubmitForApprovalButtonProps {
   documentId: string
@@ -19,50 +30,60 @@ export default function SubmitForApprovalButton({
 }: SubmitForApprovalButtonProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [showConfirm, setShowConfirm] = useState(false)
 
   const handleSubmit = async () => {
-    // Confirm submission
-    const confirmed = confirm(
-      `Submit ${documentNumber} for approval?\n\n` +
-      `This document will be reviewed by ${approverCount} approver${approverCount > 1 ? 's' : ''}. ` +
-      `You will not be able to edit it until approval is complete.`
-    )
-
-    if (!confirmed) return
-
     setIsSubmitting(true)
-    setError(null)
 
     try {
       const result = await submitForApproval(documentId)
 
       if (result.success) {
-        alert(`Document ${documentNumber} submitted for approval!`)
+        toast.success(`Document ${documentNumber} submitted for approval!`)
         router.refresh()
       } else {
-        setError(result.error || 'Failed to submit document')
+        toast.error(result.error || 'Failed to submit document')
         setIsSubmitting(false)
       }
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred')
+      toast.error(err.message || 'An unexpected error occurred')
       setIsSubmitting(false)
     }
   }
 
   return (
-    <div className="space-y-2">
+    <>
       <Button
-        onClick={handleSubmit}
+        onClick={() => setShowConfirm(true)}
         disabled={isSubmitting}
         className="bg-blue-600 hover:bg-blue-700"
       >
         <Send className="h-4 w-4 mr-2" />
         {isSubmitting ? 'Submitting...' : 'Submit for Approval'}
       </Button>
-      {error && (
-        <p className="text-sm text-red-600">{error}</p>
-      )}
-    </div>
+
+      <AlertDialog open={showConfirm} onOpenChange={setShowConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Submit for Approval?</AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>
+                Submit <span className="font-medium">{documentNumber}</span> for approval?
+              </p>
+              <p>
+                This document will be reviewed by <span className="font-medium">{approverCount}</span> approver{approverCount > 1 ? 's' : ''}. 
+                You will not be able to edit it until approval is complete.
+              </p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogAction onClick={handleSubmit} disabled={isSubmitting}>
+              {isSubmitting ? 'Submitting...' : 'Submit'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
   )
 }

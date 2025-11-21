@@ -11,6 +11,16 @@ import { ApproverSelector } from '@/components/documents/ApproverSelector'
 import { createDocument } from '@/app/actions/documents'
 import { addApprover } from '@/app/actions/approvals'
 import { toast } from 'sonner'
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
 
 interface User {
   id: string
@@ -25,6 +35,7 @@ interface NewDocumentFormProps {
 export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showProductionWarning, setShowProductionWarning] = useState(false)
   
   // Form state
   const [documentTypeId, setDocumentTypeId] = useState('')
@@ -35,43 +46,8 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
   const [files, setFiles] = useState<File[]>([])
   const [selectedApprovers, setSelectedApprovers] = useState<User[]>([])
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    setIsSubmitting(true)
-
+  const createDocumentInternal = async () => {
     try {
-      // Validate required fields
-      if (!documentTypeId) {
-        toast.error('Please select a document type')
-        setIsSubmitting(false)
-        return
-      }
-
-      if (!title.trim()) {
-        toast.error('Please enter a title')
-        setIsSubmitting(false)
-        return
-      }
-
-      // Validate project code format if provided
-      if (projectCode && !/^P-\d{5}$/.test(projectCode)) {
-        toast.error('Project code must be in format P-##### (e.g., P-12345)')
-        setIsSubmitting(false)
-        return
-      }
-
-      // Warning for production without approvers (not blocking)
-      if (isProduction && selectedApprovers.length === 0) {
-        const confirmed = confirm(
-          'Production documents should have at least one approver. ' +
-          'Are you sure you want to create this without approvers?'
-        )
-        if (!confirmed) {
-          setIsSubmitting(false)
-          return
-        }
-      }
-
       // Create document
       const result = await createDocument(
         {
@@ -125,9 +101,52 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
     }
   }
 
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setIsSubmitting(true)
+
+    try {
+      // Validate required fields
+      if (!documentTypeId) {
+        toast.error('Please select a document type')
+        setIsSubmitting(false)
+        return
+      }
+
+      if (!title.trim()) {
+        toast.error('Please enter a title')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Validate project code format if provided
+      if (projectCode && !/^P-\d{5}$/.test(projectCode)) {
+        toast.error('Project code must be in format P-##### (e.g., P-12345)')
+        setIsSubmitting(false)
+        return
+      }
+
+      // Warning for production without approvers (not blocking)
+      if (isProduction && selectedApprovers.length === 0) {
+        setShowProductionWarning(true)
+        setIsSubmitting(false)
+        return
+      }
+
+      // Proceed with document creation
+      await createDocumentInternal()
+      
+    } catch (err: any) {
+      console.error('Create document error:', err)
+      toast.error(err.message || 'An unexpected error occurred')
+      setIsSubmitting(false)
+    }
+  }
+
   const activeDocumentTypes = documentTypes.filter(dt => dt.is_active)
 
   return (
+    <>
     <form onSubmit={handleSubmit} className="space-y-6">
       {/* Document Type */}
       <div>
@@ -278,5 +297,32 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         </Button>
       </div>
     </form>
+
+    {/* Production Warning Dialog */}
+    <AlertDialog open={showProductionWarning} onOpenChange={setShowProductionWarning}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle>Production Document Without Approvers</AlertDialogTitle>
+          <AlertDialogDescription>
+            Production documents should have at least one approver. Are you sure you want to create this without approvers?
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel onClick={() => setIsSubmitting(false)}>
+            Cancel
+          </AlertDialogCancel>
+          <AlertDialogAction 
+            onClick={async () => {
+              setShowProductionWarning(false)
+              setIsSubmitting(true)
+              await createDocumentInternal()
+            }}
+          >
+            Create Anyway
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
