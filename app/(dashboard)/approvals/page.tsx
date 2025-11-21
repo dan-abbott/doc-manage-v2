@@ -15,12 +15,12 @@ export default async function MyApprovalsPage() {
     redirect('/')
   }
 
-  // Get all approvals for current user
+  // Get all approvals for current user (inner join ensures document exists)
   const { data: approvals, error } = await supabase
     .from('approvers')
     .select(`
       *,
-      document:documents (
+      document:documents!inner (
         id,
         document_number,
         version,
@@ -46,12 +46,20 @@ export default async function MyApprovalsPage() {
 
   const approvalsList = approvals || []
 
+  // Filter out any approvals where document is null (extra safety)
+  const validApprovals = approvalsList.filter(a => a.document !== null)
+
+  // Log for debugging
+  if (approvalsList.length !== validApprovals.length) {
+    console.warn(`Filtered out ${approvalsList.length - validApprovals.length} approvals with null documents`)
+  }
+
   // Categorize approvals
-  const pendingApprovals = approvalsList.filter(a => 
-    a.status === 'Pending' && a.document.status === 'In Approval'
+  const pendingApprovals = validApprovals.filter(a => 
+    a.status === 'Pending' && a.document?.status === 'In Approval'
   )
-  const approvedApprovals = approvalsList.filter(a => a.status === 'Approved')
-  const rejectedApprovals = approvalsList.filter(a => a.status === 'Rejected')
+  const approvedApprovals = validApprovals.filter(a => a.status === 'Approved')
+  const rejectedApprovals = validApprovals.filter(a => a.status === 'Rejected')
 
   const getStatusIcon = (status: string) => {
     switch (status) {
