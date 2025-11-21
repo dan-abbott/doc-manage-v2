@@ -3,6 +3,7 @@ import { Inter } from 'next/font/google'
 import './globals.css'
 import Navigation from '@/components/dashboard/Navigation'
 import { createClient } from '@/lib/supabase/server'
+import { Toaster } from 'sonner'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -31,7 +32,7 @@ export default async function RootLayout({
     isAdmin = userData?.is_admin || false
   }
 
-  return (
+return (
     <html lang="en">
       <body className={inter.className}>
         {/* Show styled navigation only when user is authenticated */}
@@ -41,7 +42,11 @@ export default async function RootLayout({
         <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
           {children}
         </main>
+        
+        {/* Toast notifications */}
+        <Toaster position="top-right" />
       </body>
     </html>
   )
+
 }

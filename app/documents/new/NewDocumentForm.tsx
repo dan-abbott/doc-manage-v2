@@ -10,6 +10,7 @@ import { FileUpload } from '@/components/documents/FileUpload'
 import { ApproverSelector } from '@/components/documents/ApproverSelector'
 import { createDocument } from '@/app/actions/documents'
 import { addApprover } from '@/app/actions/approvals'
+import { toast } from 'sonner'
 
 interface User {
   id: string
@@ -24,7 +25,6 @@ interface NewDocumentFormProps {
 export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
-  const [error, setError] = useState<string | null>(null)
   
   // Form state
   const [documentTypeId, setDocumentTypeId] = useState('')
@@ -37,26 +37,25 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setError(null)
     setIsSubmitting(true)
 
     try {
       // Validate required fields
       if (!documentTypeId) {
-        setError('Please select a document type')
+        toast.error('Please select a document type')
         setIsSubmitting(false)
         return
       }
 
       if (!title.trim()) {
-        setError('Please enter a title')
+        toast.error('Please enter a title')
         setIsSubmitting(false)
         return
       }
 
       // Validate project code format if provided
       if (projectCode && !/^P-\d{5}$/.test(projectCode)) {
-        setError('Project code must be in format P-##### (e.g., P-12345)')
+        toast.error('Project code must be in format P-##### (e.g., P-12345)')
         setIsSubmitting(false)
         return
       }
@@ -86,13 +85,18 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
       )
 
       if (!result.success || !result.documentId) {
-        setError(result.error || 'Failed to create document')
+        toast.error(result.error || 'Failed to create document')
         setIsSubmitting(false)
         return
       }
 
+      // Document created successfully
+      const docNumber = result.documentNumber || 'Document'
+      
       // Add approvers if any selected
       if (selectedApprovers.length > 0) {
+        toast.loading(`Creating document ${docNumber}...`)
+        
         const approverPromises = selectedApprovers.map(approver =>
           addApprover(result.documentId!, approver.id, approver.email)
         )
@@ -103,15 +107,20 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         const failedApprovers = approverResults.filter(r => !r.success)
         if (failedApprovers.length > 0) {
           console.error('Some approvers failed to add:', failedApprovers)
-          // Continue anyway - document was created successfully
+          toast.warning(`Document created but some approvers couldn't be added`)
+        } else {
+          toast.success(`Document ${docNumber} created successfully!`)
         }
+      } else {
+        toast.success(`Document ${docNumber} created successfully!`)
       }
 
       // Redirect to the new document's detail page
       router.push(`/documents/${result.documentId}`)
       
     } catch (err: any) {
-      setError(err.message || 'An unexpected error occurred')
+      console.error('Create document error:', err)
+      toast.error(err.message || 'An unexpected error occurred')
       setIsSubmitting(false)
     }
   }
@@ -120,13 +129,6 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Error Display */}
-      {error && (
-        <div className="rounded-lg bg-red-50 p-4 border border-red-200">
-          <p className="text-sm text-red-800">{error}</p>
-        </div>
-      )}
-
       {/* Document Type */}
       <div>
         <Label htmlFor="documentType">
