@@ -14,6 +14,7 @@ import AuditTrail from './AuditTrail'
 import CreateNewVersionButton from './CreateNewVersionButton'
 import SeeLatestReleasedButton from './SeeLatestReleasedButton'
 import VersionHistory from './VersionHistory'
+import PromoteToProductionButton from './PromoteToProductionButton'
 
 interface PageProps {
   params: { id: string }
@@ -346,6 +347,17 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             documentNumber={document.document_number}
             version={document.version}
             isProduction={document.is_production}
+          />
+        )}
+
+        {/* Promote to Production button for Released Prototype documents */}
+        {document.status === 'Released' && 
+         !document.is_production && 
+         (isCreator || isAdmin) && (
+          <PromoteToProductionButton
+            documentId={document.id}
+            documentNumber={document.document_number}
+            version={document.version}
           />
         )}
 
