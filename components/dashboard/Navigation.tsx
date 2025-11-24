@@ -4,10 +4,12 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { getGreetingWithName } from '@/lib/utils/greetings';
 
 type Props = {
   user: {
     email: string;
+    fullName: string;
   };
   isAdmin: boolean;
 };
@@ -99,7 +101,9 @@ export default function Navigation({ user, isAdmin }: Props) {
                   Admin
                 </span>
               )}
-              <span className="text-sm text-slate-700">{user.email}</span>
+              <span className="text-sm text-slate-700 font-medium">
+                {getGreetingWithName(user.fullName)}
+              </span>
               <button
                 onClick={handleSignOut}
                 className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50"

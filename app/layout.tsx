@@ -22,21 +22,23 @@ export default async function RootLayout({
 
   // Get user's admin status if authenticated
   let isAdmin = false
+  let fullName = ''
   if (user) {
     const { data: userData } = await supabase
       .from('users')
-      .select('is_admin')
+      .select('is_admin, full_name')
       .eq('id', user.id)
       .single()
     
     isAdmin = userData?.is_admin || false
+    fullName = userData?.full_name || ''
   }
 
 return (
     <html lang="en">
       <body className={inter.className}>
         {/* Show styled navigation only when user is authenticated */}
-        {user && <Navigation user={{ email: user.email || '' }} isAdmin={isAdmin} />}
+        {user && <Navigation user={{ email: user.email || '', fullName }} isAdmin={isAdmin} />}
         
         {/* Main content */}
         <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
