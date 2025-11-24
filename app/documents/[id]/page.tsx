@@ -10,6 +10,7 @@ import SubmitForApprovalButton from './SubmitForApprovalButton'
 import DeleteDocumentButton from './DeleteDocumentButton'
 import ChangeOwnerButton from './ChangeOwnerButton'
 import ApprovalWorkflow from './ApprovalWorkflow'
+import AuditTrail from './AuditTrail'
 
 interface PageProps {
   params: { id: string }
@@ -282,6 +283,11 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           )}
         </CardContent>
       </Card>
+
+      {/* Audit Trail */}
+      <div className="mb-6">
+        <AuditTrail documentId={document.id} />
+      </div>
 
       {/* Action Buttons */}
       <div className="flex gap-4 flex-wrap">
