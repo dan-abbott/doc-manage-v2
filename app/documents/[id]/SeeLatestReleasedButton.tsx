@@ -1,9 +1,8 @@
 import { Button } from '@/components/ui/button'
-import { ArrowRight } from 'lucide-react'
+import { Card, CardContent } from '@/components/ui/card'
+import { ArrowRight, AlertCircle } from 'lucide-react'
 import Link from 'next/link'
 import { getLatestReleasedVersion } from '@/app/actions/versions'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { AlertCircle } from 'lucide-react'
 
 interface SeeLatestReleasedButtonProps {
   documentNumber: string
@@ -28,24 +27,30 @@ export default async function SeeLatestReleasedButton({
   }
 
   return (
-    <Alert className="border-yellow-200 bg-yellow-50">
-      <AlertCircle className="h-4 w-4 text-yellow-600" />
-      <AlertDescription className="flex items-center justify-between">
-        <div>
-          <p className="font-medium text-yellow-900">
-            This document is obsolete
-          </p>
-          <p className="text-sm text-yellow-700 mt-1">
-            A newer version ({latestVersion.version}) is available
-          </p>
+    <Card className="border-yellow-200 bg-yellow-50">
+      <CardContent className="pt-6">
+        <div className="flex items-start gap-4">
+          <div className="flex-shrink-0">
+            <AlertCircle className="h-5 w-5 text-yellow-600" />
+          </div>
+          <div className="flex-1 min-w-0">
+            <p className="font-medium text-yellow-900 mb-1">
+              This document is obsolete
+            </p>
+            <p className="text-sm text-yellow-700">
+              A newer version ({latestVersion.version}) is available
+            </p>
+          </div>
+          <div className="flex-shrink-0">
+            <Button variant="outline" size="sm" asChild>
+              <Link href={`/documents/${latestVersion.id}`}>
+                <ArrowRight className="mr-2 h-4 w-4" />
+                View Latest Version
+              </Link>
+            </Button>
+          </div>
         </div>
-        <Button variant="outline" size="sm" asChild className="ml-4">
-          <Link href={`/documents/${latestVersion.id}`}>
-            <ArrowRight className="mr-2 h-4 w-4" />
-            View Latest Version
-          </Link>
-        </Button>
-      </AlertDescription>
-    </Alert>
+      </CardContent>
+    </Card>
   )
 }
