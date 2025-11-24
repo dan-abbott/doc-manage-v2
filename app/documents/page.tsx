@@ -13,6 +13,7 @@ interface PageProps {
     type?: string
     status?: string
     project?: string
+    filter?: string
     page?: string
   }
 }
@@ -85,6 +86,24 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     query = query.eq('project_code', searchParams.project.toUpperCase())
   }
 
+  // My Documents filter
+  // Shows documents where user created THIS version OR ANY version of the same document
+  if (searchParams.filter === 'my') {
+    // First, get all document_numbers where user created at least one version
+    const { data: userDocNumbers } = await supabase
+      .from('documents')
+      .select('document_number')
+      .eq('created_by', user.id)
+    
+    if (userDocNumbers && userDocNumbers.length > 0) {
+      const docNumbers = [...new Set(userDocNumbers.map(d => d.document_number))]
+      query = query.in('document_number', docNumbers)
+    } else {
+      // User hasn't created any documents, show empty result
+      query = query.eq('created_by', user.id)
+    }
+  }
+
   // Pagination and sorting
   query = query
     .order('updated_at', { ascending: false })
@@ -103,9 +122,11 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-3xl font-bold">All Documents</h1>
+          <h1 className="text-3xl font-bold">
+            {searchParams.filter === 'my' ? 'My Documents' : 'All Documents'}
+          </h1>
           <p className="text-muted-foreground">
-            {count !== null ? `${count} total documents` : 'Loading...'}
+            {count !== null ? `${count} ${searchParams.filter === 'my' ? 'document' : 'total document'}${count === 1 ? '' : 's'}` : 'Loading...'}
           </p>
         </div>
         <Button asChild>

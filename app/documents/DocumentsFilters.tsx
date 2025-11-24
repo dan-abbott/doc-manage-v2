@@ -14,6 +14,7 @@ interface DocumentsFiltersProps {
     type?: string
     status?: string
     project?: string
+    filter?: string
   }
 }
 
@@ -44,6 +45,9 @@ export default function DocumentsFilters({
     if (status) params.set('status', status)
     if (project) params.set('project', project)
     
+    // Preserve the "my documents" filter if active
+    if (currentFilters.filter) params.set('filter', currentFilters.filter)
+    
     router.push(`/documents?${params.toString()}`)
   }
 
@@ -55,10 +59,19 @@ export default function DocumentsFilters({
     router.push('/documents')
   }
 
-  const hasActiveFilters = search || type || status || project
+  const hasActiveFilters = search || type || status || project || currentFilters.filter
 
   return (
     <div className="space-y-4">
+      {/* Active My Documents Filter Indicator */}
+      {currentFilters.filter === 'my' && (
+        <div className="bg-purple-50 border border-purple-200 rounded-lg p-3">
+          <p className="text-sm text-purple-800">
+            <strong>My Documents:</strong> Showing documents you created or revised
+          </p>
+        </div>
+      )}
+      
       {/* Search */}
       <div>
         <Label htmlFor="search">Search</Label>
