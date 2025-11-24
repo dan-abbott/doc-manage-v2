@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, User, CheckCircle, Plus, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getGreeting } from '@/lib/utils/greetings'
+import { getGreetingWithName } from '@/lib/utils/greetings'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
 
 export default async function DashboardPage() {
@@ -22,9 +22,7 @@ export default async function DashboardPage() {
     .eq('id', user.id)
     .single()
 
-  const fullName = userData?.full_name || ''
-  const firstName = fullName.split(' ')[0] || 'there'
-  const greeting = getGreeting(firstName)
+  const greeting = getGreetingWithName(userData?.full_name)
 
   // Get total documents count
   const { count: totalDocuments } = await supabase
