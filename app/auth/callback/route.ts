@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 export async function GET(request: Request) {
   const requestUrl = new URL(request.url)
   const code = requestUrl.searchParams.get('code')
+  const redirect = requestUrl.searchParams.get('redirect')
   const origin = requestUrl.origin
 
   if (code) {
@@ -11,6 +12,7 @@ export async function GET(request: Request) {
     await supabase.auth.exchangeCodeForSession(code)
   }
 
-  // URL to redirect to after sign in process completes
-  return NextResponse.redirect(`${origin}/dashboard`)
+  // Redirect to the original destination, or dashboard if none specified
+  const destination = redirect || '/dashboard'
+  return NextResponse.redirect(`${origin}${destination}`)
 }

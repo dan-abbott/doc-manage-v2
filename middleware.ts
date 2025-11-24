@@ -56,13 +56,27 @@ export async function middleware(request: NextRequest) {
 
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Protected routes - require authentication
-  if (request.nextUrl.pathname.startsWith('/dashboard') && !user) {
-    return NextResponse.redirect(new URL('/', request.url))
+  // Define public routes (don't require authentication)
+  const publicRoutes = [
+    '/',
+    '/auth/callback',
+  ]
+
+  const isPublicRoute = publicRoutes.some(route => 
+    request.nextUrl.pathname === route || 
+    request.nextUrl.pathname.startsWith('/auth/callback')
+  )
+
+  // Redirect unauthenticated users to landing page (except on public routes)
+  if (!user && !isPublicRoute) {
+    const redirectUrl = new URL('/', request.url)
+    // Add the attempted URL as a query param so we can redirect back after login
+    redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
+    return NextResponse.redirect(redirectUrl)
   }
 
-  // Redirect authenticated users away from auth pages
-  if (request.nextUrl.pathname === '/' && user) {
+  // Redirect authenticated users away from landing page to dashboard
+  if (user && request.nextUrl.pathname === '/') {
     return NextResponse.redirect(new URL('/dashboard', request.url))
   }
 
