@@ -11,6 +11,9 @@ import DeleteDocumentButton from './DeleteDocumentButton'
 import ChangeOwnerButton from './ChangeOwnerButton'
 import ApprovalWorkflow from './ApprovalWorkflow'
 import AuditTrail from './AuditTrail'
+import CreateNewVersionButton from './CreateNewVersionButton'
+import SeeLatestReleasedButton from './SeeLatestReleasedButton'
+import VersionHistory from './VersionHistory'
 
 interface PageProps {
   params: { id: string }
@@ -127,6 +130,16 @@ export default async function DocumentDetailPage({ params }: PageProps) {
             />
           </CardContent>
         </Card>
+      )}
+
+      {/* See Latest Released Version (for obsolete documents) */}
+      {document.status === 'Obsolete' && (
+        <div className="mb-6">
+          <SeeLatestReleasedButton 
+            documentNumber={document.document_number}
+            currentVersion={document.version}
+          />
+        </div>
       )}
 
       {/* Approval Workflow Section */}
@@ -289,6 +302,14 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         <AuditTrail documentId={document.id} />
       </div>
 
+      {/* Version History */}
+      <div className="mb-6">
+        <VersionHistory 
+          documentNumber={document.document_number}
+          currentVersionId={document.id}
+        />
+      </div>
+
       {/* Action Buttons */}
       <div className="flex gap-4 flex-wrap">
         {canEdit && (
@@ -316,6 +337,16 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
         {canDelete && (
           <DeleteDocumentButton documentId={document.id} />
+        )}
+
+        {/* Create New Version button for Released documents */}
+        {document.status === 'Released' && (isCreator || isAdmin) && (
+          <CreateNewVersionButton
+            documentId={document.id}
+            documentNumber={document.document_number}
+            version={document.version}
+            isProduction={document.is_production}
+          />
         )}
 
         {!canEdit && !canRelease && !canSubmitForApproval && !canDelete && (

@@ -456,6 +456,40 @@ export async function releaseDocument(documentId: string) {
       return { success: false, error: 'Failed to release document' }
     }
 
+    // Handle obsolescence: make immediate predecessor obsolete
+    // Get the immediate predecessor version
+    const { getImmediatePredecessor } = await import('./versions')
+    const predecessorResult = await getImmediatePredecessor(
+      document.document_number,
+      document.version
+    )
+
+    if (predecessorResult.success && predecessorResult.data) {
+      const predecessor = predecessorResult.data
+      
+      // Only obsolete if predecessor is Released
+      if (predecessor.status === 'Released') {
+        await supabase
+          .from('documents')
+          .update({ status: 'Obsolete' })
+          .eq('id', predecessor.id)
+
+        // Log obsolescence
+        await supabase
+          .from('audit_log')
+          .insert({
+            document_id: predecessor.id,
+            action: 'document_obsoleted',
+            performed_by: user.id,
+            performed_by_email: user.email,
+            details: {
+              document_number: `${predecessor.document_number}${predecessor.version}`,
+              obsoleted_by_version: document.version,
+            },
+          })
+      }
+    }
+
     // Create audit log entry
     await supabase
       .from('audit_log')

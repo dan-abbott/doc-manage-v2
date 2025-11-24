@@ -345,6 +345,39 @@ export async function approveDocument(documentId: string, comments?: string) {
         })
         .eq('id', documentId)
 
+      // Handle obsolescence: make immediate predecessor obsolete
+      const { getImmediatePredecessor } = await import('./versions')
+      const predecessorResult = await getImmediatePredecessor(
+        document.document_number,
+        document.version
+      )
+
+      if (predecessorResult.success && predecessorResult.data) {
+        const predecessor = predecessorResult.data
+        
+        // Only obsolete if predecessor is Released
+        if (predecessor.status === 'Released') {
+          await supabase
+            .from('documents')
+            .update({ status: 'Obsolete' })
+            .eq('id', predecessor.id)
+
+          // Log obsolescence
+          await supabase
+            .from('audit_log')
+            .insert({
+              document_id: predecessor.id,
+              action: 'document_obsoleted',
+              performed_by: user.id,
+              performed_by_email: user.email,
+              details: {
+                document_number: `${predecessor.document_number}${predecessor.version}`,
+                obsoleted_by_version: document.version,
+              },
+            })
+        }
+      }
+
       // Create release audit log
       await supabase
         .from('audit_log')
