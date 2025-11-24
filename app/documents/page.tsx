@@ -3,7 +3,7 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus } from 'lucide-react'
+import { Plus, FileText } from 'lucide-react'
 import DocumentsTable from './DocumentsTable'
 import DocumentsFilters from './DocumentsFilters'
 
@@ -202,17 +202,25 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
             </>
           ) : (
             <div className="text-center py-12">
-              <p className="text-muted-foreground mb-4">
+              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
                 {searchParams.search || searchParams.type || searchParams.status || searchParams.project
-                  ? 'No documents match your filters'
+                  ? 'No documents found'
                   : 'No documents yet'}
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                {searchParams.search || searchParams.type || searchParams.status || searchParams.project
+                  ? 'Try adjusting your filters or search terms'
+                  : 'Get started by creating your first document'}
               </p>
-              <Button asChild>
-                <Link href="/documents/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Your First Document
-                </Link>
-              </Button>
+              {!(searchParams.search || searchParams.type || searchParams.status || searchParams.project) && (
+                <Button asChild>
+                  <Link href="/documents/new">
+                    <Plus className="mr-2 h-4 w-4" />
+                    Create Document
+                  </Link>
+                </Button>
+              )}
             </div>
           )}
         </CardContent>

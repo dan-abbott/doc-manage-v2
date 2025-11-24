@@ -15,6 +15,7 @@ import CreateNewVersionButton from './CreateNewVersionButton'
 import SeeLatestReleasedButton from './SeeLatestReleasedButton'
 import VersionHistory from './VersionHistory'
 import PromoteToProductionButton from './PromoteToProductionButton'
+import CollapsibleAdminSection from './CollapsibleAdminSection'
 
 interface PageProps {
   params: { id: string }
@@ -118,19 +119,65 @@ export default async function DocumentDetailPage({ params }: PageProps) {
         <p className="text-xl text-gray-600">{document.title}</p>
       </div>
 
+      {/* Action Buttons */}
+      <div className="flex gap-3 flex-wrap mb-6">
+        {canEdit && (
+          <Button asChild>
+            <Link href={`/documents/${document.id}/edit`}>
+              Edit Document
+            </Link>
+          </Button>
+        )}
+
+        {canRelease && (
+          <ReleaseDocumentButton 
+            documentId={document.id}
+            isProduction={document.is_production}
+          />
+        )}
+
+        {canSubmitForApproval && (
+          <SubmitForApprovalButton
+            documentId={document.id}
+            documentNumber={`${document.document_number}${document.version}`}
+            approverCount={approverCount}
+          />
+        )}
+
+        {/* Create New Version button for Released documents */}
+        {document.status === 'Released' && (isCreator || isAdmin) && (
+          <CreateNewVersionButton
+            documentId={document.id}
+            documentNumber={document.document_number}
+            version={document.version}
+            isProduction={document.is_production}
+          />
+        )}
+
+        {/* Promote to Production button for Released Prototype documents */}
+        {document.status === 'Released' && 
+         !document.is_production && 
+         (isCreator || isAdmin) && (
+          <PromoteToProductionButton
+            documentId={document.id}
+            documentNumber={document.document_number}
+            version={document.version}
+          />
+        )}
+
+        {canDelete && (
+          <DeleteDocumentButton documentId={document.id} />
+        )}
+      </div>
+
       {/* Admin Section */}
       {isAdmin && (
-        <Card className="mb-6 border-yellow-300 bg-yellow-50">
-          <CardHeader>
-            <CardTitle className="text-yellow-900">Admin Actions</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <ChangeOwnerButton 
-              documentId={document.id}
-              currentOwnerEmail={document.creator?.email || 'Unknown'}
-            />
-          </CardContent>
-        </Card>
+        <CollapsibleAdminSection>
+          <ChangeOwnerButton 
+            documentId={document.id}
+            currentOwnerEmail={document.creator?.email || 'Unknown'}
+          />
+        </CollapsibleAdminSection>
       )}
 
       {/* See Latest Released Version (for obsolete documents) */}
@@ -157,99 +204,72 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
       {/* Document Information */}
       <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Document Information</CardTitle>
+        <CardHeader className="pb-3">
+          <CardTitle className="text-base">Document Information</CardTitle>
         </CardHeader>
-        <CardContent className="space-y-3">
-          <div className="flex items-start gap-2">
-            <Package className="h-5 w-5 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-gray-500">Document Type</p>
-              <p className="text-base">{document.document_type?.name || 'Unknown'}</p>
-            </div>
-          </div>
-
-          {document.project_code && (
-            <div className="flex items-start gap-2">
-              <FileText className="h-5 w-5 text-gray-400 mt-0.5" />
-              <div>
-                <p className="text-sm font-medium text-gray-500">Project Code</p>
-                <p className="text-base font-mono">{document.project_code}</p>
-              </div>
-            </div>
-          )}
-
+        <CardContent>
+          {/* Description (full width if exists) */}
           {document.description && (
-            <div>
-              <p className="text-sm font-medium text-gray-500 mb-1">Description</p>
-              <p className="text-base text-gray-700">{document.description}</p>
+            <div className="mb-4 pb-4 border-b">
+              <p className="text-sm text-gray-700">{document.description}</p>
             </div>
           )}
-
-          {/* Show approver count if any */}
-          {approverCount > 0 && (
-            <div className="flex items-start gap-2">
-              <User className="h-5 w-5 text-gray-400 mt-0.5" />
+          
+          {/* Grid layout for compact display */}
+          <div className="grid grid-cols-2 gap-x-6 gap-y-3 text-sm">
+            {/* Left Column */}
+            <div className="space-y-3">
               <div>
-                <p className="text-sm font-medium text-gray-500">Approvers</p>
-                <p className="text-base">
-                  {approverCount} approver{approverCount > 1 ? 's' : ''} assigned
-                </p>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Document Type</p>
+                <p className="text-sm text-gray-900">{document.document_type?.name || 'Unknown'}</p>
               </div>
-            </div>
-          )}
-
-          <div className="flex items-start gap-2">
-            <User className="h-5 w-5 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-gray-500">Created By</p>
-              <p className="text-base">{document.creator?.email || 'Unknown'}</p>
-            </div>
-          </div>
-
-          <div className="flex items-start gap-2">
-            <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
-            <div>
-              <p className="text-sm font-medium text-gray-500">Created At</p>
-              <p className="text-base">
-                {new Date(document.created_at).toLocaleDateString('en-US', {
-                  year: 'numeric',
-                  month: 'long',
-                  day: 'numeric',
-                  hour: '2-digit',
-                  minute: '2-digit',
-                })}
-              </p>
-            </div>
-          </div>
-
-          {document.released_at && (
-            <>
-              <div className="flex items-start gap-2">
-                <User className="h-5 w-5 text-gray-400 mt-0.5" />
+              
+              {document.project_code && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Released By</p>
-                  <p className="text-base">{document.releaser?.email || 'Unknown'}</p>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Project Code</p>
+                  <p className="text-sm font-mono text-gray-900">{document.project_code}</p>
                 </div>
-              </div>
-
-              <div className="flex items-start gap-2">
-                <Calendar className="h-5 w-5 text-gray-400 mt-0.5" />
+              )}
+              
+              {approverCount > 0 && (
                 <div>
-                  <p className="text-sm font-medium text-gray-500">Released At</p>
-                  <p className="text-base">
-                    {new Date(document.released_at).toLocaleDateString('en-US', {
-                      year: 'numeric',
-                      month: 'long',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit',
-                    })}
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Approvers</p>
+                  <p className="text-sm text-gray-900">
+                    {approverCount} approver{approverCount > 1 ? 's' : ''} assigned
                   </p>
                 </div>
+              )}
+            </div>
+
+            {/* Right Column */}
+            <div className="space-y-3">
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Created</p>
+                <p className="text-sm text-gray-900">
+                  {new Date(document.created_at).toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </p>
+                <p className="text-xs text-gray-500">{document.creator?.email?.split('@')[0] || 'Unknown'}</p>
               </div>
-            </>
-          )}
+              
+              {document.released_at && (
+                <div>
+                  <p className="text-xs font-medium text-gray-500 mb-0.5">Released</p>
+                  <p className="text-sm text-gray-900">
+                    {new Date(document.released_at).toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </p>
+                  <p className="text-xs text-gray-500">{document.releaser?.email?.split('@')[0] || 'Unknown'}</p>
+                </div>
+              )}
+            </div>
+          </div>
         </CardContent>
       </Card>
 
@@ -309,88 +329,6 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           documentNumber={document.document_number}
           currentVersionId={document.id}
         />
-      </div>
-
-      {/* Action Buttons */}
-      <div className="flex gap-4 flex-wrap">
-        {canEdit && (
-          <Button asChild>
-            <Link href={`/documents/${document.id}/edit`}>
-              Edit Document
-            </Link>
-          </Button>
-        )}
-
-        {canRelease && (
-          <ReleaseDocumentButton 
-            documentId={document.id}
-            isProduction={document.is_production}
-          />
-        )}
-
-        {canSubmitForApproval && (
-          <SubmitForApprovalButton
-            documentId={document.id}
-            documentNumber={`${document.document_number}${document.version}`}
-            approverCount={approverCount}
-          />
-        )}
-
-        {canDelete && (
-          <DeleteDocumentButton documentId={document.id} />
-        )}
-
-        {/* Create New Version button for Released documents */}
-        {document.status === 'Released' && (isCreator || isAdmin) && (
-          <CreateNewVersionButton
-            documentId={document.id}
-            documentNumber={document.document_number}
-            version={document.version}
-            isProduction={document.is_production}
-          />
-        )}
-
-        {/* Promote to Production button for Released Prototype documents */}
-        {document.status === 'Released' && 
-         !document.is_production && 
-         (isCreator || isAdmin) && (
-          <PromoteToProductionButton
-            documentId={document.id}
-            documentNumber={document.document_number}
-            version={document.version}
-          />
-        )}
-
-        {!canEdit && !canRelease && !canSubmitForApproval && !canDelete && (
-          <>
-            {document.status === 'Draft' && (
-              <div className="text-sm space-y-1">
-                <p className="text-gray-500 italic">Draft document</p>
-                {!isCreator && !isAdmin && (
-                  <p className="text-gray-500">Only the creator can edit or release this document.</p>
-                )}
-                {(isCreator || isAdmin) && hasApprovers && (
-                  <p className="text-gray-500">This document has {approverCount} approver{approverCount > 1 ? 's' : ''}. Use "Submit for Approval" to proceed.</p>
-                )}
-              </div>
-            )}
-            {document.status === 'Released' && (
-              <p className="text-sm text-gray-500 italic">
-                This document is released and read-only
-              </p>
-            )}
-            {document.status === 'In Approval' && (
-              <p className="text-sm text-gray-500 italic">
-                This document is awaiting approval
-              </p>
-            )}
-            {document.status === 'Obsolete' && (
-              <p className="text-sm text-gray-500 italic">
-                This document version has been superseded
-              </p>
-            )}
-          </>
-        )}
       </div>
     </div>
   )

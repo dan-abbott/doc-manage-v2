@@ -163,7 +163,7 @@ export async function getVersionHistory(documentNumber: string) {
         creator:users!documents_created_by_fkey(email)
       `)
       .eq('document_number', documentNumber)
-      .order('created_at', { ascending: true })
+      .order('created_at', { ascending: false })
 
     if (error) {
       console.error('Get version history error:', error)
