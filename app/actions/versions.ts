@@ -249,7 +249,7 @@ export async function getImmediatePredecessor(documentNumber: string, currentVer
     // Get all versions
     const { data: versions, error } = await supabase
       .from('documents')
-      .select('id, version, status, is_production')
+      .select('id, version, status, is_production, document_number')
       .eq('document_number', documentNumber)
       .order('created_at', { ascending: true })
 
