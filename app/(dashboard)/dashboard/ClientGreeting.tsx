@@ -5,21 +5,20 @@ import { getGreetingWithName } from '@/lib/utils/greetings'
 
 interface ClientGreetingProps {
   fullName: string | null | undefined
-  className?: string
 }
 
-export default function ClientGreeting({ fullName, className }: ClientGreetingProps) {
-  const [greeting, setGreeting] = useState('')
+export default function ClientGreeting({ fullName }: ClientGreetingProps) {
+  const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
-    // Set greeting on client side to ensure consistency
-    setGreeting(getGreetingWithName(fullName))
-  }, [fullName])
+    setMounted(true)
+  }, [])
 
-  // Return a non-breaking space during hydration to prevent layout shift
-  if (!greeting) {
-    return <span className={className}>&nbsp;</span>
+  // During SSR and before mount, return placeholder
+  if (!mounted) {
+    return <span>Hi there</span>
   }
 
-  return <span className={className}>{greeting}</span>
+  // After mount, show actual greeting
+  return <span>{getGreetingWithName(fullName)}</span>
 }
