@@ -11,6 +11,7 @@ import { ApproverSelector } from '@/components/documents/ApproverSelector'
 import { createDocument } from '@/app/actions/documents'
 import { addApprover } from '@/app/actions/approvals'
 import { toast } from 'sonner'
+import DocumentCreatedModal from './DocumentCreatedModal'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,6 +37,9 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [showProductionWarning, setShowProductionWarning] = useState(false)
+  const [showSuccessModal, setShowSuccessModal] = useState(false)
+  const [createdDocumentId, setCreatedDocumentId] = useState('')
+  const [createdDocumentNumber, setCreatedDocumentNumber] = useState('')
   
   // Form state
   const [documentTypeId, setDocumentTypeId] = useState('')
@@ -71,8 +75,6 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
       
       // Add approvers if any selected
       if (selectedApprovers.length > 0) {
-        toast.loading(`Creating document ${docNumber}...`)
-        
         const approverPromises = selectedApprovers.map(approver =>
           addApprover(result.documentId!, approver.id, approver.email)
         )
@@ -84,15 +86,14 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         if (failedApprovers.length > 0) {
           console.error('Some approvers failed to add:', failedApprovers)
           toast.warning(`Document created but some approvers couldn't be added`)
-        } else {
-          toast.success(`Document ${docNumber} created successfully!`)
         }
-      } else {
-        toast.success(`Document ${docNumber} created successfully!`)
       }
 
-      // Redirect to the new document's detail page
-      router.push(`/documents/${result.documentId}`)
+      // Show success modal instead of toast + redirect
+      setCreatedDocumentId(result.documentId)
+      setCreatedDocumentNumber(docNumber)
+      setShowSuccessModal(true)
+      setIsSubmitting(false)
       
     } catch (err: any) {
       console.error('Create document error:', err)
@@ -182,11 +183,9 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
               checked={!isProduction}
               onChange={() => setIsProduction(false)}
               disabled={isSubmitting}
-              className="h-4 w-4 text-blue-600"
+              className="mr-2"
             />
-            <span className="ml-2 text-sm">
-              Prototype (vA, vB, vC...)
-            </span>
+            <span className="text-sm">Prototype</span>
           </label>
           <label className="flex items-center">
             <input
@@ -196,18 +195,33 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
               checked={isProduction}
               onChange={() => setIsProduction(true)}
               disabled={isSubmitting}
-              className="h-4 w-4 text-blue-600"
+              className="mr-2"
             />
-            <span className="ml-2 text-sm">
-              Production (v1, v2, v3...)
-            </span>
+            <span className="text-sm">Production</span>
           </label>
         </div>
         {isProduction && (
           <p className="mt-2 text-sm text-yellow-600">
-            ⚠️ Production documents require approval workflow
+            ⚠️ Production documents should have at least one approver
           </p>
         )}
+      </div>
+
+      {/* Project Code */}
+      <div>
+        <Label htmlFor="projectCode">Project Code (Optional)</Label>
+        <Input
+          id="projectCode"
+          type="text"
+          placeholder="P-12345"
+          value={projectCode}
+          onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
+          disabled={isSubmitting}
+          className="mt-1"
+        />
+        <p className="mt-1 text-xs text-gray-500">
+          Format: P-##### (e.g., P-12345)
+        </p>
       </div>
 
       {/* Title */}
@@ -217,12 +231,13 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         </Label>
         <Input
           id="title"
+          type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          placeholder="Enter document title"
           required
           disabled={isSubmitting}
-          maxLength={200}
+          className="mt-1"
+          placeholder="Enter document title"
         />
       </div>
 
@@ -233,32 +248,26 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          placeholder="Enter document description (optional)"
+          disabled={isSubmitting}
+          className="mt-1"
           rows={4}
-          disabled={isSubmitting}
-          maxLength={1000}
+          placeholder="Enter document description (optional)"
         />
       </div>
 
-      {/* Project Code */}
+      {/* File Upload */}
       <div>
-        <Label htmlFor="projectCode">Project Code</Label>
-        <Input
-          id="projectCode"
-          value={projectCode}
-          onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
-          placeholder="P-12345"
+        <Label>Attachments</Label>
+        <FileUpload
+          files={files}
+          onFilesChange={setFiles}
           disabled={isSubmitting}
-          maxLength={7}
-          pattern="P-\d{5}"
         />
-        <p className="mt-1 text-sm text-gray-500">
-          Format: P-##### (e.g., P-12345)
-        </p>
       </div>
 
-      {/* Approver Selection */}
+      {/* Approvers */}
       <div>
+        <Label>Approvers</Label>
         <ApproverSelector
           selectedApprovers={selectedApprovers}
           onApproversChange={setSelectedApprovers}
@@ -266,24 +275,11 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         />
       </div>
 
-      {/* File Upload */}
-      <div>
-        <Label>Attachments</Label>
-        <div className="mt-2">
-          <FileUpload
-            files={files}
-            onFilesChange={setFiles}
-            maxFiles={20}
-          />
-        </div>
-      </div>
-
-      {/* Submit Button */}
-      <div className="flex gap-4 pt-4">
+      {/* Form Actions */}
+      <div className="flex gap-3">
         <Button
           type="submit"
           disabled={isSubmitting}
-          className="min-w-[120px]"
         >
           {isSubmitting ? 'Creating...' : 'Create Document'}
         </Button>
@@ -323,6 +319,14 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         </AlertDialogFooter>
       </AlertDialogContent>
     </AlertDialog>
+
+    {/* Success Modal */}
+    <DocumentCreatedModal
+      open={showSuccessModal}
+      onOpenChange={setShowSuccessModal}
+      documentId={createdDocumentId}
+      documentNumber={createdDocumentNumber}
+    />
     </>
   )
 }
