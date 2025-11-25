@@ -13,6 +13,7 @@ const actionConfig: Record<string, { icon: any, label: string, color: string }> 
   'version_created': { icon: GitBranch, label: 'New Version', color: 'text-blue-600' },
   'submitted_for_approval': { icon: Clock, label: 'Submitted', color: 'text-yellow-600' },
   'document_obsoleted': { icon: Activity, label: 'Obsoleted', color: 'text-gray-600' },
+  'updated': { icon: FileText, label: 'Updated', color: 'text-blue-600' },
 }
 
 function formatTimeAgo(dateString: string) {
@@ -44,7 +45,7 @@ function ActivityIcon({ action }: { action: string }) {
 
 function ActivityLabel({ action }: { action: string }) {
   const config = actionConfig[action] || { label: action }
-  return <span className="font-medium">{config.label}</span>
+  return config.label
 }
 
 export default async function RecentActivityFeed() {
@@ -141,39 +142,63 @@ export default async function RecentActivityFeed() {
           </CardTitle>
         </CardHeader>
         <CardContent>
-          <div className="space-y-4">
-            {activities.map((activity: any) => {
-              const doc = activity.document
+          {/* Table-like layout for horizontal, compact display */}
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead>
+                <tr className="border-b text-left">
+                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
+                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
+                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
+                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
+                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Time</th>
+                </tr>
+              </thead>
+              <tbody>
+                {activities.map((activity: any) => {
+                  const doc = activity.document
 
-              return (
-                <div key={activity.id} className="flex items-start gap-3 pb-4 border-b last:border-b-0 last:pb-0">
-                  <div className="flex-shrink-0 mt-0.5">
-                    <ActivityIcon action={activity.action} />
-                  </div>
-                  <div className="flex-1 min-w-0">
-                    <Link 
-                      href={`/documents/${activity.document_id}`}
-                      className="hover:underline"
-                    >
-                      <p className="text-sm font-medium text-gray-900">
-                        {doc.document_number}{doc.version}
-                      </p>
-                      <p className="text-sm text-gray-600 truncate">
-                        {doc.title || 'Untitled Document'}
-                      </p>
-                    </Link>
-                    <p className="text-xs text-gray-500 mt-1">
-                      <ActivityLabel action={activity.action} /> by{' '}
-                      <span className="font-medium">
-                        {activity.performed_by_email?.split('@')[0] || 'Unknown'}
-                      </span>
-                      {' • '}
-                      {formatTimeAgo(activity.created_at)}
-                    </p>
-                  </div>
-                </div>
-              )
-            })}
+                  return (
+                    <tr key={activity.id} className="border-b last:border-b-0 hover:bg-gray-50">
+                      <td className="py-3">
+                        <Link 
+                          href={`/documents/${activity.document_id}`}
+                          className="text-sm font-medium text-blue-600 hover:underline"
+                        >
+                          {doc.document_number}{doc.version}
+                        </Link>
+                      </td>
+                      <td className="py-3">
+                        <Link 
+                          href={`/documents/${activity.document_id}`}
+                          className="text-sm text-gray-900 hover:underline truncate max-w-xs block"
+                        >
+                          {doc.title || 'Untitled Document'}
+                        </Link>
+                      </td>
+                      <td className="py-3">
+                        <div className="flex items-center gap-1.5">
+                          <ActivityIcon action={activity.action} />
+                          <span className="text-sm text-gray-600">
+                            {ActivityLabel({ action: activity.action })}
+                          </span>
+                        </div>
+                      </td>
+                      <td className="py-3">
+                        <span className="text-sm text-gray-600">
+                          {activity.performed_by_email?.split('@')[0] || 'Unknown'}
+                        </span>
+                      </td>
+                      <td className="py-3 text-right">
+                        <span className="text-xs text-gray-500">
+                          {formatTimeAgo(activity.created_at)}
+                        </span>
+                      </td>
+                    </tr>
+                  )
+                })}
+              </tbody>
+            </table>
           </div>
         </CardContent>
       </Card>

@@ -131,28 +131,28 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Quick Actions */}
+      {/* Quick Actions - Limited Width */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent className="flex flex-col sm:flex-row gap-3">
-          <Link href="/documents/new" className="flex-1">
-            <Button className="w-full">
+        <CardContent className="flex flex-wrap gap-3">
+          <Link href="/documents/new">
+            <Button className="w-auto">
               <Plus className="mr-2 h-4 w-4" />
               Create New Document
             </Button>
           </Link>
           {pendingApprovalsCount > 0 && (
-            <Link href="/approvals" className="flex-1">
-              <Button variant="outline" className="w-full">
+            <Link href="/approvals">
+              <Button variant="outline" className="w-auto">
                 <ClipboardList className="mr-2 h-4 w-4" />
                 My Approvals ({pendingApprovalsCount})
               </Button>
             </Link>
           )}
-          <Link href="/documents" className="flex-1">
-            <Button variant="outline" className="w-full">
+          <Link href="/documents">
+            <Button variant="outline" className="w-auto">
               <FileText className="mr-2 h-4 w-4" />
               View All Documents
             </Button>
