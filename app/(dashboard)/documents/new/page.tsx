@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { CreateDocumentForm } from '@/components/documents/CreateDocumentForm'
+import NewDocumentForm from '../../../documents/new/NewDocumentForm'
 
 export const metadata = {
   title: 'Create New Document',
@@ -43,7 +43,7 @@ export default async function NewDocumentPage() {
         {/* Form Card */}
         <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
           {documentTypes && documentTypes.length > 0 ? (
-            <CreateDocumentForm documentTypes={documentTypes} />
+            <NewDocumentForm documentTypes={documentTypes} />
           ) : (
             <div className="text-center py-12">
               <svg
