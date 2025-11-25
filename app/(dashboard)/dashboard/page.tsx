@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, User, CheckCircle, Plus, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import ClientGreeting from './ClientGreeting'
+import { getGreetingWithName } from '@/lib/utils/greetings'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
 
 export default async function DashboardPage() {
@@ -21,6 +21,9 @@ export default async function DashboardPage() {
     .select('full_name')
     .eq('id', user.id)
     .single()
+
+  // Server-side greeting (no client component needed)
+  const greeting = getGreetingWithName(userData?.full_name)
 
   // Get total documents count
   const { count: totalDocuments } = await supabase
@@ -54,7 +57,7 @@ export default async function DashboardPage() {
       {/* Header with Greeting */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          <ClientGreeting fullName={userData?.full_name} />
+          {greeting}
         </h1>
         <p className="text-gray-600">
           Here's what's happening with your documents
@@ -79,7 +82,7 @@ export default async function DashboardPage() {
           </Card>
         </Link>
 
-        {/* Pending Approval */}
+        {/* Pending Approvals */}
         <Link href="/approvals">
           <Card className="hover:shadow-lg cursor-pointer transition-all hover:border-blue-300">
             <CardHeader className="pb-3">
@@ -128,38 +131,36 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Quick Actions - NOW ABOVE RECENT ACTIVITY */}
+      {/* Quick Actions */}
       <Card>
         <CardHeader>
           <CardTitle className="text-base">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <div className="flex gap-3 flex-wrap">
-            <Button asChild>
-              <Link href="/documents/new">
-                <Plus className="mr-2 h-4 w-4" />
-                Create New Document
-              </Link>
+        <CardContent className="flex flex-col sm:flex-row gap-3">
+          <Link href="/documents/new" className="flex-1">
+            <Button className="w-full">
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Document
             </Button>
-            {pendingApprovalsCount > 0 && (
-              <Button variant="outline" asChild>
-                <Link href="/approvals">
-                  <ClipboardList className="mr-2 h-4 w-4" />
-                  My Approvals ({pendingApprovalsCount})
-                </Link>
+          </Link>
+          {pendingApprovalsCount > 0 && (
+            <Link href="/approvals" className="flex-1">
+              <Button variant="outline" className="w-full">
+                <ClipboardList className="mr-2 h-4 w-4" />
+                My Approvals ({pendingApprovalsCount})
               </Button>
-            )}
-            <Button variant="outline" asChild>
-              <Link href="/documents">
-                <FileText className="mr-2 h-4 w-4" />
-                View All Documents
-              </Link>
+            </Link>
+          )}
+          <Link href="/documents" className="flex-1">
+            <Button variant="outline" className="w-full">
+              <FileText className="mr-2 h-4 w-4" />
+              View All Documents
             </Button>
-          </div>
+          </Link>
         </CardContent>
       </Card>
 
-      {/* Recent Activity - NOW BELOW QUICK ACTIONS */}
+      {/* Recent Activity */}
       <RecentActivityFeed />
     </div>
   )

@@ -51,30 +51,19 @@ export default async function RecentActivityFeed() {
   try {
     const supabase = await createClient()
 
-    // Query directly (like the existing dashboard does)
-    const { data: recentActivity, error } = await supabase
+    // Get recent audit logs (no join - avoid RLS issues)
+    const { data: auditLogs, error: auditError } = await supabase
       .from('audit_log')
-      .select(`
-        id,
-        document_id,
-        action,
-        performed_by_email,
-        created_at,
-        documents!inner (
-          document_number,
-          version,
-          title
-        )
-      `)
+      .select('id, document_id, action, performed_by_email, created_at')
       .order('created_at', { ascending: false })
       .limit(10)
 
-    if (error) {
-      console.error('Recent activity error:', error)
-      throw error
+    if (auditError) {
+      console.error('Audit log error:', auditError)
+      throw auditError
     }
 
-    if (!recentActivity || recentActivity.length === 0) {
+    if (!auditLogs || auditLogs.length === 0) {
       return (
         <Card>
           <CardHeader>
@@ -92,6 +81,57 @@ export default async function RecentActivityFeed() {
       )
     }
 
+    // Get unique document IDs
+    const documentIds = [...new Set(auditLogs.map(log => log.document_id))]
+
+    // Fetch documents separately (RLS will filter what user can see)
+    const { data: documents, error: docError } = await supabase
+      .from('documents')
+      .select('id, document_number, version, title')
+      .in('id', documentIds)
+
+    if (docError) {
+      console.error('Documents error:', docError)
+      // Don't throw - just show what we can
+    }
+
+    // Create lookup map
+    const docMap = new Map()
+    documents?.forEach(doc => {
+      docMap.set(doc.id, doc)
+    })
+
+    // Combine the data
+    const activities = auditLogs
+      .map(log => {
+        const doc = docMap.get(log.document_id)
+        if (!doc) return null // Skip if user can't see this document
+        
+        return {
+          ...log,
+          document: doc
+        }
+      })
+      .filter(Boolean) // Remove nulls
+
+    if (activities.length === 0) {
+      return (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Activity className="h-4 w-4" />
+              Recent Activity
+            </CardTitle>
+          </CardHeader>
+          <CardContent>
+            <p className="text-center py-8 text-sm text-gray-500">
+              No recent activity visible.
+            </p>
+          </CardContent>
+        </Card>
+      )
+    }
+
     return (
       <Card>
         <CardHeader>
@@ -102,12 +142,8 @@ export default async function RecentActivityFeed() {
         </CardHeader>
         <CardContent>
           <div className="space-y-4">
-            {recentActivity.map((activity: any) => {
-              // Safely access document data
-              const doc = activity.documents
-              if (!doc || !doc.document_number) {
-                return null
-              }
+            {activities.map((activity: any) => {
+              const doc = activity.document
 
               return (
                 <div key={activity.id} className="flex items-start gap-3 pb-4 border-b last:border-b-0 last:pb-0">
@@ -145,7 +181,6 @@ export default async function RecentActivityFeed() {
   } catch (error) {
     console.error('RecentActivityFeed error:', error)
     
-    // Return error state
     return (
       <Card>
         <CardHeader>
