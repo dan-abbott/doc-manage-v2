@@ -3,7 +3,7 @@ import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, User, CheckCircle, Plus, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { getGreetingWithName } from '@/lib/utils/greetings'
+import ClientGreeting from './ClientGreeting'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
 
 export default async function DashboardPage() {
@@ -21,8 +21,6 @@ export default async function DashboardPage() {
     .select('full_name')
     .eq('id', user.id)
     .single()
-
-  const greeting = getGreetingWithName(userData?.full_name)
 
   // Get total documents count
   const { count: totalDocuments } = await supabase
@@ -56,7 +54,7 @@ export default async function DashboardPage() {
       {/* Header with Greeting */}
       <div>
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {greeting}
+          <ClientGreeting fullName={userData?.full_name} />
         </h1>
         <p className="text-gray-600">
           Here's what's happening with your documents

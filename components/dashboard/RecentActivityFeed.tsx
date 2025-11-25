@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Activity, FileText, CheckCircle, XCircle, ArrowUp, GitBranch, Clock } from 'lucide-react'
 import Link from 'next/link'
-import { getRecentActivity, ActivityItem } from '@/app/actions/dashboard'
+import { createClient } from '@/lib/supabase/server'
 
 // Map actions to icons and labels
 const actionConfig: Record<string, { icon: any, label: string, color: string }> = {
@@ -44,9 +44,23 @@ function ActivityLabel({ action }: { action: string }) {
 }
 
 export default async function RecentActivityFeed() {
-  const result = await getRecentActivity(10)
+  const supabase = await createClient()
 
-  if (!result.success || !result.data || result.data.length === 0) {
+  // Query directly (like the existing dashboard does)
+  const { data: recentActivity } = await supabase
+    .from('audit_log')
+    .select(`
+      id,
+      document_id,
+      action,
+      performed_by_email,
+      created_at,
+      document:documents(document_number, version, title)
+    `)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  if (!recentActivity || recentActivity.length === 0) {
     return (
       <Card>
         <CardHeader>
@@ -64,8 +78,6 @@ export default async function RecentActivityFeed() {
     )
   }
 
-  const activities = result.data
-
   return (
     <Card>
       <CardHeader>
@@ -76,34 +88,39 @@ export default async function RecentActivityFeed() {
       </CardHeader>
       <CardContent>
         <div className="space-y-4">
-          {activities.map((activity: ActivityItem) => (
-            <div key={activity.id} className="flex items-start gap-3 pb-4 border-b last:border-b-0 last:pb-0">
-              <div className="flex-shrink-0 mt-0.5">
-                <ActivityIcon action={activity.action} />
-              </div>
-              <div className="flex-1 min-w-0">
-                <Link 
-                  href={`/documents/${activity.document_id}`}
-                  className="hover:underline"
-                >
-                  <p className="text-sm font-medium text-gray-900">
-                    {activity.document_number}
+          {recentActivity.map((activity: any) => {
+            const doc = activity.document
+            if (!doc) return null
+
+            return (
+              <div key={activity.id} className="flex items-start gap-3 pb-4 border-b last:border-b-0 last:pb-0">
+                <div className="flex-shrink-0 mt-0.5">
+                  <ActivityIcon action={activity.action} />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <Link 
+                    href={`/documents/${activity.document_id}`}
+                    className="hover:underline"
+                  >
+                    <p className="text-sm font-medium text-gray-900">
+                      {doc.document_number}{doc.version}
+                    </p>
+                    <p className="text-sm text-gray-600 truncate">
+                      {doc.title}
+                    </p>
+                  </Link>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <ActivityLabel action={activity.action} /> by{' '}
+                    <span className="font-medium">
+                      {activity.performed_by_email?.split('@')[0] || 'Unknown'}
+                    </span>
+                    {' • '}
+                    {formatTimeAgo(activity.created_at)}
                   </p>
-                  <p className="text-sm text-gray-600 truncate">
-                    {activity.document_title}
-                  </p>
-                </Link>
-                <p className="text-xs text-gray-500 mt-1">
-                  <ActivityLabel action={activity.action} /> by{' '}
-                  <span className="font-medium">
-                    {activity.performed_by_email.split('@')[0]}
-                  </span>
-                  {' • '}
-                  {formatTimeAgo(activity.created_at)}
-                </p>
+                </div>
               </div>
-            </div>
-          ))}
+            )
+          })}
         </div>
       </CardContent>
     </Card>
