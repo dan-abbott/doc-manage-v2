@@ -40,7 +40,7 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
   const [showSuccessModal, setShowSuccessModal] = useState(false)
   const [createdDocumentId, setCreatedDocumentId] = useState('')
   const [createdDocumentNumber, setCreatedDocumentNumber] = useState('')
-  
+
   // Form state
   const [documentTypeId, setDocumentTypeId] = useState('')
   const [title, setTitle] = useState('')
@@ -53,16 +53,24 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
   const createDocumentInternal = async () => {
     try {
       // Create document
-      const result = await createDocument(
-        {
-          document_type_id: documentTypeId,
-          title: title.trim(),
-          description: description.trim(),
-          is_production: isProduction,
-          project_code: projectCode || null,
-        },
-        files
-      )
+      // Build FormData
+      const formData = new FormData()
+      formData.append('document_type_id', documentTypeId)
+      formData.append('title', title.trim())
+      formData.append('description', description.trim())
+      formData.append('is_production', isProduction.toString())
+
+      if (projectCode) {
+        formData.append('project_code', projectCode)
+      }
+
+      // Add files
+      files.forEach((file, index) => {
+        formData.append(`file_${index}`, file)
+      })
+
+      // Create document
+      const result = await createDocument(formData)
 
       if (!result.success || !result.documentId) {
         toast.error(result.error || 'Failed to create document')
@@ -72,15 +80,15 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
 
       // Document created successfully
       const docNumber = result.documentNumber || 'Document'
-      
+
       // Add approvers if any selected
       if (selectedApprovers.length > 0) {
         const approverPromises = selectedApprovers.map(approver =>
           addApprover(result.documentId!, approver.id, approver.email)
         )
-        
+
         const approverResults = await Promise.all(approverPromises)
-        
+
         // Check if any approver additions failed
         const failedApprovers = approverResults.filter(r => !r.success)
         if (failedApprovers.length > 0) {
@@ -94,7 +102,7 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
       setCreatedDocumentNumber(docNumber)
       setShowSuccessModal(true)
       setIsSubmitting(false)
-      
+
     } catch (err: any) {
       console.error('Create document error:', err)
       toast.error(err.message || 'An unexpected error occurred')
@@ -136,7 +144,7 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
 
       // Proceed with document creation
       await createDocumentInternal()
-      
+
     } catch (err: any) {
       console.error('Create document error:', err)
       toast.error(err.message || 'An unexpected error occurred')
@@ -148,185 +156,185 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
 
   return (
     <>
-    <form onSubmit={handleSubmit} className="space-y-6">
-      {/* Document Type */}
-      <div>
-        <Label htmlFor="documentType">
-          Document Type <span className="text-red-500">*</span>
-        </Label>
-        <select
-          id="documentType"
-          value={documentTypeId}
-          onChange={(e) => setDocumentTypeId(e.target.value)}
-          required
-          disabled={isSubmitting}
-          className="mt-1 flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-        >
-          <option value="">Select a document type</option>
-          {activeDocumentTypes.map((dt) => (
-            <option key={dt.id} value={dt.id}>
-              {dt.name}
-            </option>
-          ))}
-        </select>
-      </div>
-
-      {/* Production Classification */}
-      <div>
-        <Label>Classification <span className="text-red-500">*</span></Label>
-        <div className="mt-2 space-y-2">
-          <label className="flex items-center">
-            <input
-              type="radio"
-              name="classification"
-              value="prototype"
-              checked={!isProduction}
-              onChange={() => setIsProduction(false)}
-              disabled={isSubmitting}
-              className="mr-2"
-            />
-            <span className="text-sm">Prototype</span>
-          </label>
-          <label className="flex items-center">
-            <input
-              type="radio"
-              name="classification"
-              value="production"
-              checked={isProduction}
-              onChange={() => setIsProduction(true)}
-              disabled={isSubmitting}
-              className="mr-2"
-            />
-            <span className="text-sm">Production</span>
-          </label>
-        </div>
-        {isProduction && (
-          <p className="mt-2 text-sm text-yellow-600">
-            ⚠️ Production documents should have at least one approver
-          </p>
-        )}
-      </div>
-
-      {/* Project Code */}
-      <div>
-        <Label htmlFor="projectCode">Project Code (Optional)</Label>
-        <Input
-          id="projectCode"
-          type="text"
-          placeholder="P-12345"
-          value={projectCode}
-          onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
-          disabled={isSubmitting}
-          className="mt-1"
-        />
-        <p className="mt-1 text-xs text-gray-500">
-          Format: P-##### (e.g., P-12345)
-        </p>
-      </div>
-
-      {/* Title */}
-      <div>
-        <Label htmlFor="title">
-          Title <span className="text-red-500">*</span>
-        </Label>
-        <Input
-          id="title"
-          type="text"
-          value={title}
-          onChange={(e) => setTitle(e.target.value)}
-          required
-          disabled={isSubmitting}
-          className="mt-1"
-          placeholder="Enter document title"
-        />
-      </div>
-
-      {/* Description */}
-      <div>
-        <Label htmlFor="description">Description</Label>
-        <Textarea
-          id="description"
-          value={description}
-          onChange={(e) => setDescription(e.target.value)}
-          disabled={isSubmitting}
-          className="mt-1"
-          rows={4}
-          placeholder="Enter document description (optional)"
-        />
-      </div>
-
-      {/* File Upload */}
-      <div>
-        <Label>Attachments</Label>
-        <FileUpload
-          files={files}
-          onFilesChange={setFiles}
-          disabled={isSubmitting}
-        />
-      </div>
-
-      {/* Approvers */}
-      <div>
-        <Label>Approvers</Label>
-        <ApproverSelector
-          selectedApprovers={selectedApprovers}
-          onApproversChange={setSelectedApprovers}
-          disabled={isSubmitting}
-        />
-      </div>
-
-      {/* Form Actions */}
-      <div className="flex gap-3">
-        <Button
-          type="submit"
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? 'Creating...' : 'Create Document'}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          onClick={() => router.push('/documents')}
-          disabled={isSubmitting}
-        >
-          Cancel
-        </Button>
-      </div>
-    </form>
-
-    {/* Production Warning Dialog */}
-    <AlertDialog open={showProductionWarning} onOpenChange={setShowProductionWarning}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>Production Document Without Approvers</AlertDialogTitle>
-          <AlertDialogDescription>
-            Production documents should have at least one approver. Are you sure you want to create this without approvers?
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel onClick={() => setIsSubmitting(false)}>
-            Cancel
-          </AlertDialogCancel>
-          <AlertDialogAction 
-            onClick={async () => {
-              setShowProductionWarning(false)
-              setIsSubmitting(true)
-              await createDocumentInternal()
-            }}
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Document Type */}
+        <div>
+          <Label htmlFor="documentType">
+            Document Type <span className="text-red-500">*</span>
+          </Label>
+          <select
+            id="documentType"
+            value={documentTypeId}
+            onChange={(e) => setDocumentTypeId(e.target.value)}
+            required
+            disabled={isSubmitting}
+            className="mt-1 flex h-10 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
           >
-            Create Anyway
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+            <option value="">Select a document type</option>
+            {activeDocumentTypes.map((dt) => (
+              <option key={dt.id} value={dt.id}>
+                {dt.name}
+              </option>
+            ))}
+          </select>
+        </div>
 
-    {/* Success Modal */}
-    <DocumentCreatedModal
-      open={showSuccessModal}
-      onOpenChange={setShowSuccessModal}
-      documentId={createdDocumentId}
-      documentNumber={createdDocumentNumber}
-    />
+        {/* Production Classification */}
+        <div>
+          <Label>Classification <span className="text-red-500">*</span></Label>
+          <div className="mt-2 space-y-2">
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="classification"
+                value="prototype"
+                checked={!isProduction}
+                onChange={() => setIsProduction(false)}
+                disabled={isSubmitting}
+                className="mr-2"
+              />
+              <span className="text-sm">Prototype</span>
+            </label>
+            <label className="flex items-center">
+              <input
+                type="radio"
+                name="classification"
+                value="production"
+                checked={isProduction}
+                onChange={() => setIsProduction(true)}
+                disabled={isSubmitting}
+                className="mr-2"
+              />
+              <span className="text-sm">Production</span>
+            </label>
+          </div>
+          {isProduction && (
+            <p className="mt-2 text-sm text-yellow-600">
+              ⚠️ Production documents should have at least one approver
+            </p>
+          )}
+        </div>
+
+        {/* Project Code */}
+        <div>
+          <Label htmlFor="projectCode">Project Code (Optional)</Label>
+          <Input
+            id="projectCode"
+            type="text"
+            placeholder="P-12345"
+            value={projectCode}
+            onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
+            disabled={isSubmitting}
+            className="mt-1"
+          />
+          <p className="mt-1 text-xs text-gray-500">
+            Format: P-##### (e.g., P-12345)
+          </p>
+        </div>
+
+        {/* Title */}
+        <div>
+          <Label htmlFor="title">
+            Title <span className="text-red-500">*</span>
+          </Label>
+          <Input
+            id="title"
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            required
+            disabled={isSubmitting}
+            className="mt-1"
+            placeholder="Enter document title"
+          />
+        </div>
+
+        {/* Description */}
+        <div>
+          <Label htmlFor="description">Description</Label>
+          <Textarea
+            id="description"
+            value={description}
+            onChange={(e) => setDescription(e.target.value)}
+            disabled={isSubmitting}
+            className="mt-1"
+            rows={4}
+            placeholder="Enter document description (optional)"
+          />
+        </div>
+
+        {/* File Upload */}
+        <div>
+          <Label>Attachments</Label>
+          <FileUpload
+            files={files}
+            onFilesChange={setFiles}
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {/* Approvers */}
+        <div>
+          <Label>Approvers</Label>
+          <ApproverSelector
+            selectedApprovers={selectedApprovers}
+            onApproversChange={setSelectedApprovers}
+            disabled={isSubmitting}
+          />
+        </div>
+
+        {/* Form Actions */}
+        <div className="flex gap-3">
+          <Button
+            type="submit"
+            disabled={isSubmitting}
+          >
+            {isSubmitting ? 'Creating...' : 'Create Document'}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => router.push('/documents')}
+            disabled={isSubmitting}
+          >
+            Cancel
+          </Button>
+        </div>
+      </form>
+
+      {/* Production Warning Dialog */}
+      <AlertDialog open={showProductionWarning} onOpenChange={setShowProductionWarning}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Production Document Without Approvers</AlertDialogTitle>
+            <AlertDialogDescription>
+              Production documents should have at least one approver. Are you sure you want to create this without approvers?
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel onClick={() => setIsSubmitting(false)}>
+              Cancel
+            </AlertDialogCancel>
+            <AlertDialogAction
+              onClick={async () => {
+                setShowProductionWarning(false)
+                setIsSubmitting(true)
+                await createDocumentInternal()
+              }}
+            >
+              Create Anyway
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Success Modal */}
+      <DocumentCreatedModal
+        open={showSuccessModal}
+        onOpenChange={setShowSuccessModal}
+        documentId={createdDocumentId}
+        documentNumber={createdDocumentNumber}
+      />
     </>
   )
 }

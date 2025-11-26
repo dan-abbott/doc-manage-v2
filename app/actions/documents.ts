@@ -7,13 +7,7 @@ import { revalidatePath } from 'next/cache'
 // Action: Create Document
 // ==========================================
 
-export async function createDocument(data: {
-  document_type_id: string
-  title: string
-  description: string
-  is_production: boolean
-  project_code: string | null
-}, files: File[]) {
+export async function createDocument(formData: FormData) {
   try {
     const supabase = await createClient()
 
@@ -23,11 +17,26 @@ export async function createDocument(data: {
       return { success: false, error: 'Not authenticated' }
     }
 
+    // Extract form data
+    const document_type_id = formData.get('document_type_id') as string
+    const title = formData.get('title') as string
+    const description = formData.get('description') as string
+    const is_production = formData.get('is_production') === 'true'
+    const project_code = formData.get('project_code') as string | null
+    
+    // Extract files from FormData
+    const files: File[] = []
+    formData.forEach((value, key) => {
+      if (key.startsWith('file_') && value instanceof File) {
+        files.push(value)
+      }
+    })
+
     // Get document type for prefix and number
     const { data: docType, error: typeError } = await supabase
       .from('document_types')
       .select('prefix, next_number')
-      .eq('id', data.document_type_id)
+      .eq('id', document_type_id)
       .single()
 
     if (typeError || !docType) {
@@ -38,19 +47,19 @@ export async function createDocument(data: {
     const documentNumber = `${docType.prefix}-${String(docType.next_number).padStart(5, '0')}`
     
     // Determine version based on production flag
-    const version = data.is_production ? 'v1' : 'vA'
+    const version = is_production ? 'v1' : 'vA'
 
     // Create document
     const { data: document, error: createError } = await supabase
       .from('documents')
       .insert({
-        document_type_id: data.document_type_id,
+        document_type_id: document_type_id,
         document_number: documentNumber,
         version: version,
-        title: data.title,
-        description: data.description,
-        is_production: data.is_production,
-        project_code: data.project_code,
+        title: title,
+        description: description,
+        is_production: is_production,
+        project_code: project_code || null,
         status: 'Draft',
         created_by: user.id,
       })
@@ -65,7 +74,7 @@ export async function createDocument(data: {
     await supabase
       .from('document_types')
       .update({ next_number: docType.next_number + 1 })
-      .eq('id', data.document_type_id)
+      .eq('id', document_type_id)
 
     // Upload files
     if (files.length > 0) {
@@ -119,7 +128,7 @@ export async function createDocument(data: {
         details: { 
           document_number: documentNumber,
           version: version,
-          title: data.title 
+          title: title 
         },
       })
 
