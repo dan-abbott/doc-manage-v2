@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Plus, FileText } from 'lucide-react'
 import DocumentsTable from './DocumentsTable'
 import DocumentsFilters from './DocumentsFilters'
+import AdminViewAllToggle from './AdminViewAllToggle'
 
 interface PageProps {
   searchParams: {
@@ -15,6 +16,7 @@ interface PageProps {
     project?: string
     filter?: string
     page?: string
+    viewAll?: string  // NEW: Admin view all parameter
   }
 }
 
@@ -43,6 +45,16 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     redirect('/auth/login')
   }
 
+  // NEW: Check if user is admin
+  const { data: userData } = await supabase
+    .from('users')
+    .select('is_admin')
+    .eq('id', user.id)
+    .single()
+
+  const isAdmin = userData?.is_admin || false
+  const viewAll = searchParams.viewAll === 'true'
+
   // Get document types for filter
   const { data: documentTypes } = await supabase
     .from('document_types')
@@ -62,8 +74,15 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
       document_type:document_types(name, prefix)
     `, { count: 'exact' })
 
-  // Apply RLS: user sees their own Drafts + all Released/Obsolete
-  // (RLS handles this automatically)
+  // NEW: Apply RLS based on admin status and viewAll toggle
+  // If admin with viewAll enabled, no filter (see everything)
+  // Otherwise, apply normal RLS (own drafts + all released/obsolete)
+  if (!isAdmin || !viewAll) {
+    // Normal users and admins without viewAll:
+    // See own Drafts + all Released/Obsolete
+    query = query.or(`created_by.eq.${user.id},status.eq.Released,status.eq.Obsolete`)
+  }
+  // If admin with viewAll=true, no filter applied - see everything
 
   // Search filter
   if (searchParams.search) {
@@ -137,6 +156,13 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
         </Button>
       </div>
 
+      {/* NEW: Admin View All Toggle */}
+      {isAdmin && (
+        <div className="mb-4">
+          <AdminViewAllToggle />
+        </div>
+      )}
+
       {/* Filters */}
       <Card className="mb-6">
         <CardHeader>
@@ -159,68 +185,52 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
               
               {/* Pagination */}
               {totalPages > 1 && (
-                <div className="flex items-center justify-between mt-6">
-                  <p className="text-sm text-muted-foreground">
+                <div className="flex items-center justify-center gap-2 mt-6">
+                  {page > 1 && (
+                    <Button
+                      variant="outline"
+                      asChild
+                    >
+                      <Link
+                        href={{
+                          pathname: '/documents',
+                          query: { ...searchParams, page: String(page - 1) },
+                        }}
+                      >
+                        Previous
+                      </Link>
+                    </Button>
+                  )}
+                  <span className="text-sm text-muted-foreground">
                     Page {page} of {totalPages}
-                  </p>
-                  <div className="flex gap-2">
-                    {page > 1 && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        asChild
+                  </span>
+                  {page < totalPages && (
+                    <Button
+                      variant="outline"
+                      asChild
+                    >
+                      <Link
+                        href={{
+                          pathname: '/documents',
+                          query: { ...searchParams, page: String(page + 1) },
+                        }}
                       >
-                        <Link 
-                          href={{
-                            pathname: '/documents',
-                            query: { ...searchParams, page: (page - 1).toString() }
-                          }}
-                        >
-                          Previous
-                        </Link>
-                      </Button>
-                    )}
-                    {page < totalPages && (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        asChild
-                      >
-                        <Link 
-                          href={{
-                            pathname: '/documents',
-                            query: { ...searchParams, page: (page + 1).toString() }
-                          }}
-                        >
-                          Next
-                        </Link>
-                      </Button>
-                    )}
-                  </div>
+                        Next
+                      </Link>
+                    </Button>
+                  )}
                 </div>
               )}
             </>
           ) : (
             <div className="text-center py-12">
-              <FileText className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
+              <FileText className="mx-auto h-12 w-12 text-gray-400" />
+              <h3 className="mt-2 text-sm font-semibold text-gray-900">No documents found</h3>
+              <p className="mt-1 text-sm text-gray-500">
                 {searchParams.search || searchParams.type || searchParams.status || searchParams.project
-                  ? 'No documents found'
-                  : 'No documents yet'}
-              </h3>
-              <p className="text-sm text-gray-500 mb-6">
-                {searchParams.search || searchParams.type || searchParams.status || searchParams.project
-                  ? 'Try adjusting your filters or search terms'
-                  : 'Get started by creating your first document'}
+                  ? 'Try adjusting your filters'
+                  : 'Get started by creating a new document'}
               </p>
-              {!(searchParams.search || searchParams.type || searchParams.status || searchParams.project) && (
-                <Button asChild>
-                  <Link href="/documents/new">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Document
-                  </Link>
-                </Button>
-              )}
             </div>
           )}
         </CardContent>
