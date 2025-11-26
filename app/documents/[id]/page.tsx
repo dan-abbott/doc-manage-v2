@@ -16,6 +16,8 @@ import SeeLatestReleasedButton from './SeeLatestReleasedButton'
 import VersionHistory from './VersionHistory'
 import PromoteToProductionButton from './PromoteToProductionButton'
 import CollapsibleAdminSection from './CollapsibleAdminSection'
+import AdminActions from './AdminActions'
+import AdminFileActions from './AdminFileActions'
 
 interface PageProps {
   params: { id: string }
@@ -172,13 +174,31 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
       {/* Admin Section */}
       {isAdmin && (
-        <CollapsibleAdminSection>
-          <ChangeOwnerButton 
-            documentId={document.id}
-            currentOwnerEmail={document.creator?.email || 'Unknown'}
-          />
-        </CollapsibleAdminSection>
-      )}
+  <CollapsibleAdminSection>
+    <ChangeOwnerButton 
+      documentId={document.id}
+      currentOwnerEmail={document.creator?.email || 'Unknown'}
+    />
+    
+    <div className="mt-4">
+      <AdminActions
+        documentId={document.id}
+        documentNumber={`${document.document_number}${document.version}`}
+        currentStatus={document.status}
+        currentVersion={document.version}
+        isProduction={document.is_production}
+      />
+    </div>
+    
+    <div className="mt-4">
+      <AdminFileActions
+        documentId={document.id}
+        documentNumber={`${document.document_number}${document.version}`}
+        files={document.document_files || []}
+      />
+    </div>
+  </CollapsibleAdminSection>
+)}
 
       {/* See Latest Released Version (for obsolete documents) */}
       {document.status === 'Obsolete' && (
