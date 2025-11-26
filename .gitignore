@@ -33,3 +33,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 *.zip
+Test Documents/fakefile_40MB.pdf
+Test Documents/fakefile_500KB.doc
+Test Documents/fakefile_500KB.xlsx
+Test Documents/fakefile_55MB.pdf
+Test Documents/fakefile_500KB.pdf
+Test Documents/fakefile_7MB.pdf
