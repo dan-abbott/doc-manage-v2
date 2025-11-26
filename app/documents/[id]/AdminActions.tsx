@@ -40,6 +40,7 @@ export default function AdminActions({
   // Form state
   const [newStatus, setNewStatus] = useState(currentStatus)
   const [newVersion, setNewVersion] = useState(currentVersion)
+  const [newIsProduction, setNewIsProduction] = useState(isProduction)
 
   const handleForceStatusChange = async () => {
     if (newStatus === currentStatus) {
@@ -67,15 +68,30 @@ export default function AdminActions({
     setShowConfirm(true)
   }
 
+  const handleToggleProduction = async () => {
+    if (newIsProduction === isProduction) {
+      toast.error('Production status unchanged')
+      return
+    }
+
+    setPendingAction({
+      type: 'production',
+      value: newIsProduction,
+    })
+    setShowConfirm(true)
+  }
+
   const executeAdminAction = async () => {
     setIsLoading(true)
     setShowConfirm(false)
 
     try {
       let response
+      let endpoint = ''
       
       if (pendingAction.type === 'status') {
-        response = await fetch('/api/admin/force-status-change', {
+        endpoint = '/api/admin/force-status-change'
+        response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -84,7 +100,8 @@ export default function AdminActions({
           }),
         })
       } else if (pendingAction.type === 'version') {
-        response = await fetch('/api/admin/force-version-change', {
+        endpoint = '/api/admin/force-version-change'
+        response = await fetch(endpoint, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
@@ -92,19 +109,34 @@ export default function AdminActions({
             newVersion: pendingAction.value,
           }),
         })
+      } else if (pendingAction.type === 'production') {
+        endpoint = '/api/admin/toggle-production'
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId,
+            isProduction: pendingAction.value,
+          }),
+        })
       }
 
-      const result = await response?.json()
+      if (!response) {
+        throw new Error('No response from server')
+      }
+
+      const result = await response.json()
 
       if (result?.success) {
         toast.success(`Admin action completed: ${pendingAction.type} changed`)
         router.refresh()
       } else {
+        console.error('Admin action failed:', result)
         toast.error(result?.error || 'Admin action failed')
       }
     } catch (error: any) {
       console.error('Admin action error:', error)
-      toast.error('An unexpected error occurred')
+      toast.error(error.message || 'An unexpected error occurred')
     } finally {
       setIsLoading(false)
       setPendingAction(null)
@@ -148,7 +180,7 @@ export default function AdminActions({
                 variant="destructive"
                 size="sm"
               >
-                Change Status
+                Change
               </Button>
             </div>
             <p className="text-xs text-gray-500">
@@ -175,7 +207,7 @@ export default function AdminActions({
                 variant="destructive"
                 size="sm"
               >
-                Change Version
+                Change
               </Button>
             </div>
             <p className="text-xs text-gray-500">
@@ -183,6 +215,41 @@ export default function AdminActions({
             </p>
             <p className="text-xs text-amber-600">
               ⚠️ Warning: Changing version may cause numbering conflicts
+            </p>
+          </div>
+
+          {/* Toggle Production Status */}
+          <div className="space-y-2">
+            <Label htmlFor="admin-production" className="text-sm font-medium">
+              Document Classification
+            </Label>
+            <div className="flex gap-2">
+              <Select 
+                value={newIsProduction ? 'production' : 'prototype'} 
+                onValueChange={(val) => setNewIsProduction(val === 'production')}
+              >
+                <SelectTrigger id="admin-production" className="flex-1">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="prototype">Prototype</SelectItem>
+                  <SelectItem value="production">Production</SelectItem>
+                </SelectContent>
+              </Select>
+              <Button
+                onClick={handleToggleProduction}
+                disabled={isLoading || newIsProduction === isProduction}
+                variant="destructive"
+                size="sm"
+              >
+                Change
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Current: <span className="font-medium">{isProduction ? 'Production' : 'Prototype'}</span>
+            </p>
+            <p className="text-xs text-amber-600">
+              ⚠️ Warning: Changing may require version renumbering (alpha ↔ numeric)
             </p>
           </div>
 
@@ -203,7 +270,7 @@ export default function AdminActions({
         onOpenChange={setShowConfirm}
         onConfirm={executeAdminAction}
         title="Confirm Admin Action"
-        description={`Are you sure you want to force change ${pendingAction?.type} to "${pendingAction?.value}"? This action will be logged in the audit trail.`}
+        description={`Are you sure you want to force change ${pendingAction?.type} to "${pendingAction?.type === 'production' ? (pendingAction?.value ? 'Production' : 'Prototype') : pendingAction?.value}"? This action will be logged in the audit trail.`}
         confirmText="Execute Admin Action"
         cancelText="Cancel"
         variant="destructive"
