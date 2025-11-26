@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { Label } from '@/components/ui/label'
-import { Switch } from '@/components/ui/switch'
 import { ShieldCheck } from 'lucide-react'
 import { useRouter, useSearchParams } from 'next/navigation'
 
@@ -31,15 +30,17 @@ export default function AdminViewAllToggle() {
   }
 
   return (
-    <div className="flex items-center gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+    <div className="flex items-center gap-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
       <ShieldCheck className="h-4 w-4 text-amber-600" />
-      <Label htmlFor="view-all" className="text-sm font-medium text-amber-900 cursor-pointer">
+      <Label htmlFor="view-all" className="text-sm font-medium text-amber-900 cursor-pointer flex-1">
         View All Documents (Including Others' Drafts)
       </Label>
-      <Switch
+      <input
+        type="checkbox"
         id="view-all"
         checked={viewAll}
-        onCheckedChange={handleToggle}
+        onChange={(e) => handleToggle(e.target.checked)}
+        className="h-5 w-5 rounded border-amber-300 text-amber-600 focus:ring-amber-500 cursor-pointer"
       />
     </div>
   )
