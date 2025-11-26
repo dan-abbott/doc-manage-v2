@@ -1,0 +1,132 @@
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+
+export async function POST(request: NextRequest) {
+  try {
+    const supabase = await createClient()
+    
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      return NextResponse.json(
+        { success: false, error: 'Unauthorized' },
+        { status: 401 }
+      )
+    }
+
+    // Check if user is admin
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_admin, email')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_admin) {
+      return NextResponse.json(
+        { success: false, error: 'Admin access required' },
+        { status: 403 }
+      )
+    }
+
+    // Get form data
+    const formData = await request.formData()
+    const file = formData.get('file') as File
+    const documentId = formData.get('documentId') as string
+
+    if (!file || !documentId) {
+      return NextResponse.json(
+        { success: false, error: 'File and document ID required' },
+        { status: 400 }
+      )
+    }
+
+    // Get document info
+    const { data: document } = await supabase
+      .from('documents')
+      .select('document_number, version, status')
+      .eq('id', documentId)
+      .single()
+
+    if (!document) {
+      return NextResponse.json(
+        { success: false, error: 'Document not found' },
+        { status: 404 }
+      )
+    }
+
+    // Generate file path
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${document.document_number}${document.version}_${Date.now()}.${fileExt}`
+    const filePath = `${documentId}/${fileName}`
+
+    // Upload to Supabase Storage
+    const fileBuffer = await file.arrayBuffer()
+    const { error: uploadError } = await supabase
+      .storage
+      .from('documents')
+      .upload(filePath, fileBuffer, {
+        contentType: file.type,
+        upsert: false,
+      })
+
+    if (uploadError) {
+      console.error('Storage upload error:', uploadError)
+      return NextResponse.json(
+        { success: false, error: 'Failed to upload file' },
+        { status: 500 }
+      )
+    }
+
+    // Create document_files record
+    const { error: dbError } = await supabase
+      .from('document_files')
+      .insert({
+        document_id: documentId,
+        file_name: fileName,
+        original_file_name: file.name,
+        file_path: filePath,
+        file_size: file.size,
+        mime_type: file.type,
+        uploaded_by: user.id,
+      })
+
+    if (dbError) {
+      console.error('Database insert error:', dbError)
+      
+      // Clean up uploaded file
+      await supabase.storage.from('documents').remove([filePath])
+      
+      return NextResponse.json(
+        { success: false, error: 'Failed to save file record' },
+        { status: 500 }
+      )
+    }
+
+    // Create audit log entry
+    await supabase
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        action: 'admin_file_added',
+        performed_by: user.id,
+        performed_by_email: userData.email,
+        details: {
+          file_name: file.name,
+          file_size: file.size,
+          admin_action: true,
+          document_number: document.document_number,
+          version: document.version,
+          document_status: document.status,
+        },
+      })
+
+    return NextResponse.json({ success: true })
+  } catch (error: any) {
+    console.error('Admin file upload error:', error)
+    return NextResponse.json(
+      { success: false, error: error.message || 'An unexpected error occurred' },
+      { status: 500 }
+    )
+  }
+}
