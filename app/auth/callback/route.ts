@@ -9,10 +9,28 @@ export async function GET(request: Request) {
 
   if (code) {
     const supabase = await createClient()
-    await supabase.auth.exchangeCodeForSession(code)
+    
+    // Exchange the code for a session
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code)
+    
+    if (error) {
+      console.error('Auth callback error:', error)
+      // Redirect to landing page with error
+      return NextResponse.redirect(`${origin}/?error=auth_failed`)
+    }
+
+    if (!data.session) {
+      console.error('No session created from code exchange')
+      return NextResponse.redirect(`${origin}/?error=no_session`)
+    }
+
+    // Session successfully created - redirect to destination
+    const destination = redirect || '/dashboard'
+    
+    // Use 302 redirect (temporary) to prevent caching
+    return NextResponse.redirect(`${origin}${destination}`, { status: 302 })
   }
 
-  // Redirect to the original destination, or dashboard if none specified
-  const destination = redirect || '/dashboard'
-  return NextResponse.redirect(`${origin}${destination}`)
+  // No code provided - redirect to landing page
+  return NextResponse.redirect(`${origin}/`)
 }
