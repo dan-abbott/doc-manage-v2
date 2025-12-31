@@ -2,27 +2,51 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logger } from '@/lib/logger'
+import { logError, logServerAction, logFileOperation, measureTime } from '@/lib/utils/logging-helpers'
+import { createDocumentSchema } from '@/lib/validation/schemas'
+import { validateFormData, validateFile } from '@/lib/validation/validate'
+import { sanitizeString, sanitizeFilename, sanitizeProjectCode } from '@/lib/security/sanitize'
 
 // ==========================================
 // Action: Create Document
 // ==========================================
 
 export async function createDocument(formData: FormData) {
+  const startTime = Date.now()
+  let userId: string | undefined
+  
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Create document attempted without authentication', { authError })
       return { success: false, error: 'Not authenticated' }
     }
+    
+    userId = user.id
 
-    // Extract form data
-    const document_type_id = formData.get('document_type_id') as string
-    const title = formData.get('title') as string
-    const description = formData.get('description') as string
-    const is_production = formData.get('is_production') === 'true'
-    const project_code = formData.get('project_code') as string | null
+    logger.info('Creating document', { userId, action: 'createDocument' })
+
+    // Validate form data
+    const validation = validateFormData(formData, createDocumentSchema)
+    if (!validation.success) {
+      logger.warn('Document creation validation failed', {
+        userId,
+        error: validation.error,
+        errors: validation.errors,
+      })
+      return { success: false, error: validation.error }
+    }
+
+    const data = validation.data
+
+    // Sanitize inputs
+    const title = sanitizeString(data.title)!
+    const description = sanitizeString(data.description)
+    const project_code = sanitizeProjectCode(data.project_code)
     
     // Extract files from FormData
     const files: File[] = []
@@ -32,14 +56,39 @@ export async function createDocument(formData: FormData) {
       }
     })
 
+    // Validate files
+    if (files.length > 0) {
+      if (files.length > 20) {
+        logger.warn('Too many files uploaded', { userId, fileCount: files.length })
+        return { success: false, error: 'Cannot upload more than 20 files at once' }
+      }
+
+      for (const file of files) {
+        const fileValidation = validateFile(file)
+        if (!fileValidation.success) {
+          logger.warn('File validation failed', {
+            userId,
+            fileName: file.name,
+            error: fileValidation.error,
+          })
+          return { success: false, error: `${file.name}: ${fileValidation.error}` }
+        }
+      }
+    }
+
     // Get document type for prefix and number
     const { data: docType, error: typeError } = await supabase
       .from('document_types')
       .select('prefix, next_number')
-      .eq('id', document_type_id)
+      .eq('id', data.document_type_id)
       .single()
 
     if (typeError || !docType) {
+      logger.error('Document type not found', {
+        userId,
+        documentTypeId: data.document_type_id,
+        error: typeError,
+      })
       return { success: false, error: 'Document type not found' }
     }
 
@@ -47,19 +96,27 @@ export async function createDocument(formData: FormData) {
     const documentNumber = `${docType.prefix}-${String(docType.next_number).padStart(5, '0')}`
     
     // Determine version based on production flag
-    const version = is_production ? 'v1' : 'vA'
+    const version = data.is_production ? 'v1' : 'vA'
+
+    logger.debug('Document number generated', {
+      userId,
+      documentNumber,
+      version,
+      prefix: docType.prefix,
+      nextNumber: docType.next_number,
+    })
 
     // Create document
     const { data: document, error: createError } = await supabase
       .from('documents')
       .insert({
-        document_type_id: document_type_id,
+        document_type_id: data.document_type_id,
         document_number: documentNumber,
         version: version,
         title: title,
         description: description,
-        is_production: is_production,
-        project_code: project_code || null,
+        is_production: data.is_production,
+        project_code: project_code,
         status: 'Draft',
         created_by: user.id,
       })
@@ -67,51 +124,103 @@ export async function createDocument(formData: FormData) {
       .single()
 
     if (createError || !document) {
+      logError(createError || new Error('No document returned'), {
+        action: 'createDocument',
+        userId,
+        documentNumber,
+      })
       return { success: false, error: 'Failed to create document' }
     }
+
+    logger.info('Document created successfully', {
+      userId,
+      documentId: document.id,
+      documentNumber: `${documentNumber}${version}`,
+    })
 
     // Increment document type counter
     await supabase
       .from('document_types')
       .update({ next_number: docType.next_number + 1 })
-      .eq('id', document_type_id)
+      .eq('id', data.document_type_id)
 
     // Upload files
     if (files.length > 0) {
+      logger.info('Uploading files', {
+        userId,
+        documentId: document.id,
+        fileCount: files.length,
+      })
+
       const uploadPromises = files.map(async (file) => {
-        // Generate unique file path with document number prefix
-        const fileName = `${documentNumber}${version}_${file.name}`
-        const filePath = `${document.id}/${fileName}`
+        const fileStartTime = Date.now()
+        
+        try {
+          // Sanitize filename
+          const sanitizedName = sanitizeFilename(file.name)
+          const fileName = `${documentNumber}${version}_${sanitizedName}`
+          const filePath = `${document.id}/${fileName}`
 
-        // Upload to storage
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, file)
+          // Upload to storage
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file)
 
-        if (uploadError) {
-          console.error('File upload error:', uploadError)
-          return null
-        }
+          if (uploadError) {
+            logFileOperation('upload', {
+              fileName: sanitizedName,
+              fileSize: file.size,
+              documentId: document.id,
+              userId,
+              success: false,
+              error: uploadError,
+              duration: Date.now() - fileStartTime,
+            })
+            return null
+          }
 
-        // Save file metadata
-        const { error: metaError } = await supabase
-          .from('document_files')
-          .insert({
-            document_id: document.id,
-            file_name: fileName,
-            original_file_name: file.name,
-            file_path: filePath,
-            file_size: file.size,
-            mime_type: file.type,
-            uploaded_by: user.id,
+          // Save file metadata
+          const { error: metaError } = await supabase
+            .from('document_files')
+            .insert({
+              document_id: document.id,
+              file_name: fileName,
+              original_file_name: sanitizedName,
+              file_path: filePath,
+              file_size: file.size,
+              mime_type: file.type,
+              uploaded_by: user.id,
+            })
+
+          if (metaError) {
+            logError(metaError, {
+              action: 'saveFileMetadata',
+              userId,
+              documentId: document.id,
+              fileName,
+            })
+            return null
+          }
+
+          logFileOperation('upload', {
+            fileName: sanitizedName,
+            fileSize: file.size,
+            documentId: document.id,
+            userId,
+            success: true,
+            duration: Date.now() - fileStartTime,
           })
 
-        if (metaError) {
-          console.error('File metadata error:', metaError)
+          return fileName
+        } catch (error) {
+          logError(error, {
+            action: 'uploadFile',
+            userId,
+            documentId: document.id,
+            fileName: file.name,
+          })
           return null
         }
-
-        return fileName
       })
 
       await Promise.all(uploadPromises)
@@ -135,14 +244,31 @@ export async function createDocument(formData: FormData) {
     revalidatePath('/documents')
     revalidatePath('/dashboard')
 
+    const duration = Date.now() - startTime
+    logServerAction('createDocument', {
+      userId,
+      documentId: document.id,
+      success: true,
+      duration,
+    })
+
     return { 
       success: true, 
       documentId: document.id,
       documentNumber: `${documentNumber}${version}`
     }
-  } catch (error: any) {
-    console.error('Create document error:', error)
-    return { success: false, error: error.message || 'Failed to create document' }
+  } catch (error) {
+    const duration = Date.now() - startTime
+    logError(error, {
+      action: 'createDocument',
+      userId,
+      duration,
+    })
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to create document'
+    }
   }
 }
 
@@ -159,13 +285,34 @@ export async function updateDocument(
   },
   newFiles: File[] = []
 ) {
+  const startTime = Date.now()
+  let userId: string | undefined
+
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Update document attempted without authentication', { authError, documentId })
       return { success: false, error: 'Not authenticated' }
+    }
+
+    userId = user.id
+    logger.info('Updating document', { userId, documentId, action: 'updateDocument' })
+
+    // Sanitize inputs
+    const title = sanitizeString(data.title)
+    const description = sanitizeString(data.description)
+    const project_code = sanitizeProjectCode(data.project_code)
+
+    // Validate sanitized data
+    if (!title || title.length === 0) {
+      return { success: false, error: 'Title is required' }
+    }
+
+    if (title.length > 200) {
+      return { success: false, error: 'Title must be less than 200 characters' }
     }
 
     // Get document to check ownership and status
@@ -176,14 +323,25 @@ export async function updateDocument(
       .single()
 
     if (getError || !document) {
+      logger.error('Document not found for update', { userId, documentId, error: getError })
       return { success: false, error: 'Document not found' }
     }
 
     if (document.created_by !== user.id) {
+      logger.warn('Unauthorized document update attempt', {
+        userId,
+        documentId,
+        ownerId: document.created_by,
+      })
       return { success: false, error: 'Not authorized' }
     }
 
     if (document.status !== 'Draft') {
+      logger.warn('Attempt to edit non-draft document', {
+        userId,
+        documentId,
+        status: document.status,
+      })
       return { success: false, error: 'Only Draft documents can be edited' }
     }
 
@@ -191,44 +349,101 @@ export async function updateDocument(
     const { error: updateError } = await supabase
       .from('documents')
       .update({
-        title: data.title,
-        description: data.description,
-        project_code: data.project_code,
+        title: title,
+        description: description,
+        project_code: project_code,
       })
       .eq('id', documentId)
 
     if (updateError) {
+      logError(updateError, { action: 'updateDocument', userId, documentId })
       return { success: false, error: 'Failed to update document' }
     }
 
-    // Upload new files
+    logger.info('Document updated successfully', { userId, documentId })
+
+    // Validate and upload new files
     if (newFiles.length > 0) {
-      const uploadPromises = newFiles.map(async (file) => {
-        const fileName = `${document.document_number}${document.version}_${file.name}`
-        const filePath = `${document.id}/${fileName}`
+      if (newFiles.length > 20) {
+        return { success: false, error: 'Cannot upload more than 20 files at once' }
+      }
 
-        const { error: uploadError } = await supabase.storage
-          .from('documents')
-          .upload(filePath, file)
-
-        if (uploadError) {
-          console.error('File upload error:', uploadError)
-          return null
+      // Validate each file
+      for (const file of newFiles) {
+        const fileValidation = validateFile(file)
+        if (!fileValidation.success) {
+          logger.warn('File validation failed during update', {
+            userId,
+            documentId,
+            fileName: file.name,
+            error: fileValidation.error,
+          })
+          return { success: false, error: `${file.name}: ${fileValidation.error}` }
         }
+      }
 
-        await supabase
-          .from('document_files')
-          .insert({
-            document_id: document.id,
-            file_name: fileName,
-            original_file_name: file.name,
-            file_path: filePath,
-            file_size: file.size,
-            mime_type: file.type,
-            uploaded_by: user.id,
+      logger.info('Uploading new files', {
+        userId,
+        documentId,
+        fileCount: newFiles.length,
+      })
+
+      const uploadPromises = newFiles.map(async (file) => {
+        const fileStartTime = Date.now()
+        
+        try {
+          const sanitizedName = sanitizeFilename(file.name)
+          const fileName = `${document.document_number}${document.version}_${sanitizedName}`
+          const filePath = `${document.id}/${fileName}`
+
+          const { error: uploadError } = await supabase.storage
+            .from('documents')
+            .upload(filePath, file)
+
+          if (uploadError) {
+            logFileOperation('upload', {
+              fileName: sanitizedName,
+              fileSize: file.size,
+              documentId: document.id,
+              userId,
+              success: false,
+              error: uploadError,
+              duration: Date.now() - fileStartTime,
+            })
+            return null
+          }
+
+          await supabase
+            .from('document_files')
+            .insert({
+              document_id: document.id,
+              file_name: fileName,
+              original_file_name: sanitizedName,
+              file_path: filePath,
+              file_size: file.size,
+              mime_type: file.type,
+              uploaded_by: user.id,
+            })
+
+          logFileOperation('upload', {
+            fileName: sanitizedName,
+            fileSize: file.size,
+            documentId: document.id,
+            userId,
+            success: true,
+            duration: Date.now() - fileStartTime,
           })
 
-        return fileName
+          return fileName
+        } catch (error) {
+          logError(error, {
+            action: 'uploadFileOnUpdate',
+            userId,
+            documentId,
+            fileName: file.name,
+          })
+          return null
+        }
       })
 
       await Promise.all(uploadPromises)
@@ -242,16 +457,29 @@ export async function updateDocument(
         action: 'updated',
         performed_by: user.id,
         performed_by_email: user.email,
-        details: { changes: data },
+        details: { changes: { title, description, project_code } },
       })
 
     revalidatePath(`/documents/${documentId}`)
     revalidatePath('/documents')
 
+    const duration = Date.now() - startTime
+    logServerAction('updateDocument', {
+      userId,
+      documentId,
+      success: true,
+      duration,
+    })
+
     return { success: true }
-  } catch (error: any) {
-    console.error('Update document error:', error)
-    return { success: false, error: error.message || 'Failed to update document' }
+  } catch (error) {
+    const duration = Date.now() - startTime
+    logError(error, { action: 'updateDocument', userId, documentId, duration })
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to update document'
+    }
   }
 }
 
@@ -260,14 +488,21 @@ export async function updateDocument(
 // ==========================================
 
 export async function deleteDocument(documentId: string) {
+  const startTime = Date.now()
+  let userId: string | undefined
+
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Delete document attempted without authentication', { authError, documentId })
       return { success: false, error: 'Not authenticated' }
     }
+
+    userId = user.id
+    logger.info('Deleting document', { userId, documentId, action: 'deleteDocument' })
 
     // Get document to check ownership and status
     const { data: document, error: getError } = await supabase
@@ -277,14 +512,25 @@ export async function deleteDocument(documentId: string) {
       .single()
 
     if (getError || !document) {
+      logger.error('Document not found for deletion', { userId, documentId, error: getError })
       return { success: false, error: 'Document not found' }
     }
 
     if (document.created_by !== user.id) {
+      logger.warn('Unauthorized document deletion attempt', {
+        userId,
+        documentId,
+        ownerId: document.created_by,
+      })
       return { success: false, error: 'Not authorized' }
     }
 
     if (document.status !== 'Draft') {
+      logger.warn('Attempt to delete non-draft document', {
+        userId,
+        documentId,
+        status: document.status,
+      })
       return { 
         success: false, 
         error: 'Only Draft documents can be deleted' 
@@ -294,12 +540,30 @@ export async function deleteDocument(documentId: string) {
     // Delete all files from storage
     if (document.document_files && document.document_files.length > 0) {
       const filePaths = document.document_files.map((f: any) => f.file_path)
+      
+      logger.info('Deleting files from storage', {
+        userId,
+        documentId,
+        fileCount: filePaths.length,
+      })
+
       const { error: storageError } = await supabase.storage
         .from('documents')
         .remove(filePaths)
 
       if (storageError) {
-        console.error('Storage delete error:', storageError)
+        logError(storageError, {
+          action: 'deleteDocumentFiles',
+          userId,
+          documentId,
+          fileCount: filePaths.length,
+        })
+      } else {
+        logger.info('Files deleted from storage', {
+          userId,
+          documentId,
+          fileCount: filePaths.length,
+        })
       }
     }
 
@@ -310,20 +574,39 @@ export async function deleteDocument(documentId: string) {
       .eq('id', documentId)
 
     if (deleteError) {
-      console.error('Delete document error:', deleteError)
+      logError(deleteError, { action: 'deleteDocument', userId, documentId })
       return { success: false, error: 'Failed to delete document' }
     }
 
+    logger.info('Document deleted successfully', {
+      userId,
+      documentId,
+      documentNumber: `${document.document_number}${document.version}`,
+    })
+
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+
+    const duration = Date.now() - startTime
+    logServerAction('deleteDocument', {
+      userId,
+      documentId,
+      success: true,
+      duration,
+    })
 
     return { 
       success: true, 
       message: 'Document deleted successfully' 
     }
-  } catch (error: any) {
-    console.error('Delete document error:', error)
-    return { success: false, error: error.message || 'Failed to delete document' }
+  } catch (error) {
+    const duration = Date.now() - startTime
+    logError(error, { action: 'deleteDocument', userId, documentId, duration })
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to delete document'
+    }
   }
 }
 
@@ -332,14 +615,21 @@ export async function deleteDocument(documentId: string) {
 // ==========================================
 
 export async function deleteFile(documentId: string, fileId: string) {
+  const startTime = Date.now()
+  let userId: string | undefined
+
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Delete file attempted without authentication', { authError, documentId, fileId })
       return { success: false, error: 'Not authenticated' }
     }
+
+    userId = user.id
+    logger.info('Deleting file', { userId, documentId, fileId, action: 'deleteFile' })
 
     // Get file and document
     const { data: file, error: fileError } = await supabase
@@ -350,16 +640,29 @@ export async function deleteFile(documentId: string, fileId: string) {
       .single()
 
     if (fileError || !file) {
+      logger.error('File not found for deletion', { userId, documentId, fileId, error: fileError })
       return { success: false, error: 'File not found' }
     }
 
     const document = file.document as any
 
     if (document.created_by !== user.id) {
+      logger.warn('Unauthorized file deletion attempt', {
+        userId,
+        documentId,
+        fileId,
+        ownerId: document.created_by,
+      })
       return { success: false, error: 'Not authorized' }
     }
 
     if (document.status !== 'Draft') {
+      logger.warn('Attempt to delete file from non-draft document', {
+        userId,
+        documentId,
+        fileId,
+        status: document.status,
+      })
       return { success: false, error: 'Can only delete files from Draft documents' }
     }
 
@@ -369,7 +672,13 @@ export async function deleteFile(documentId: string, fileId: string) {
       .remove([file.file_path])
 
     if (storageError) {
-      console.error('Storage delete error:', storageError)
+      logError(storageError, {
+        action: 'deleteFileFromStorage',
+        userId,
+        documentId,
+        fileId,
+        filePath: file.file_path,
+      })
     }
 
     // Delete file record
@@ -379,8 +688,18 @@ export async function deleteFile(documentId: string, fileId: string) {
       .eq('id', fileId)
 
     if (deleteError) {
+      logError(deleteError, { action: 'deleteFileRecord', userId, documentId, fileId })
       return { success: false, error: 'Failed to delete file' }
     }
+
+    logFileOperation('delete', {
+      fileName: file.file_name,
+      fileSize: file.file_size,
+      documentId: documentId,
+      userId,
+      success: true,
+      duration: Date.now() - startTime,
+    })
 
     // Create audit log entry
     await supabase
@@ -395,10 +714,24 @@ export async function deleteFile(documentId: string, fileId: string) {
 
     revalidatePath(`/documents/${documentId}`)
 
+    const duration = Date.now() - startTime
+    logServerAction('deleteFile', {
+      userId,
+      documentId,
+      fileId,
+      success: true,
+      duration,
+    })
+
     return { success: true }
-  } catch (error: any) {
-    console.error('Delete file error:', error)
-    return { success: false, error: error.message || 'Failed to delete file' }
+  } catch (error) {
+    const duration = Date.now() - startTime
+    logError(error, { action: 'deleteFile', userId, documentId, fileId, duration })
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to delete file'
+    }
   }
 }
 
@@ -407,14 +740,21 @@ export async function deleteFile(documentId: string, fileId: string) {
 // ==========================================
 
 export async function releaseDocument(documentId: string) {
+  const startTime = Date.now()
+  let userId: string | undefined
+
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Release document attempted without authentication', { authError, documentId })
       return { success: false, error: 'Not authenticated' }
     }
+
+    userId = user.id
+    logger.info('Releasing document', { userId, documentId, action: 'releaseDocument' })
 
     // Get document with approvers count
     const { data: document, error: getError } = await supabase
@@ -424,18 +764,33 @@ export async function releaseDocument(documentId: string) {
       .single()
 
     if (getError || !document) {
+      logger.error('Document not found for release', { userId, documentId, error: getError })
       return { success: false, error: 'Document not found' }
     }
 
     if (document.created_by !== user.id) {
+      logger.warn('Unauthorized document release attempt', {
+        userId,
+        documentId,
+        ownerId: document.created_by,
+      })
       return { success: false, error: 'Not authorized' }
     }
 
     if (document.status !== 'Draft') {
+      logger.warn('Attempt to release non-draft document', {
+        userId,
+        documentId,
+        status: document.status,
+      })
       return { success: false, error: 'Only Draft documents can be released' }
     }
 
     if (document.is_production) {
+      logger.warn('Attempt to directly release production document', {
+        userId,
+        documentId,
+      })
       return { 
         success: false, 
         error: 'Production documents require approval workflow' 
@@ -445,6 +800,11 @@ export async function releaseDocument(documentId: string) {
     // Check if there are approvers - if yes, must use submitForApproval instead
     const approverCount = document.approvers?.[0]?.count || 0
     if (approverCount > 0) {
+      logger.warn('Attempt to release document with approvers', {
+        userId,
+        documentId,
+        approverCount,
+      })
       return {
         success: false,
         error: 'This document has approvers assigned. Use "Submit for Approval" instead of "Release".'
@@ -462,8 +822,15 @@ export async function releaseDocument(documentId: string) {
       .eq('id', documentId)
 
     if (updateError) {
+      logError(updateError, { action: 'releaseDocument', userId, documentId })
       return { success: false, error: 'Failed to release document' }
     }
+
+    logger.info('Document released successfully', {
+      userId,
+      documentId,
+      documentNumber: `${document.document_number}${document.version}`,
+    })
 
     // Handle obsolescence: make immediate predecessor obsolete
     // Get the immediate predecessor version
@@ -478,6 +845,13 @@ export async function releaseDocument(documentId: string) {
       
       // Only obsolete if predecessor is Released
       if (predecessor.status === 'Released') {
+        logger.info('Obsoleting predecessor version', {
+          userId,
+          documentId,
+          predecessorId: predecessor.id,
+          predecessorVersion: predecessor.version,
+        })
+
         await supabase
           .from('documents')
           .update({ status: 'Obsolete' })
@@ -516,9 +890,22 @@ export async function releaseDocument(documentId: string) {
     revalidatePath('/documents')
     revalidatePath('/dashboard')
 
+    const duration = Date.now() - startTime
+    logServerAction('releaseDocument', {
+      userId,
+      documentId,
+      success: true,
+      duration,
+    })
+
     return { success: true }
-  } catch (error: any) {
-    console.error('Release document error:', error)
-    return { success: false, error: error.message || 'Failed to release document' }
+  } catch (error) {
+    const duration = Date.now() - startTime
+    logError(error, { action: 'releaseDocument', userId, documentId, duration })
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to release document'
+    }
   }
 }
