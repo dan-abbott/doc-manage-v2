@@ -8,6 +8,10 @@ import DocumentsTable from './DocumentsTable'
 import DocumentsFilters from './DocumentsFilters'
 import AdminViewAllToggle from './AdminViewAllToggle'
 
+// Force dynamic rendering - don't cache this page
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface PageProps {
   searchParams: {
     search?: string

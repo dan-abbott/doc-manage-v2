@@ -29,10 +29,12 @@ export default function ApproveButton({ documentId, documentNumber }: ApproveBut
       if (result.success) {
         if (result.allApproved) {
           alert(`All approvers have approved! Document ${documentNumber} has been released.`)
+          // Force full page reload when document is released
+          window.location.reload()
         } else {
           alert('Document approved successfully. Waiting for other approvers.')
+          router.refresh()
         }
-        router.refresh()
       } else {
         setError(result.error || 'Failed to approve document')
         setIsSubmitting(false)

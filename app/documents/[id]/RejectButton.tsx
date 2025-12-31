@@ -33,7 +33,8 @@ export default function RejectButton({ documentId, documentNumber }: RejectButto
 
       if (result.success) {
         alert(`Document ${documentNumber} has been rejected and returned to Draft status.`)
-        router.refresh()
+        // Force full page reload to show updated status
+        window.location.reload()
       } else {
         setError(result.error || 'Failed to reject document')
         setIsSubmitting(false)
