@@ -8,8 +8,7 @@ import DocumentsTable from './DocumentsTable'
 import DocumentsFilters from './DocumentsFilters'
 import AdminViewAllToggle from './AdminViewAllToggle'
 
-// Force dynamic rendering - don't cache this page
-export const dynamic = 'force-dynamic'
+// Disable caching but allow dynamic rendering
 export const revalidate = 0
 
 interface PageProps {

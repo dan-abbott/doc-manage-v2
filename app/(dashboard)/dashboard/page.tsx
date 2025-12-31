@@ -6,8 +6,7 @@ import { Button } from '@/components/ui/button'
 import { getGreetingWithName } from '@/lib/utils/greetings'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
 
-// Force dynamic rendering - don't cache this page
-export const dynamic = 'force-dynamic'
+// Disable caching but allow dynamic rendering
 export const revalidate = 0
 
 export default async function DashboardPage() {
