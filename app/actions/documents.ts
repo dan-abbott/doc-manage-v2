@@ -48,6 +48,16 @@ export async function createDocument(formData: FormData) {
     const description = sanitizeHTML(data.description || '')
     const project_code = sanitizeProjectCode(data.project_code)
     
+    // Log if HTML was stripped (potential XSS attempt or accidental paste)
+    if (data.title !== title) {
+      logger.warn('HTML stripped from title', { 
+        userId, 
+        originalTitle: data.title,
+        sanitizedTitle: title,
+        action: 'createDocument'
+      })
+    }
+    
     // Validate sanitized title isn't empty after HTML stripping
     if (!title || title.trim().length === 0) {
       logger.warn('Title is empty after sanitization', { userId, originalTitle: data.title })
@@ -311,6 +321,17 @@ export async function updateDocument(
     const title = sanitizeHTML(data.title)
     const description = sanitizeHTML(data.description || '')
     const project_code = sanitizeProjectCode(data.project_code)
+
+    // Log if HTML was stripped
+    if (data.title !== title) {
+      logger.warn('HTML stripped from title during update', { 
+        userId, 
+        documentId,
+        originalTitle: data.title,
+        sanitizedTitle: title,
+        action: 'updateDocument'
+      })
+    }
 
     // Validate sanitized data
     if (!title || title.length === 0) {

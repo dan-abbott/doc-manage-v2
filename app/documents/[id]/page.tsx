@@ -60,7 +60,41 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     .single()
 
   if (error || !document) {
-    console.error('Document fetch error:', error)
+    // Check if it's an RLS/access denied error (0 rows returned)
+    if (error?.code === 'PGRST116' || (error?.details && error.details.includes('0 rows'))) {
+      // Document exists but user doesn't have access (RLS blocked it)
+      // This is expected for Draft documents owned by others
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100 dark:from-slate-900 dark:to-slate-800">
+          <div className="container mx-auto px-4 py-16">
+            <Card className="max-w-2xl mx-auto">
+              <CardHeader>
+                <CardTitle className="text-2xl text-red-600">Access Denied</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <p className="text-gray-700">
+                  You don't have permission to view this document. This could be because:
+                </p>
+                <ul className="list-disc list-inside space-y-2 text-gray-600 ml-4">
+                  <li>The document is in Draft status and you're not the creator</li>
+                  <li>The document has been deleted</li>
+                  <li>You're not assigned as an approver for this document</li>
+                </ul>
+                <div className="pt-4">
+                  <Link href="/documents">
+                    <Button variant="outline">
+                      ← Back to Documents
+                    </Button>
+                  </Link>
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+      )
+    }
+    
+    // Other error or truly not found
     notFound()
   }
 
