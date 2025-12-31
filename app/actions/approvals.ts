@@ -39,12 +39,12 @@ export async function addApprover(documentId: string, userId: string, userEmail:
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      logger.warn('Add approver attempted without authentication', { authError, documentId })
+      logger.warn({ authError, documentId }, 'Add approver attempted without authentication')
       return { success: false, error: 'Not authenticated' }
     }
 
     currentUserId = user.id
-    logger.info('Adding approver', { userId: currentUserId, documentId, approverId: userId, action: 'addApprover' })
+    logger.info({ userId: currentUserId, documentId, approverId: userId, action: 'addApprover' }, 'Adding approver')
 
     // Validate input
     const validation = validateJSON(

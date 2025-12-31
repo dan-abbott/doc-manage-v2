@@ -45,8 +45,8 @@ const baseConfig: pino.LoggerOptions = {
   },
 }
 
-// Create logger with environment-specific transport
-export const logger = isProduction
+// Create base Pino logger with environment-specific transport
+const pinoLogger = isProduction
   ? pino(baseConfig)
   : pino({
       ...baseConfig,
@@ -62,11 +62,51 @@ export const logger = isProduction
     })
 
 /**
+ * Wrapper logger that accepts both (message, object) and (object, message) syntax
+ * This provides a more intuitive API
+ */
+export const logger = {
+  info: (msgOrObj: string | object, objOrMsg?: object | string) => {
+    if (typeof msgOrObj === 'string') {
+      pinoLogger.info(objOrMsg as object || {}, msgOrObj)
+    } else {
+      pinoLogger.info(msgOrObj, objOrMsg as string || '')
+    }
+  },
+  
+  warn: (msgOrObj: string | object, objOrMsg?: object | string) => {
+    if (typeof msgOrObj === 'string') {
+      pinoLogger.warn(objOrMsg as object || {}, msgOrObj)
+    } else {
+      pinoLogger.warn(msgOrObj, objOrMsg as string || '')
+    }
+  },
+  
+  error: (msgOrObj: string | object, objOrMsg?: object | string) => {
+    if (typeof msgOrObj === 'string') {
+      pinoLogger.error(objOrMsg as object || {}, msgOrObj)
+    } else {
+      pinoLogger.error(msgOrObj, objOrMsg as string || '')
+    }
+  },
+  
+  debug: (msgOrObj: string | object, objOrMsg?: object | string) => {
+    if (typeof msgOrObj === 'string') {
+      pinoLogger.debug(objOrMsg as object || {}, msgOrObj)
+    } else {
+      pinoLogger.debug(msgOrObj, objOrMsg as string || '')
+    }
+  },
+  
+  child: (bindings: pino.Bindings) => pinoLogger.child(bindings),
+}
+
+/**
  * Create a child logger with additional context
  * Useful for adding request-specific context
  */
 export function createContextLogger(context: Record<string, any>) {
-  return logger.child(context)
+  return pinoLogger.child(context)
 }
 
 /**
