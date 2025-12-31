@@ -8,6 +8,17 @@ export async function middleware(request: NextRequest) {
     },
   })
 
+  // Add cache-control headers for document pages to prevent stale data
+  const isDocumentPage = request.nextUrl.pathname.startsWith('/documents') || 
+                         request.nextUrl.pathname.startsWith('/dashboard') ||
+                         request.nextUrl.pathname.startsWith('/approvals')
+  
+  if (isDocumentPage) {
+    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
+    response.headers.set('Pragma', 'no-cache')
+    response.headers.set('Expires', '0')
+  }
+
   const supabase = createServerClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,

@@ -1,18 +1,24 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { logger } from '@/lib/logger'
+import { logError, logServerAction } from '@/lib/utils/logging-helpers'
 
 // ==========================================
 // Dashboard Statistics
 // ==========================================
 
 export async function getDashboardStats() {
+  const startTime = Date.now()
+  let userId: string | undefined
+  
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Dashboard stats accessed without authentication')
       return { 
         success: false, 
         error: 'Not authenticated',
@@ -24,6 +30,9 @@ export async function getDashboardStats() {
         }
       }
     }
+
+    userId = user.id
+    logger.debug('Fetching dashboard statistics', { userId, action: 'getDashboardStats' })
 
     // Get total documents count
     const { count: totalCount } = await supabase
@@ -49,17 +58,31 @@ export async function getDashboardStats() {
       .select('*', { count: 'exact', head: true })
       .eq('status', 'Released')
 
+    const stats = {
+      totalDocuments: totalCount || 0,
+      pendingApprovals: pendingCount || 0,
+      myDocuments: myDocsCount || 0,
+      releasedDocuments: releasedCount || 0,
+    }
+
+    logServerAction('getDashboardStats', {
+      userId,
+      success: true,
+      duration: Date.now() - startTime,
+      stats
+    })
+
     return {
       success: true,
-      data: {
-        totalDocuments: totalCount || 0,
-        pendingApprovals: pendingCount || 0,
-        myDocuments: myDocsCount || 0,
-        releasedDocuments: releasedCount || 0,
-      }
+      data: stats
     }
   } catch (error: any) {
-    console.error('Get dashboard stats error:', error)
+    logError(error, {
+      action: 'getDashboardStats',
+      userId,
+      duration: Date.now() - startTime
+    })
+    
     return {
       success: false,
       error: error.message || 'Failed to fetch dashboard statistics',
@@ -88,14 +111,21 @@ export interface ActivityItem {
 }
 
 export async function getRecentActivity(limit: number = 10) {
+  const startTime = Date.now()
+  let userId: string | undefined
+  
   try {
     const supabase = await createClient()
 
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
+      logger.warn('Recent activity accessed without authentication')
       return { success: false, error: 'Not authenticated', data: [] }
     }
+
+    userId = user.id
+    logger.debug('Fetching recent activity', { userId, limit, action: 'getRecentActivity' })
 
     // Get recent audit log entries with document details
     const { data: activities, error } = await supabase
@@ -112,7 +142,12 @@ export async function getRecentActivity(limit: number = 10) {
       .limit(limit)
 
     if (error) {
-      console.error('Get recent activity error:', error)
+      logError(error, {
+        action: 'getRecentActivity',
+        userId,
+        limit,
+        duration: Date.now() - startTime
+      })
       return { success: false, error: 'Failed to fetch recent activity', data: [] }
     }
 
@@ -129,9 +164,23 @@ export async function getRecentActivity(limit: number = 10) {
       created_at: a.created_at,
     }))
 
+    logServerAction('getRecentActivity', {
+      userId,
+      success: true,
+      duration: Date.now() - startTime,
+      activityCount: formattedActivities.length,
+      limit
+    })
+
     return { success: true, data: formattedActivities }
   } catch (error: any) {
-    console.error('Get recent activity error:', error)
+    logError(error, {
+      action: 'getRecentActivity',
+      userId,
+      limit,
+      duration: Date.now() - startTime
+    })
+    
     return { 
       success: false, 
       error: error.message || 'Failed to fetch recent activity', 
