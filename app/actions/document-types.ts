@@ -1,553 +1,638 @@
-'use server';
+// app/actions/document-types.ts
+'use server'
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
-
-export type DocumentType = {
-  id: string;
-  name: string;
-  prefix: string;
-  description: string | null;
-  is_active: boolean;
-  next_number: number;
-  created_at: string;
-  updated_at: string;
-};
-
-type ActionResult<T = void> = {
-  success: boolean;
-  data?: T;
-  error?: {
-    code: string;
-    message: string;
-    field?: string;
-  };
-};
-
-/**
- * Get all document types (for list page and dropdowns)
- */
-export async function getDocumentTypes(activeOnly = false): Promise<ActionResult<DocumentType[]>> {
-  try {
-    const supabase = await createClient();
-
-    let query = supabase
-      .from('document_types')
-      .select('*')
-      .order('name');
-
-    if (activeOnly) {
-      query = query.eq('is_active', true);
-    }
-
-    const { data, error } = await query;
-
-    if (error) {
-      return {
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Failed to load document types',
-        },
-      };
-    }
-
-    return {
-      success: true,
-      data: data || [],
-    };
-  } catch (error) {
-    console.error('Error in getDocumentTypes:', error);
-    return {
-      success: false,
-      error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    };
-  }
-}
-
-/**
- * Get a single document type by ID
- */
-export async function getDocumentType(id: string): Promise<ActionResult<DocumentType>> {
-  try {
-    const supabase = await createClient();
-
-    const { data, error } = await supabase
-      .from('document_types')
-      .select('*')
-      .eq('id', id)
-      .single();
-
-    if (error || !data) {
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Document type not found',
-        },
-      };
-    }
-
-    return {
-      success: true,
-      data,
-    };
-  } catch (error) {
-    console.error('Error in getDocumentType:', error);
-    return {
-      success: false,
-      error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    };
-  }
-}
-
-/**
- * Check if user is admin
- */
-async function checkAdminAccess(): Promise<ActionResult> {
-  const supabase = await createClient();
-  
-  const { data: { user } } = await supabase.auth.getUser();
-  
-  if (!user) {
-    return {
-      success: false,
-      error: {
-        code: 'AUTH_REQUIRED',
-        message: 'Authentication required',
-      },
-    };
-  }
-
-  const { data: userData } = await supabase
-    .from('users')
-    .select('is_admin')
-    .eq('id', user.id)
-    .single();
-
-  if (!userData?.is_admin) {
-    return {
-      success: false,
-      error: {
-        code: 'PERMISSION_DENIED',
-        message: 'Admin access required',
-      },
-    };
-  }
-
-  return { success: true };
-}
-
-/**
- * Validate document type input
- */
-function validateDocumentTypeInput(data: {
-  name: string;
-  prefix: string;
-  description?: string;
-}): ActionResult {
-  if (!data.name || data.name.trim().length === 0) {
-    return {
-      success: false,
-      error: {
-        code: 'INVALID_INPUT',
-        message: 'Name is required',
-        field: 'name',
-      },
-    };
-  }
-
-  if (data.name.length > 100) {
-    return {
-      success: false,
-      error: {
-        code: 'INVALID_INPUT',
-        message: 'Name must be 100 characters or less',
-        field: 'name',
-      },
-    };
-  }
-
-  if (!data.prefix || data.prefix.trim().length === 0) {
-    return {
-      success: false,
-      error: {
-        code: 'INVALID_INPUT',
-        message: 'Prefix is required',
-        field: 'prefix',
-      },
-    };
-  }
-
-  // Prefix must be uppercase letters only, 2-10 chars
-  const prefixRegex = /^[A-Z]{2,10}$/;
-  if (!prefixRegex.test(data.prefix)) {
-    return {
-      success: false,
-      error: {
-        code: 'INVALID_INPUT',
-        message: 'Prefix must be 2-10 uppercase letters (A-Z)',
-        field: 'prefix',
-      },
-    };
-  }
-
-  if (data.description && data.description.length > 500) {
-    return {
-      success: false,
-      error: {
-        code: 'INVALID_INPUT',
-        message: 'Description must be 500 characters or less',
-        field: 'description',
-      },
-    };
-  }
-
-  return { success: true };
-}
+import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { z } from 'zod'
+import { logger, logServerAction, logError, logDatabaseQuery } from '@/lib/logger'
+import { sanitizeString } from '@/lib/validation/sanitize'
+import { 
+  documentTypeCreateSchema, 
+  documentTypeUpdateSchema,
+  uuidSchema 
+} from '@/lib/validation/schemas'
 
 /**
  * Create a new document type
+ * Admin only - creates new document type with validation
  */
-export async function createDocumentType(data: {
-  name: string;
-  prefix: string;
-  description?: string;
-}): Promise<ActionResult<DocumentType>> {
+export async function createDocumentType(formData: FormData) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
   try {
-    // Check admin access
-    const accessCheck = await checkAdminAccess();
-    if (!accessCheck.success) {
-      return accessCheck as ActionResult<DocumentType>;
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.warn('Unauthorized document type creation attempt', { error: userError?.message })
+      return { 
+        success: false, 
+        error: 'You must be logged in to create document types' 
+      }
     }
 
-    // Validate input
-    const validation = validateDocumentTypeInput(data);
+    const userId = user.id
+    const userEmail = user.email
+
+    // Check admin status
+    const { data: userData, error: adminCheckError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single()
+
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted document type creation', { 
+        userId, 
+        userEmail,
+        isAdmin: userData?.is_admin 
+      })
+      return { 
+        success: false, 
+        error: 'Only administrators can create document types' 
+      }
+    }
+
+    // Extract and validate form data
+    const rawData = {
+      name: formData.get('name'),
+      prefix: formData.get('prefix'),
+      description: formData.get('description'),
+      is_active: formData.get('is_active') === 'true'
+    }
+
+    const validation = documentTypeCreateSchema.safeParse(rawData)
+    
     if (!validation.success) {
-      return validation as ActionResult<DocumentType>;
+      const errorMessage = validation.error.issues.map(i => i.message).join(', ')
+      logger.warn('Document type creation validation failed', { 
+        userId, 
+        userEmail,
+        errors: validation.error.issues,
+        rawData: { ...rawData, description: rawData.description ? '[PROVIDED]' : null }
+      })
+      return { 
+        success: false, 
+        error: errorMessage 
+      }
     }
 
-    const supabase = await createClient();
+    const validatedData = validation.data
 
-    // Check if prefix already exists
-    const { data: existingType } = await supabase
+    // Sanitize text inputs
+    const sanitizedData = {
+      name: sanitizeString(validatedData.name),
+      prefix: validatedData.prefix.toUpperCase(), // Already validated as uppercase letters
+      description: validatedData.description ? sanitizeString(validatedData.description) : null,
+      is_active: validatedData.is_active
+    }
+
+    logger.info('Creating document type', {
+      userId,
+      userEmail,
+      documentType: sanitizedData.name,
+      prefix: sanitizedData.prefix
+    })
+
+    // Check for duplicate prefix
+    const { data: existingType, error: checkError } = await supabase
       .from('document_types')
-      .select('id')
-      .eq('prefix', data.prefix.toUpperCase())
-      .single();
+      .select('id, prefix')
+      .eq('prefix', sanitizedData.prefix)
+      .maybeSingle()
+
+    if (checkError) {
+      logger.error('Database error checking for duplicate prefix', {
+        userId,
+        prefix: sanitizedData.prefix,
+        error: checkError
+      })
+      throw checkError
+    }
 
     if (existingType) {
-      return {
-        success: false,
-        error: {
-          code: 'DUPLICATE_PREFIX',
-          message: 'A document type with this prefix already exists',
-          field: 'prefix',
-        },
-      };
+      logger.warn('Duplicate prefix attempted', {
+        userId,
+        userEmail,
+        prefix: sanitizedData.prefix,
+        existingTypeId: existingType.id
+      })
+      return { 
+        success: false, 
+        error: `Prefix "${sanitizedData.prefix}" is already in use` 
+      }
     }
 
-    // Insert document type
-    const { data: newType, error } = await supabase
+    // Insert new document type
+    const { data: newType, error: insertError } = await supabase
       .from('document_types')
       .insert({
-        name: data.name.trim(),
-        prefix: data.prefix.toUpperCase(),
-        description: data.description?.trim() || null,
-        is_active: true,
-        next_number: 1,
+        name: sanitizedData.name,
+        prefix: sanitizedData.prefix,
+        description: sanitizedData.description,
+        is_active: sanitizedData.is_active,
+        next_number: 1 // Start sequential numbering at 1
       })
       .select()
-      .single();
+      .single()
 
-    if (error || !newType) {
-      console.error('Error creating document type:', error);
-      return {
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Failed to create document type',
-        },
-      };
+    if (insertError) {
+      logger.error('Failed to insert document type', {
+        userId,
+        userEmail,
+        error: insertError,
+        data: sanitizedData
+      })
+      throw insertError
     }
 
-    revalidatePath('/dashboard/document-types');
-    return {
-      success: true,
-      data: newType,
-    };
+    const duration = Date.now() - startTime
+    
+    logger.info('Document type created successfully', {
+      userId,
+      userEmail,
+      documentTypeId: newType.id,
+      name: newType.name,
+      prefix: newType.prefix,
+      duration
+    })
+
+    logServerAction('createDocumentType', {
+      userId,
+      userEmail,
+      documentTypeId: newType.id,
+      prefix: newType.prefix,
+      duration,
+      success: true
+    })
+
+    revalidatePath('/document-types')
+    
+    return { 
+      success: true, 
+      data: newType 
+    }
+
   } catch (error) {
-    console.error('Error in createDocumentType:', error);
-    return {
-      success: false,
-      error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    };
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'createDocumentType',
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
+
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to create document type' 
+    }
   }
 }
 
 /**
- * Update a document type
+ * Update an existing document type
+ * Admin only - updates document type with validation
  */
-export async function updateDocumentType(
-  id: string,
-  data: {
-    name: string;
-    prefix: string;
-    description?: string;
-  }
-): Promise<ActionResult<DocumentType>> {
+export async function updateDocumentType(id: string, formData: FormData) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
   try {
-    // Check admin access
-    const accessCheck = await checkAdminAccess();
-    if (!accessCheck.success) {
-      return accessCheck as ActionResult<DocumentType>;
+    // Validate ID
+    const idValidation = uuidSchema.safeParse(id)
+    if (!idValidation.success) {
+      logger.warn('Invalid document type ID for update', { providedId: id })
+      return { success: false, error: 'Invalid document type ID' }
     }
 
-    // Validate input
-    const validation = validateDocumentTypeInput(data);
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.warn('Unauthorized document type update attempt', { error: userError?.message })
+      return { 
+        success: false, 
+        error: 'You must be logged in to update document types' 
+      }
+    }
+
+    const userId = user.id
+    const userEmail = user.email
+
+    // Check admin status
+    const { data: userData, error: adminCheckError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single()
+
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted document type update', { 
+        userId, 
+        userEmail,
+        documentTypeId: id,
+        isAdmin: userData?.is_admin 
+      })
+      return { 
+        success: false, 
+        error: 'Only administrators can update document types' 
+      }
+    }
+
+    // Extract and validate form data
+    const rawData = {
+      name: formData.get('name'),
+      description: formData.get('description'),
+      is_active: formData.get('is_active') === 'true'
+    }
+
+    const validation = documentTypeUpdateSchema.safeParse(rawData)
+    
     if (!validation.success) {
-      return validation as ActionResult<DocumentType>;
+      const errorMessage = validation.error.issues.map(i => i.message).join(', ')
+      logger.warn('Document type update validation failed', { 
+        userId,
+        userEmail,
+        documentTypeId: id,
+        errors: validation.error.issues
+      })
+      return { 
+        success: false, 
+        error: errorMessage 
+      }
     }
 
-    const supabase = await createClient();
+    const validatedData = validation.data
 
-    // Get current document type
-    const { data: currentType } = await supabase
+    // Sanitize text inputs
+    const sanitizedData = {
+      name: sanitizeString(validatedData.name),
+      description: validatedData.description ? sanitizeString(validatedData.description) : null,
+      is_active: validatedData.is_active
+    }
+
+    logger.info('Updating document type', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      updates: sanitizedData
+    })
+
+    // Get current document type to check for documents
+    const { data: currentType, error: fetchError } = await supabase
       .from('document_types')
-      .select('*')
+      .select('prefix, name')
       .eq('id', id)
-      .single();
+      .single()
 
-    if (!currentType) {
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Document type not found',
-        },
-      };
-    }
-
-    // Check if prefix is changing
-    const prefixChanged = currentType.prefix !== data.prefix.toUpperCase();
-
-    if (prefixChanged) {
-      // Check if any documents exist with this document type
-      // Note: This check will be more complete when documents table exists in Phase 3
-      // For now, we'll allow prefix changes since no documents exist yet
-      
-      // Future: Add this check when documents table exists
-      // const { count } = await supabase
-      //   .from('documents')
-      //   .select('id', { count: 'exact', head: true })
-      //   .eq('document_type_id', id);
-      // 
-      // if (count && count > 0) {
-      //   return {
-      //     success: false,
-      //     error: {
-      //       code: 'PREFIX_CHANGE_NOT_ALLOWED',
-      //       message: `Cannot change prefix - ${count} document(s) exist with this type`,
-      //       field: 'prefix',
-      //     },
-      //   };
-      // }
-
-      // Check if new prefix already exists
-      const { data: existingType } = await supabase
-        .from('document_types')
-        .select('id')
-        .eq('prefix', data.prefix.toUpperCase())
-        .neq('id', id)
-        .single();
-
-      if (existingType) {
-        return {
-          success: false,
-          error: {
-            code: 'DUPLICATE_PREFIX',
-            message: 'A document type with this prefix already exists',
-            field: 'prefix',
-          },
-        };
+    if (fetchError || !currentType) {
+      logger.error('Document type not found for update', {
+        userId,
+        documentTypeId: id,
+        error: fetchError
+      })
+      return { 
+        success: false, 
+        error: 'Document type not found' 
       }
     }
 
     // Update document type
-    const { data: updatedType, error } = await supabase
+    const { data: updatedType, error: updateError } = await supabase
       .from('document_types')
-      .update({
-        name: data.name.trim(),
-        prefix: data.prefix.toUpperCase(),
-        description: data.description?.trim() || null,
+      .update(sanitizedData)
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      logger.error('Failed to update document type', {
+        userId,
+        userEmail,
+        documentTypeId: id,
+        error: updateError
       })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error || !updatedType) {
-      console.error('Error updating document type:', error);
-      return {
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Failed to update document type',
-        },
-      };
+      throw updateError
     }
 
-    revalidatePath('/dashboard/document-types');
-    return {
-      success: true,
-      data: updatedType,
-    };
+    const duration = Date.now() - startTime
+    
+    logger.info('Document type updated successfully', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      name: updatedType.name,
+      changes: sanitizedData,
+      duration
+    })
+
+    logServerAction('updateDocumentType', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      duration,
+      success: true
+    })
+
+    revalidatePath('/document-types')
+    
+    return { 
+      success: true, 
+      data: updatedType 
+    }
+
   } catch (error) {
-    console.error('Error in updateDocumentType:', error);
-    return {
-      success: false,
-      error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    };
-  }
-}
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'updateDocumentType',
+      documentTypeId: id,
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
 
-/**
- * Toggle document type active status
- */
-export async function toggleDocumentTypeStatus(id: string): Promise<ActionResult<DocumentType>> {
-  try {
-    // Check admin access
-    const accessCheck = await checkAdminAccess();
-    if (!accessCheck.success) {
-      return accessCheck as ActionResult<DocumentType>;
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to update document type' 
     }
-
-    const supabase = await createClient();
-
-    // Get current status
-    const { data: currentType } = await supabase
-      .from('document_types')
-      .select('is_active')
-      .eq('id', id)
-      .single();
-
-    if (!currentType) {
-      return {
-        success: false,
-        error: {
-          code: 'NOT_FOUND',
-          message: 'Document type not found',
-        },
-      };
-    }
-
-    // Toggle status
-    const { data: updatedType, error } = await supabase
-      .from('document_types')
-      .update({ is_active: !currentType.is_active })
-      .eq('id', id)
-      .select()
-      .single();
-
-    if (error || !updatedType) {
-      console.error('Error toggling document type status:', error);
-      return {
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Failed to update status',
-        },
-      };
-    }
-
-    revalidatePath('/dashboard/document-types');
-    return {
-      success: true,
-      data: updatedType,
-    };
-  } catch (error) {
-    console.error('Error in toggleDocumentTypeStatus:', error);
-    return {
-      success: false,
-      error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    };
   }
 }
 
 /**
  * Delete a document type
+ * Admin only - can only delete if no documents use this type
  */
-export async function deleteDocumentType(id: string): Promise<ActionResult> {
+export async function deleteDocumentType(id: string) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
   try {
-    // Check admin access
-    const accessCheck = await checkAdminAccess();
-    if (!accessCheck.success) {
-      return accessCheck;
+    // Validate ID
+    const idValidation = uuidSchema.safeParse(id)
+    if (!idValidation.success) {
+      logger.warn('Invalid document type ID for deletion', { providedId: id })
+      return { success: false, error: 'Invalid document type ID' }
     }
 
-    const supabase = await createClient();
-
-    // Check if any documents exist with this document type
-    // Note: This check will be implemented when documents table exists in Phase 3
-    // For now, we'll allow deletion since no documents exist yet
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
     
-    // Future: Add this check when documents table exists
-    // const { count } = await supabase
-    //   .from('documents')
-    //   .select('id', { count: 'exact', head: true })
-    //   .eq('document_type_id', id);
-    // 
-    // if (count && count > 0) {
-    //   return {
-    //     success: false,
-    //     error: {
-    //       code: 'DELETE_NOT_ALLOWED',
-    //       message: `Cannot delete - ${count} document(s) exist with this type. Deactivate instead.`,
-    //     },
-    //   };
-    // }
+    if (userError || !user) {
+      logger.warn('Unauthorized document type deletion attempt', { error: userError?.message })
+      return { 
+        success: false, 
+        error: 'You must be logged in to delete document types' 
+      }
+    }
+
+    const userId = user.id
+    const userEmail = user.email
+
+    // Check admin status
+    const { data: userData, error: adminCheckError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single()
+
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted document type deletion', { 
+        userId,
+        userEmail,
+        documentTypeId: id,
+        isAdmin: userData?.is_admin 
+      })
+      return { 
+        success: false, 
+        error: 'Only administrators can delete document types' 
+      }
+    }
+
+    logger.info('Attempting document type deletion', {
+      userId,
+      userEmail,
+      documentTypeId: id
+    })
+
+    // Check if any documents use this type
+    const { data: documents, error: checkError } = await supabase
+      .from('documents')
+      .select('id')
+      .eq('document_type_id', id)
+      .limit(1)
+
+    if (checkError) {
+      logger.error('Error checking for documents using type', {
+        userId,
+        documentTypeId: id,
+        error: checkError
+      })
+      throw checkError
+    }
+
+    if (documents && documents.length > 0) {
+      logger.warn('Cannot delete document type with existing documents', {
+        userId,
+        userEmail,
+        documentTypeId: id,
+        documentCount: documents.length
+      })
+      return { 
+        success: false, 
+        error: 'Cannot delete document type that has documents. Please deactivate it instead.' 
+      }
+    }
+
+    // Get document type info before deletion for logging
+    const { data: typeToDelete } = await supabase
+      .from('document_types')
+      .select('name, prefix')
+      .eq('id', id)
+      .single()
 
     // Delete document type
-    const { error } = await supabase
+    const { error: deleteError } = await supabase
       .from('document_types')
       .delete()
-      .eq('id', id);
+      .eq('id', id)
 
-    if (error) {
-      console.error('Error deleting document type:', error);
-      return {
-        success: false,
-        error: {
-          code: 'DATABASE_ERROR',
-          message: 'Failed to delete document type',
-        },
-      };
+    if (deleteError) {
+      logger.error('Failed to delete document type', {
+        userId,
+        userEmail,
+        documentTypeId: id,
+        error: deleteError
+      })
+      throw deleteError
     }
 
-    revalidatePath('/dashboard/document-types');
-    return { success: true };
+    const duration = Date.now() - startTime
+    
+    logger.info('Document type deleted successfully', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      name: typeToDelete?.name,
+      prefix: typeToDelete?.prefix,
+      duration
+    })
+
+    logServerAction('deleteDocumentType', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      name: typeToDelete?.name,
+      prefix: typeToDelete?.prefix,
+      duration,
+      success: true
+    })
+
+    revalidatePath('/document-types')
+    
+    return { success: true }
+
   } catch (error) {
-    console.error('Error in deleteDocumentType:', error);
-    return {
-      success: false,
-      error: {
-        code: 'UNKNOWN_ERROR',
-        message: 'An unexpected error occurred',
-      },
-    };
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'deleteDocumentType',
+      documentTypeId: id,
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
+
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to delete document type' 
+    }
+  }
+}
+
+/**
+ * Toggle document type active status
+ * Admin only - quick action to activate/deactivate types
+ */
+export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
+  try {
+    // Validate inputs
+    const idValidation = uuidSchema.safeParse(id)
+    if (!idValidation.success) {
+      logger.warn('Invalid document type ID for status toggle', { providedId: id })
+      return { success: false, error: 'Invalid document type ID' }
+    }
+
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.warn('Unauthorized status toggle attempt', { error: userError?.message })
+      return { 
+        success: false, 
+        error: 'You must be logged in to modify document types' 
+      }
+    }
+
+    const userId = user.id
+    const userEmail = user.email
+
+    // Check admin status
+    const { data: userData, error: adminCheckError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single()
+
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted status toggle', { 
+        userId,
+        userEmail,
+        documentTypeId: id,
+        isAdmin: userData?.is_admin 
+      })
+      return { 
+        success: false, 
+        error: 'Only administrators can modify document types' 
+      }
+    }
+
+    logger.info('Toggling document type status', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      newStatus: isActive ? 'active' : 'inactive'
+    })
+
+    // Get current document type info
+    const { data: currentType } = await supabase
+      .from('document_types')
+      .select('name, prefix, is_active')
+      .eq('id', id)
+      .single()
+
+    // Update status
+    const { data: updatedType, error: updateError } = await supabase
+      .from('document_types')
+      .update({ is_active: isActive })
+      .eq('id', id)
+      .select()
+      .single()
+
+    if (updateError) {
+      logger.error('Failed to toggle document type status', {
+        userId,
+        userEmail,
+        documentTypeId: id,
+        error: updateError
+      })
+      throw updateError
+    }
+
+    const duration = Date.now() - startTime
+    
+    logger.info('Document type status toggled successfully', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      name: updatedType.name,
+      prefix: updatedType.prefix,
+      previousStatus: currentType?.is_active,
+      newStatus: isActive,
+      duration
+    })
+
+    logServerAction('toggleDocumentTypeStatus', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      newStatus: isActive ? 'active' : 'inactive',
+      duration,
+      success: true
+    })
+
+    revalidatePath('/document-types')
+    
+    return { 
+      success: true, 
+      data: updatedType 
+    }
+
+  } catch (error) {
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'toggleDocumentTypeStatus',
+      documentTypeId: id,
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
+
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to toggle status' 
+    }
   }
 }
