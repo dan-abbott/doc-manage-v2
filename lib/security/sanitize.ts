@@ -259,21 +259,21 @@ export function sanitizeObject<T extends Record<string, any>>(
 ): T {
   const { sanitizeStrings = true, sanitizeHTML: shouldSanitizeHTML = false } = options
 
-  const sanitized = { ...obj }
+  const sanitized: Record<string, any> = { ...obj }
 
   for (const [key, value] of Object.entries(sanitized)) {
     if (typeof value === 'string') {
       if (shouldSanitizeHTML) {
-        sanitized[key] = sanitizeHTML(value) as any
+        sanitized[key] = sanitizeHTML(value)
       } else if (sanitizeStrings) {
-        sanitized[key] = sanitizeString(value) as any
+        sanitized[key] = sanitizeString(value)
       }
     } else if (value && typeof value === 'object' && !Array.isArray(value)) {
       sanitized[key] = sanitizeObject(value, options)
     }
   }
 
-  return sanitized
+  return sanitized as T
 }
 
 /**
