@@ -6,7 +6,7 @@ import { logger } from '@/lib/logger'
 import { logError, logServerAction, logFileOperation, measureTime } from '@/lib/utils/logging-helpers'
 import { createDocumentSchema } from '@/lib/validation/schemas'
 import { validateFormData, validateFile } from '@/lib/validation/validate'
-import { sanitizeString, sanitizeFilename, sanitizeProjectCode } from '@/lib/security/sanitize'
+import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } from '@/lib/security/sanitize'
 
 // ==========================================
 // Action: Create Document
@@ -43,10 +43,16 @@ export async function createDocument(formData: FormData) {
 
     const data = validation.data
 
-    // Sanitize inputs
-    const title = sanitizeString(data.title)!
-    const description = sanitizeString(data.description)
+    // Sanitize inputs - use sanitizeHTML for user-facing text to strip tags
+    const title = sanitizeHTML(data.title)
+    const description = sanitizeHTML(data.description || '')
     const project_code = sanitizeProjectCode(data.project_code)
+    
+    // Validate sanitized title isn't empty after HTML stripping
+    if (!title || title.trim().length === 0) {
+      logger.warn('Title is empty after sanitization', { userId, originalTitle: data.title })
+      return { success: false, error: 'Title cannot be empty or contain only HTML tags' }
+    }
     
     // Extract files from FormData
     const files: File[] = []
@@ -301,14 +307,15 @@ export async function updateDocument(
     userId = user.id
     logger.info('Updating document', { userId, documentId, action: 'updateDocument' })
 
-    // Sanitize inputs
-    const title = sanitizeString(data.title)
-    const description = sanitizeString(data.description)
+    // Sanitize inputs - use sanitizeHTML for user-facing text
+    const title = sanitizeHTML(data.title)
+    const description = sanitizeHTML(data.description || '')
     const project_code = sanitizeProjectCode(data.project_code)
 
     // Validate sanitized data
     if (!title || title.length === 0) {
-      return { success: false, error: 'Title is required' }
+      logger.warn('Title is empty after sanitization', { userId, documentId, originalTitle: data.title })
+      return { success: false, error: 'Title cannot be empty or contain only HTML tags' }
     }
 
     if (title.length > 200) {

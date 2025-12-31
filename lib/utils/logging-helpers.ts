@@ -17,15 +17,34 @@ export function logError(
     [key: string]: any
   } = {}
 ) {
-  const errorMessage = error instanceof Error ? error.message : String(error)
-  const errorStack = error instanceof Error ? error.stack : undefined
+  let errorMessage: string
+  let errorStack: string | undefined
+  let errorName: string
+  let errorDetails: any = {}
+
+  if (error instanceof Error) {
+    errorMessage = error.message
+    errorStack = error.stack
+    errorName = error.name
+    // Include any custom properties on the error
+    errorDetails = { ...error }
+  } else if (typeof error === 'object' && error !== null) {
+    // If it's an object, try to extract useful info
+    errorMessage = JSON.stringify(error)
+    errorName = 'Unknown'
+    errorDetails = error
+  } else {
+    errorMessage = String(error)
+    errorName = 'Unknown'
+  }
 
   logger.error({
     msg: errorMessage,
     error: {
       message: errorMessage,
       stack: errorStack,
-      name: error instanceof Error ? error.name : 'Unknown',
+      name: errorName,
+      details: errorDetails,
     },
     ...context,
   })
