@@ -606,6 +606,36 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
 
     logServerAction('toggleDocumentTypeStatus', {
       userId,
+      userEmail,
+      documentTypeId: id,
+      newStatus: isActive ? 'active' : 'inactive',
+      duration,
+      success: true
+    })
+
+    revalidatePath('/document-types')
+    
+    return { 
+      success: true, 
+      data: updatedType 
+    }
+
+  } catch (error) {
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'toggleDocumentTypeStatus',
+      documentTypeId: id,
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
+
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to toggle status' 
+    }
+  }
+}
 
 /**
  * Get a single document type by ID
