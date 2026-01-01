@@ -135,7 +135,10 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       })
       return { 
         success: false, 
-        error: `Prefix "${sanitizedData.prefix}" is already in use` 
+        error: { 
+          field: 'prefix',
+          message: `Prefix "${sanitizedData.prefix}" is already in use` 
+        }
       }
     }
 
@@ -200,7 +203,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
 
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to create document type' 
+      error: { message: error instanceof Error ? error.message : 'Failed to create document type' } 
     }
   }
 }
@@ -372,7 +375,7 @@ export async function updateDocumentType(id: string, data: { name: string; descr
 
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to update document type' 
+      error: { message: error instanceof Error ? error.message : 'Failed to update document type' } 
     }
   }
 }
@@ -522,7 +525,7 @@ export async function deleteDocumentType(id: string) {
 
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to delete document type' 
+      error: { message: error instanceof Error ? error.message : 'Failed to delete document type' } 
     }
   }
 }
@@ -650,7 +653,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
 
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to toggle status' 
+      error: { message: error instanceof Error ? error.message : 'Failed to toggle status' } 
     }
   }
 }
@@ -670,7 +673,7 @@ export async function getDocumentType(id: string) {
     
     if (error) {
       logger.error('Failed to fetch document type', { id, error })
-      return { success: false, error: error.message }
+      return { success: false, error: { message: error.message } }
     }
     
     return { success: true, data }
@@ -678,7 +681,7 @@ export async function getDocumentType(id: string) {
     logger.error('Error in getDocumentType', { id, error })
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to fetch document type' 
+      error: { message: error instanceof Error ? error.message : 'Failed to fetch document type' } 
     }
   }
 }
@@ -705,7 +708,7 @@ export async function getDocumentTypes(activeOnly: boolean = true) {
     
     if (error) {
       logger.error('Failed to fetch document types', { activeOnly, error })
-      return { success: false, error: error.message, data: [] }
+      return { success: false, error: { message: error.message }, data: [] }
     }
     
     return { success: true, data: data || [] }
@@ -713,7 +716,7 @@ export async function getDocumentTypes(activeOnly: boolean = true) {
     logger.error('Error in getDocumentTypes', { activeOnly, error })
     return { 
       success: false, 
-      error: error instanceof Error ? error.message : 'Failed to fetch document types',
+      error: { message: error instanceof Error ? error.message : 'Failed to fetch document types' },
       data: []
     }
   }
