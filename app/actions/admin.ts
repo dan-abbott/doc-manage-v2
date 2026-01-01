@@ -411,7 +411,7 @@ export async function changeDocumentOwner(documentId: string, newOwnerEmail: str
       success: true
     })
     
-    return { success: true }
+    return { success: true, newOwnerEmail: newOwner.email }
     
   } catch (error) {
     const duration = Date.now() - startTime
