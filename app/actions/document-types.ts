@@ -534,7 +534,7 @@ export async function deleteDocumentType(id: string) {
  * Toggle document type active status
  * Admin only - quick action to activate/deactivate types
  */
-export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
+export async function toggleDocumentTypeStatus(id: string) {
   const startTime = Date.now()
   const supabase = await createClient()
   
@@ -584,7 +584,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       userId,
       userEmail,
       documentTypeId: id,
-      newStatus: isActive ? 'active' : 'inactive'
+      newStatus: newStatus ? 'active' : 'inactive'
     })
 
     // Get current document type info
@@ -593,11 +593,18 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       .select('name, prefix, is_active')
       .eq('id', id)
       .single()
+    
+    if (!currentType) {
+      return { success: false, error: { message: "Document type not found" } }
+    }
+    
+    // Toggle the current status
+    const newStatus = !currentType.is_active
 
     // Update status
     const { data: updatedType, error: updateError } = await supabase
       .from('document_types')
-      .update({ is_active: isActive })
+      .update({ is_active: newStatus })
       .eq('id', id)
       .select()
       .single()
@@ -621,7 +628,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       name: updatedType.name,
       prefix: updatedType.prefix,
       previousStatus: currentType?.is_active,
-      newStatus: isActive,
+      newStatus: newStatus,
       duration
     })
 
@@ -629,7 +636,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       userId,
       userEmail,
       documentTypeId: id,
-      newStatus: isActive ? 'active' : 'inactive',
+      newStatus: newStatus ? 'active' : 'inactive',
       duration,
       success: true
     })
