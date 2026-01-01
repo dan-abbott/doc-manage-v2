@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError, logDatabaseQuery } from '@/lib/logger'
-import { sanitizeString } from '@/lib/validation/sanitize'
+import { sanitizeString } from '@/lib/security/sanitize'
 import { 
   documentTypeCreateSchema, 
   documentTypeUpdateSchema,
