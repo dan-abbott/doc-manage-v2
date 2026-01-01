@@ -1,5 +1,6 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+// Force a new deployent
 
 // Force dynamic rendering - no cache
 export const dynamic = 'force-dynamic'
