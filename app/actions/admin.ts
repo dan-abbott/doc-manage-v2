@@ -71,12 +71,12 @@ export async function adminDeleteDocument(documentId: string) {
         document_number,
         version,
         title,
-        status,
-        is_production,
-        created_by,
-        created_at,
-        document_type_id,
-        document_types (
+    // Fetch document details for audit log
+    const { data: document, error: fetchError } = await supabase
+      .from('documents')
+      .select(`
+        *,
+        document_type:document_types!documents_document_type_id_fkey(
           name,
           prefix
         )
@@ -95,6 +95,7 @@ export async function adminDeleteDocument(documentId: string) {
         success: false, 
         error: 'Document not found' 
       }
+    }
     }
 
     // Get file count for logging
@@ -138,7 +139,7 @@ export async function adminDeleteDocument(documentId: string) {
           title: document.title,
           status: document.status,
           is_production: document.is_production,
-          document_type: document.document_types?.name,
+          document_type: document.document_type?.name,
           original_creator: document.created_by,
           created_at: document.created_at,
           file_count: fileCount,
