@@ -516,18 +516,31 @@ export async function getLatestReleasedVersion(documentNumber: string) {
 export async function getVersionHistory(documentNumber: string) {
   const supabase = await createClient()
   
-  const { data, error } = await supabase
-    .from('documents')
-    .select(`
-      *,
-      users!documents_created_by_fkey(email),
-      document_types(name, prefix)
-    `)
-    .eq('document_number', documentNumber)
-    .order('created_at', { ascending: true })
-  
-  if (error) throw error
-  return data || []
+  try {
+    const { data, error } = await supabase
+      .from('documents')
+      .select(`
+        *,
+        users!documents_created_by_fkey(email),
+        document_types(name, prefix)
+      `)
+      .eq('document_number', documentNumber)
+      .order('created_at', { ascending: true })
+    
+    if (error) {
+      logger.error('Failed to fetch version history', { documentNumber, error })
+      return { success: false, error: error.message, data: [] }
+    }
+    
+    return { success: true, data: data || [] }
+  } catch (error) {
+    logger.error('Error in getVersionHistory', { documentNumber, error })
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch version history',
+      data: []
+    }
+  }
 }
 
 /**
