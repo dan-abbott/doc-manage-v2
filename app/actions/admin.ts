@@ -95,6 +95,24 @@ export async function adminDeleteDocument(documentId: string) {
       }
     }
 
+    // TypeScript workaround: document_type comes as single object but TS infers as array
+    const documentType = Array.isArray(document.document_type) 
+      ? document.document_type[0] 
+      : document.document_type
+
+    if (fetchError || !document) {
+      logger.error('Document not found for admin deletion', {
+        userId,
+        userEmail,
+        documentId,
+        error: fetchError
+      })
+      return { 
+        success: false, 
+        error: 'Document not found' 
+      }
+    }
+
     // Get file count for logging
     const { data: files, error: filesError } = await supabase
       .from('document_files')
@@ -136,7 +154,7 @@ export async function adminDeleteDocument(documentId: string) {
           title: document.title,
           status: document.status,
           is_production: document.is_production,
-          document_type: document.document_type?.name,
+          document_type: documentType?.name,
           original_creator: document.created_by,
           created_at: document.created_at,
           file_count: fileCount,
