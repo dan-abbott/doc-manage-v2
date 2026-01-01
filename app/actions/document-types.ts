@@ -12,6 +12,18 @@ import {
   uuidSchema 
 } from '@/lib/validation/schemas'
 
+// Type export for components
+export type DocumentType = {
+  id: string
+  name: string
+  prefix: string
+  description: string | null
+  is_active: boolean
+  next_number: number
+  created_at: string
+  updated_at: string
+}
+
 /**
  * Create a new document type
  * Admin only - creates new document type with validation
