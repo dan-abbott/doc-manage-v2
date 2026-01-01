@@ -239,7 +239,9 @@ export async function createNewVersion(sourceDocumentId: string) {
     revalidatePath(`/documents/${newVersion.id}`)
     
     return { 
-      success: true, 
+      success: true,
+      version: nextVersion,
+      documentId: newVersion.id,
       data: newVersion 
     }
 
