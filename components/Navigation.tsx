@@ -20,6 +20,9 @@ export default async function Navigation() {
 
   const isAdmin = userData?.is_admin || false
 
+  // TEMPORARY DEBUG - Remove after testing
+  console.log('[Navigation] User:', user.email, 'isAdmin:', isAdmin, 'userData:', userData)
+
   return (
     <nav className="bg-white shadow-sm border-b">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
