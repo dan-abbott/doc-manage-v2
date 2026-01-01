@@ -287,3 +287,146 @@ export async function adminDeleteDocument(documentId: string) {
     }
   }
 }
+export async function changeDocumentOwner(documentId: string, newOwnerEmail: string) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
+  try {
+    // Get current user (must be admin)
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.warn('Unauthorized change owner attempt')
+      return { success: false, error: 'You must be logged in' }
+    }
+    
+    const userId = user.id
+    const userEmail = user.email
+    
+    // Check admin status
+    const { data: userData, error: adminCheckError } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', userId)
+      .single()
+    
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted to change document owner', { 
+        userId, 
+        userEmail,
+        documentId 
+      })
+      return { success: false, error: 'Only administrators can change document owners' }
+    }
+    
+    logger.info('Changing document owner', {
+      userId,
+      userEmail,
+      documentId,
+      newOwnerEmail
+    })
+    
+    // Find new owner by email
+    const { data: newOwner, error: ownerError } = await supabase
+      .from('users')
+      .select('id, email, full_name')
+      .eq('email', newOwnerEmail)
+      .single()
+    
+    if (ownerError || !newOwner) {
+      logger.warn('New owner not found', {
+        userId,
+        documentId,
+        newOwnerEmail,
+        error: ownerError
+      })
+      return { success: false, error: 'User not found with that email address' }
+    }
+    
+    // Get document details before change
+    const { data: document } = await supabase
+      .from('documents')
+      .select('document_number, version, created_by')
+      .eq('id', documentId)
+      .single()
+    
+    // Update document owner
+    const { error: updateError } = await supabase
+      .from('documents')
+      .update({ created_by: newOwner.id })
+      .eq('id', documentId)
+    
+    if (updateError) {
+      logger.error('Failed to change document owner', {
+        userId,
+        documentId,
+        error: updateError
+      })
+      return { success: false, error: updateError.message }
+    }
+    
+    // Create audit log
+    const { error: auditError } = await supabase
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        action: 'owner_changed',
+        performed_by: userId,
+        performed_by_email: userEmail || '',
+        details: {
+          old_owner_id: document?.created_by,
+          new_owner_id: newOwner.id,
+          new_owner_email: newOwner.email,
+          changed_by_admin: true
+        }
+      })
+    
+    if (auditError) {
+      logger.error('Failed to create audit log for owner change', {
+        userId,
+        documentId,
+        error: auditError
+      })
+      // Don't fail the operation
+    }
+    
+    const duration = Date.now() - startTime
+    
+    logger.info('Document owner changed successfully', {
+      userId,
+      userEmail,
+      documentId,
+      documentNumber: document?.document_number,
+      newOwnerId: newOwner.id,
+      newOwnerEmail: newOwner.email,
+      duration
+    })
+    
+    logServerAction('changeDocumentOwner', {
+      userId,
+      userEmail,
+      documentId,
+      newOwnerEmail: newOwner.email,
+      duration,
+      success: true
+    })
+    
+    return { success: true }
+    
+  } catch (error) {
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'changeDocumentOwner',
+      documentId,
+      newOwnerEmail,
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
+    
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to change document owner' 
+    }
+  }
+}
