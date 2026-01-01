@@ -1,6 +1,10 @@
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 
+// Force dynamic rendering - no cache
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 export default async function Navigation() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()

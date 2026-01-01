@@ -59,9 +59,11 @@ export default function UserManagementTable() {
       if (result.success) {
         setUsers(result.data)
       } else {
-        const errorMessage = typeof result.error === 'string' 
-          ? result.error 
-          : result.error?.message || 'Unknown error'
+        // Handle error - could be string or object
+        const error = result.error as any
+        const errorMessage = typeof error === 'string' 
+          ? error 
+          : error?.message || 'Unknown error'
         
         console.error('Failed to load users:', result.error)
         toast.error('Failed to Load Users', {
@@ -103,9 +105,11 @@ export default function UserManagementTable() {
       })
       loadUsers() // Reload user list
     } else {
-      const errorMessage = typeof result.error === 'string'
-        ? result.error
-        : result.error?.message || 'Unknown error'
+      // Handle error - could be string or object
+      const error = result.error as any
+      const errorMessage = typeof error === 'string'
+        ? error
+        : error?.message || 'Unknown error'
         
       toast.error('Update Failed', {
         description: errorMessage
