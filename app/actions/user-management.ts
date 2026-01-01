@@ -8,7 +8,8 @@ import { logger, logServerAction, logError } from '@/lib/logger'
 import { uuidSchema } from '@/lib/validation/schemas'
 
 // User role type
-export type UserRole = 'admin' | 'normal' | 'read_only' | 'deactivated'
+// Type exports for components
+export type UserRole = 'Admin' | 'Normal' | 'Read Only' | 'Deactivated'
 
 // Validation schema for user updates
 const userUpdateSchema = z.object({
