@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError, logDatabaseQuery } from '@/lib/logger'
-import { sanitizeString } from '@/lib/security/sanitize'
+import { sanitizeString } from '@/lib/validation/sanitize'
 import { 
   documentTypeCreateSchema, 
   documentTypeUpdateSchema,
@@ -606,36 +606,6 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
 
     logServerAction('toggleDocumentTypeStatus', {
       userId,
-      userEmail,
-      documentTypeId: id,
-      newStatus: isActive ? 'active' : 'inactive',
-      duration,
-      success: true
-    })
-
-    revalidatePath('/document-types')
-    
-    return { 
-      success: true, 
-      data: updatedType 
-    }
-
-  } catch (error) {
-    const duration = Date.now() - startTime
-    
-    logError(error, {
-      action: 'toggleDocumentTypeStatus',
-      documentTypeId: id,
-      userId: (await supabase.auth.getUser()).data.user?.id,
-      duration
-    })
-
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to toggle status' 
-    }
-  }
-}
 
 /**
  * Get a single document type by ID
@@ -643,27 +613,60 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
 export async function getDocumentType(id: string) {
   const supabase = await createClient()
   
-  const { data, error } = await supabase
-    .from('document_types')
-    .select('*')
-    .eq('id', id)
-    .single()
-  
-  if (error) throw error
-  return data
+  try {
+    const { data, error } = await supabase
+      .from('document_types')
+      .select('*')
+      .eq('id', id)
+      .single()
+    
+    if (error) {
+      logger.error('Failed to fetch document type', { id, error })
+      return { success: false, error: error.message }
+    }
+    
+    return { success: true, data }
+  } catch (error) {
+    logger.error('Error in getDocumentType', { id, error })
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch document type' 
+    }
+  }
 }
 
 /**
  * Get all document types
+ * @param activeOnly - If true, only return active types. If false, return all.
  */
-export async function getDocumentTypes() {
+export async function getDocumentTypes(activeOnly: boolean = true) {
   const supabase = await createClient()
   
-  const { data, error } = await supabase
-    .from('document_types')
-    .select('*')
-    .order('name')
-  
-  if (error) throw error
-  return data
+  try {
+    let query = supabase
+      .from('document_types')
+      .select('*')
+      .order('name')
+    
+    // Filter by active status if requested
+    if (activeOnly) {
+      query = query.eq('is_active', true)
+    }
+    
+    const { data, error } = await query
+    
+    if (error) {
+      logger.error('Failed to fetch document types', { activeOnly, error })
+      return { success: false, error: error.message, data: [] }
+    }
+    
+    return { success: true, data: data || [] }
+  } catch (error) {
+    logger.error('Error in getDocumentTypes', { activeOnly, error })
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch document types',
+      data: []
+    }
+  }
 }
