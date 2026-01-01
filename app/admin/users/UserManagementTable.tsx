@@ -113,7 +113,7 @@ export default function UserManagementTable() {
     
     const normalizedRole = roleMap[effectiveRole] || 'normal'
     
-    const badges = {
+    const badges: Record<string, { icon: any, color: string, label: string }> = {
       admin: { icon: Shield, color: 'bg-purple-100 text-purple-800', label: 'Admin' },
       normal: { icon: User, color: 'bg-green-100 text-green-800', label: 'Normal' },
       read_only: { icon: Eye, color: 'bg-blue-100 text-blue-800', label: 'Read Only' },
