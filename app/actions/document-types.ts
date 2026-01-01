@@ -580,13 +580,6 @@ export async function toggleDocumentTypeStatus(id: string) {
       }
     }
 
-    logger.info('Toggling document type status', {
-      userId,
-      userEmail,
-      documentTypeId: id,
-      newStatus: newStatus ? 'active' : 'inactive'
-    })
-
     // Get current document type info
     const { data: currentType } = await supabase
       .from('document_types')
@@ -600,6 +593,14 @@ export async function toggleDocumentTypeStatus(id: string) {
     
     // Toggle the current status
     const newStatus = !currentType.is_active
+
+    logger.info('Toggling document type status', {
+      userId,
+      userEmail,
+      documentTypeId: id,
+      previousStatus: currentType.is_active,
+      newStatus: newStatus ? 'active' : 'inactive'
+    })
 
     // Update status
     const { data: updatedType, error: updateError } = await supabase
