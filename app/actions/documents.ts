@@ -11,6 +11,33 @@ import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } f
 // ==========================================
 // Action: Create Document
 // ==========================================
+/**
+ * Check if user has permission to perform write operations
+ * Read Only and Deactivated users cannot create, edit, or delete
+ */
+async function checkWritePermission(supabase: any, userId: string): Promise<{ allowed: boolean, role: string | null }> {
+  const { data: userData } = await supabase
+    .from('users')
+    .select('role, is_active')
+    .eq('id', userId)
+    .single()
+
+  const role = userData?.role || 'Normal'
+  const isActive = userData?.is_active !== false
+
+  // Deactivated users cannot do anything
+  if (!isActive || role === 'Deactivated') {
+    return { allowed: false, role }
+  }
+
+  // Read Only users cannot write
+  if (role === 'Read Only') {
+    return { allowed: false, role }
+  }
+
+  // Admin and Normal users can write
+  return { allowed: true, role }
+}
 
 export async function createDocument(formData: FormData) {
   const startTime = Date.now()
@@ -27,6 +54,22 @@ export async function createDocument(formData: FormData) {
     }
     
     userId = user.id
+
+        // Check write permission
+    const { allowed, role } = await checkWritePermission(supabase, userId)
+    if (!allowed) {
+      logger.warn('User without write permission attempted to create document', {
+        userId,
+        role,
+        action: 'createDocument'
+      })
+      return { 
+        success: false, 
+        error: role === 'Read Only' 
+          ? 'Read-only users cannot create documents' 
+          : 'Your account is deactivated. Please contact an administrator.'
+      }
+    }
 
     logger.info('Creating document', { userId, action: 'createDocument' })
 
@@ -315,6 +358,24 @@ export async function updateDocument(
     }
 
     userId = user.id
+
+// Check write permission
+    const { allowed, role } = await checkWritePermission(supabase, userId)
+    if (!allowed) {
+      logger.warn('User without write permission attempted to update document', {
+        userId,
+        role,
+        documentId,
+        action: 'updateDocument'
+      })
+      return { 
+        success: false, 
+        error: role === 'Read Only' 
+          ? 'Read-only users cannot edit documents' 
+          : 'Your account is deactivated. Please contact an administrator.'
+      }
+    }
+
     logger.info('Updating document', { userId, documentId, action: 'updateDocument' })
 
     // Sanitize inputs - use sanitizeHTML for user-facing text
@@ -530,6 +591,24 @@ export async function deleteDocument(documentId: string) {
     }
 
     userId = user.id
+
+    // Check write permission
+    const { allowed, role } = await checkWritePermission(supabase, userId)
+    if (!allowed) {
+      logger.warn('User without write permission attempted to delete document', {
+        userId,
+        role,
+        documentId,
+        action: 'deleteDocument'
+      })
+      return { 
+        success: false, 
+        error: role === 'Read Only' 
+          ? 'Read-only users cannot delete documents' 
+          : 'Your account is deactivated. Please contact an administrator.'
+      }
+    }
+
     logger.info('Deleting document', { userId, documentId, action: 'deleteDocument' })
 
     // Get document to check ownership and status
