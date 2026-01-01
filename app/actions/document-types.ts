@@ -40,7 +40,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       logger.warn('Unauthorized document type creation attempt', { error: userError?.message })
       return { 
         success: false, 
-        error: 'You must be logged in to create document types' 
+        error: { message: 'You must be logged in to create document types' } 
       }
     }
 
@@ -62,7 +62,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       })
       return { 
         success: false, 
-        error: 'Only administrators can create document types' 
+        error: { message: 'Only administrators can create document types' } 
       }
     }
 
@@ -77,7 +77,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
     const validation = documentTypeCreateSchema.safeParse(rawData)
     
     if (!validation.success) {
-      const errorMessage = validation.error.issues.map(i => i.message).join(', ')
+      const firstError = validation.error.issues[0]
       logger.warn('Document type creation validation failed', { 
         userId, 
         userEmail,
@@ -86,7 +86,10 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       })
       return { 
         success: false, 
-        error: errorMessage 
+        error: {
+          field: firstError.path[0] as string,
+          message: firstError.message
+        }
       }
     }
 
@@ -215,7 +218,7 @@ export async function updateDocumentType(id: string, data: { name: string; descr
     const idValidation = uuidSchema.safeParse(id)
     if (!idValidation.success) {
       logger.warn('Invalid document type ID for update', { providedId: id })
-      return { success: false, error: 'Invalid document type ID' }
+      return { success: false, error: { message: 'Invalid document type ID' } }
     }
 
     // Get current user
@@ -225,7 +228,7 @@ export async function updateDocumentType(id: string, data: { name: string; descr
       logger.warn('Unauthorized document type update attempt', { error: userError?.message })
       return { 
         success: false, 
-        error: 'You must be logged in to update document types' 
+        error: { message: 'You must be logged in to update document types' } 
       }
     }
 
@@ -248,7 +251,7 @@ export async function updateDocumentType(id: string, data: { name: string; descr
       })
       return { 
         success: false, 
-        error: 'Only administrators can update document types' 
+        error: { message: 'Only administrators can update document types' } 
       }
     }
 
@@ -262,7 +265,7 @@ export async function updateDocumentType(id: string, data: { name: string; descr
     const validation = documentTypeUpdateSchema.safeParse(rawData)
     
     if (!validation.success) {
-      const errorMessage = validation.error.issues.map(i => i.message).join(', ')
+      const firstError = validation.error.issues[0]
       logger.warn('Document type update validation failed', { 
         userId,
         userEmail,
@@ -271,7 +274,10 @@ export async function updateDocumentType(id: string, data: { name: string; descr
       })
       return { 
         success: false, 
-        error: errorMessage 
+        error: {
+          field: firstError.path[0] as string,
+          message: firstError.message
+        }
       }
     }
 
@@ -306,7 +312,7 @@ export async function updateDocumentType(id: string, data: { name: string; descr
       })
       return { 
         success: false, 
-        error: 'Document type not found' 
+        error: { message: 'Document type not found' } 
       }
     }
 
@@ -384,7 +390,7 @@ export async function deleteDocumentType(id: string) {
     const idValidation = uuidSchema.safeParse(id)
     if (!idValidation.success) {
       logger.warn('Invalid document type ID for deletion', { providedId: id })
-      return { success: false, error: 'Invalid document type ID' }
+      return { success: false, error: { message: 'Invalid document type ID' } }
     }
 
     // Get current user
@@ -394,7 +400,7 @@ export async function deleteDocumentType(id: string) {
       logger.warn('Unauthorized document type deletion attempt', { error: userError?.message })
       return { 
         success: false, 
-        error: 'You must be logged in to delete document types' 
+        error: { message: 'You must be logged in to delete document types' } 
       }
     }
 
@@ -417,7 +423,7 @@ export async function deleteDocumentType(id: string) {
       })
       return { 
         success: false, 
-        error: 'Only administrators can delete document types' 
+        error: { message: 'Only administrators can delete document types' } 
       }
     }
 
@@ -452,7 +458,7 @@ export async function deleteDocumentType(id: string) {
       })
       return { 
         success: false, 
-        error: 'Cannot delete document type that has documents. Please deactivate it instead.' 
+        error: { message: 'Cannot delete document type that has documents. Please deactivate it instead.' } 
       }
     }
 
@@ -534,7 +540,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
     const idValidation = uuidSchema.safeParse(id)
     if (!idValidation.success) {
       logger.warn('Invalid document type ID for status toggle', { providedId: id })
-      return { success: false, error: 'Invalid document type ID' }
+      return { success: false, error: { message: 'Invalid document type ID' } }
     }
 
     // Get current user
@@ -544,7 +550,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       logger.warn('Unauthorized status toggle attempt', { error: userError?.message })
       return { 
         success: false, 
-        error: 'You must be logged in to modify document types' 
+        error: { message: 'You must be logged in to modify document types' } 
       }
     }
 
@@ -567,7 +573,7 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       })
       return { 
         success: false, 
-        error: 'Only administrators can modify document types' 
+        error: { message: 'Only administrators can modify document types' } 
       }
     }
 
