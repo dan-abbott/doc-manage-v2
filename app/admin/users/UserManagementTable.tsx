@@ -53,17 +53,29 @@ export default function UserManagementTable() {
 
   const loadUsers = async () => {
     setLoading(true)
-    const result = await getAllUsers()
-    
-    if (result.success) {
-      setUsers(result.data)
-    } else {
+    try {
+      const result = await getAllUsers()
+      
+      if (result.success) {
+        setUsers(result.data)
+      } else {
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : result.error?.message || 'Unknown error'
+        
+        console.error('Failed to load users:', result.error)
+        toast.error('Failed to Load Users', {
+          description: errorMessage
+        })
+      }
+    } catch (error) {
+      console.error('Exception loading users:', error)
       toast.error('Failed to Load Users', {
-        description: result.error
+        description: 'An unexpected error occurred'
       })
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   const handleRoleChange = (userId: string, userName: string, currentRole: UserRole, newRole: string) => {
@@ -91,8 +103,12 @@ export default function UserManagementTable() {
       })
       loadUsers() // Reload user list
     } else {
+      const errorMessage = typeof result.error === 'string'
+        ? result.error
+        : result.error?.message || 'Unknown error'
+        
       toast.error('Update Failed', {
-        description: result.error
+        description: errorMessage
       })
     }
 
