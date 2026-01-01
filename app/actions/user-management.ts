@@ -13,7 +13,7 @@ export type UserRole = 'Admin' | 'Normal' | 'Read Only' | 'Deactivated'
 
 // Validation schema for user updates
 const userUpdateSchema = z.object({
-  role: z.enum(['admin', 'normal', 'read_only', 'deactivated']),
+  role: z.enum(['Admin', 'Normal', 'Read Only', 'Deactivated']),
   reason: z.string().optional()
 })
 
@@ -222,7 +222,7 @@ export async function updateUserRole(
     }
 
     // Prevent self-demotion from admin
-    if (targetUserId === adminUserId && newRole !== 'admin') {
+    if (targetUserId === adminUserId && newRole !== 'Admin') {
       logger.warn('Admin attempted self-demotion', {
         adminUserId,
         adminEmail,
@@ -235,15 +235,15 @@ export async function updateUserRole(
     }
 
     // Determine new status based on role
-    const isAdmin = newRole === 'admin'
-    const isActive = newRole !== 'deactivated'
+    const isAdmin = newRole === 'Admin'
+    const isActive = newRole !== 'Deactivated'
 
     logger.info('Updating user role', {
       adminUserId,
       adminEmail,
       targetUserId,
       targetEmail: targetUser.email,
-      oldRole: targetUser.role || (targetUser.is_admin ? 'admin' : 'normal'),
+      oldRole: targetUser.role || (targetUser.is_admin ? 'Admin' : 'Normal'),
       newRole,
       oldActive: targetUser.is_active,
       newActive: isActive,
@@ -284,7 +284,7 @@ export async function updateUserRole(
         details: {
           target_user_id: targetUserId,
           target_user_email: targetUser.email,
-          old_role: targetUser.role || (targetUser.is_admin ? 'admin' : 'normal'),
+          old_role: targetUser.role || (targetUser.is_admin ? 'Admin' : 'Normal'),
           new_role: newRole,
           old_active: targetUser.is_active,
           new_active: isActive,
@@ -353,26 +353,26 @@ export async function updateUserRole(
  * Deactivate a user (quick action)
  */
 export async function deactivateUser(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'deactivated', reason)
+  return updateUserRole(targetUserId, 'Deactivated', reason)
 }
 
 /**
  * Reactivate a user (restore to normal)
  */
 export async function reactivateUser(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'normal', reason)
+  return updateUserRole(targetUserId, 'Normal', reason)
 }
 
 /**
  * Make user admin
  */
 export async function makeUserAdmin(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'admin', reason)
+  return updateUserRole(targetUserId, 'Admin', reason)
 }
 
 /**
  * Remove admin privileges (demote to normal)
  */
 export async function removeAdminPrivileges(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'normal', reason)
+  return updateUserRole(targetUserId, 'Normal', reason)
 }

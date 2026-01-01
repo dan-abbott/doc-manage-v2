@@ -100,7 +100,18 @@ export default function UserManagementTable() {
   }
 
   const getRoleBadge = (role: UserRole | null, isAdmin: boolean) => {
-    const effectiveRole = role || (isAdmin ? 'admin' : 'normal')
+    // Get effective role from database
+    let effectiveRole = role || (isAdmin ? 'Admin' : 'Normal')
+    
+    // Convert database format to component format
+    const roleMap: Record<string, string> = {
+      'Admin': 'admin',
+      'Normal': 'normal',
+      'Read Only': 'read_only',
+      'Deactivated': 'deactivated'
+    }
+    
+    const normalizedRole = roleMap[effectiveRole] || 'normal'
     
     const badges = {
       admin: { icon: Shield, color: 'bg-purple-100 text-purple-800', label: 'Admin' },
@@ -109,7 +120,18 @@ export default function UserManagementTable() {
       deactivated: { icon: XCircle, color: 'bg-gray-100 text-gray-800', label: 'Deactivated' }
     }
 
-    const badge = badges[effectiveRole]
+    const badge = badges[normalizedRole]
+    
+    // Safety check
+    if (!badge) {
+      console.error('Unknown role:', effectiveRole, 'normalized to:', normalizedRole)
+      return (
+        <span className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-sm font-medium bg-gray-100 text-gray-800">
+          Unknown Role
+        </span>
+      )
+    }
+    
     const Icon = badge.icon
 
     return (
@@ -161,7 +183,7 @@ export default function UserManagementTable() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {users.map((user) => {
-                const currentRole = user.role || (user.is_admin ? 'admin' : 'normal')
+                const currentRole = user.role || (user.is_admin ? 'Admin' : 'Normal')
                 
                 return (
                   <tr key={user.id} className="hover:bg-gray-50">
@@ -207,10 +229,10 @@ export default function UserManagementTable() {
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
-                          <SelectItem value="admin">Admin</SelectItem>
-                          <SelectItem value="normal">Normal</SelectItem>
-                          <SelectItem value="read_only">Read Only</SelectItem>
-                          <SelectItem value="deactivated">Deactivated</SelectItem>
+                          <SelectItem value="Admin">Admin</SelectItem>
+                          <SelectItem value="Normal">Normal</SelectItem>
+                          <SelectItem value="Read Only">Read Only</SelectItem>
+                          <SelectItem value="Deactivated">Deactivated</SelectItem>
                         </SelectContent>
                       </Select>
                     </td>
@@ -240,7 +262,7 @@ export default function UserManagementTable() {
                   from <strong>{changeDialog.currentRole}</strong> to <strong>{changeDialog.newRole}</strong>.
                 </p>
                 
-                {changeDialog.newRole === 'deactivated' && (
+                {changeDialog.newRole === 'Deactivated' && (
                   <div className="bg-red-50 border border-red-200 p-3 rounded-md">
                     <p className="text-sm text-red-800 font-semibold">
                       ⚠️ This user will lose all access to the system.
@@ -248,7 +270,7 @@ export default function UserManagementTable() {
                   </div>
                 )}
 
-                {changeDialog.newRole === 'read_only' && (
+                {changeDialog.newRole === 'Read Only' && (
                   <div className="bg-yellow-50 border border-yellow-200 p-3 rounded-md">
                     <p className="text-sm text-yellow-800 font-semibold">
                       ℹ️ This user will only be able to view documents, not create or edit.
