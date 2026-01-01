@@ -361,3 +361,26 @@ export const forceStatusChangeSchema = z.object({
 // Infer types
 export type UpdateUserAdminInput = z.infer<typeof updateUserAdminSchema>
 export type ForceStatusChangeInput = z.infer<typeof forceStatusChangeSchema>
+
+/**
+ * Document type schemas for admin operations
+ */
+export const documentTypeCreateSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  prefix: z
+    .string()
+    .min(2, 'Prefix must be at least 2 characters')
+    .max(10, 'Prefix must be at most 10 characters')
+    .regex(/^[A-Z]+$/, 'Prefix must contain only uppercase letters'),
+  description: z.string().max(500, 'Description too long').optional().nullable(),
+  is_active: z.boolean().default(true),
+})
+
+export const documentTypeUpdateSchema = z.object({
+  name: z.string().min(1, 'Name is required').max(100, 'Name too long'),
+  description: z.string().max(500, 'Description too long').optional().nullable(),
+  is_active: z.boolean(),
+})
+
+export type DocumentTypeCreateInput = z.infer<typeof documentTypeCreateSchema>
+export type DocumentTypeUpdateInput = z.infer<typeof documentTypeUpdateSchema>

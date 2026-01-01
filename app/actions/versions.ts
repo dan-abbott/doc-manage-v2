@@ -488,3 +488,42 @@ export async function getDocumentVersions(documentNumber: string) {
     }
   }
 }
+
+/**
+ * Get latest released version of a document
+ */
+export async function getLatestReleasedVersion(documentNumber: string) {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('documents')
+    .select('*')
+    .eq('document_number', documentNumber)
+    .eq('status', 'Released')
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get version history for a document
+ */
+export async function getVersionHistory(documentNumber: string) {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('documents')
+    .select(`
+      *,
+      users!documents_created_by_fkey(email),
+      document_types(name, prefix)
+    `)
+    .eq('document_number', documentNumber)
+    .order('created_at', { ascending: true })
+  
+  if (error) throw error
+  return data || []
+}

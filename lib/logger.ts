@@ -120,3 +120,77 @@ export type LogLevel = 'error' | 'warn' | 'info' | 'debug'
 
 // Export for type safety
 export type Logger = typeof logger
+
+/**
+ * Log server action execution
+ */
+export function logServerAction(
+  action: string,
+  params: {
+    userId?: string
+    userEmail?: string
+    duration?: number
+    success: boolean
+    [key: string]: any
+  }
+) {
+  const level = params.success ? 'info' : 'warn'
+  
+  logger[level]({
+    msg: `Server action: ${action}`,
+    action,
+    ...params,
+  })
+}
+
+/**
+ * Log errors with context
+ */
+export function logError(
+  error: unknown,
+  context?: {
+    action?: string
+    userId?: string
+    [key: string]: any
+  }
+) {
+  const errorObj = error instanceof Error ? {
+    message: error.message,
+    stack: error.stack,
+    name: error.name,
+  } : { error: String(error) }
+  
+  logger.error({
+    msg: `Error: ${errorObj.message || 'Unknown error'}`,
+    error: errorObj,
+    ...context,
+  })
+}
+
+/**
+ * Log database operations
+ */
+export function logDatabaseQuery(
+  operation: string,
+  details: {
+    table?: string
+    duration?: number
+    rowCount?: number
+    error?: Error
+    [key: string]: any
+  }
+) {
+  const level = details.error ? 'error' : 'debug'
+  
+  logger[level]({
+    msg: `Database ${operation}`,
+    operation,
+    ...details,
+    ...(details.error && {
+      error: {
+        message: details.error.message,
+        stack: details.error.stack,
+      },
+    }),
+  })
+}

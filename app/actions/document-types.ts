@@ -5,7 +5,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError, logDatabaseQuery } from '@/lib/logger'
-import { sanitizeString } from '@/lib/security/sanitize'
+import { sanitizeString } from '@/lib/validation/sanitize'
 import { 
   documentTypeCreateSchema, 
   documentTypeUpdateSchema,
@@ -635,4 +635,35 @@ export async function toggleDocumentTypeStatus(id: string, isActive: boolean) {
       error: error instanceof Error ? error.message : 'Failed to toggle status' 
     }
   }
+}
+
+/**
+ * Get a single document type by ID
+ */
+export async function getDocumentType(id: string) {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('document_types')
+    .select('*')
+    .eq('id', id)
+    .single()
+  
+  if (error) throw error
+  return data
+}
+
+/**
+ * Get all document types
+ */
+export async function getDocumentTypes() {
+  const supabase = await createClient()
+  
+  const { data, error } = await supabase
+    .from('document_types')
+    .select('*')
+    .order('name')
+  
+  if (error) throw error
+  return data
 }
