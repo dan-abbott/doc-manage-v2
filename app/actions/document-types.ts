@@ -28,7 +28,7 @@ export type DocumentType = {
  * Create a new document type
  * Admin only - creates new document type with validation
  */
-export async function createDocumentType(formData: FormData) {
+export async function createDocumentType(data: { name: string; prefix: string; description?: string; is_active?: boolean }) {
   const startTime = Date.now()
   const supabase = await createClient()
   
@@ -66,12 +66,12 @@ export async function createDocumentType(formData: FormData) {
       }
     }
 
-    // Extract and validate form data
+    // Validate input data
     const rawData = {
-      name: formData.get('name'),
-      prefix: formData.get('prefix'),
-      description: formData.get('description'),
-      is_active: formData.get('is_active') === 'true'
+      name: data.name,
+      prefix: data.prefix,
+      description: data.description || null,
+      is_active: data.is_active ?? true
     }
 
     const validation = documentTypeCreateSchema.safeParse(rawData)
@@ -206,7 +206,7 @@ export async function createDocumentType(formData: FormData) {
  * Update an existing document type
  * Admin only - updates document type with validation
  */
-export async function updateDocumentType(id: string, formData: FormData) {
+export async function updateDocumentType(id: string, data: { name: string; description?: string; is_active?: boolean }) {
   const startTime = Date.now()
   const supabase = await createClient()
   
@@ -252,11 +252,11 @@ export async function updateDocumentType(id: string, formData: FormData) {
       }
     }
 
-    // Extract and validate form data
+    // Validate input data
     const rawData = {
-      name: formData.get('name'),
-      description: formData.get('description'),
-      is_active: formData.get('is_active') === 'true'
+      name: data.name,
+      description: data.description || null,
+      is_active: data.is_active ?? true
     }
 
     const validation = documentTypeUpdateSchema.safeParse(rawData)
