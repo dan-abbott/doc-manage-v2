@@ -47,6 +47,14 @@ export default async function Navigation() {
                 Document Types
               </Link>
             )}
+            {isAdmin && (
+              <Link 
+                href="/admin/users" 
+                className="inline-flex items-center px-1 pt-1 text-sm font-medium text-gray-700 hover:text-gray-900"
+              >
+                User Management
+              </Link>
+            )}
           </div>
           <div className="flex items-center gap-4">
             <span className="text-sm text-gray-700">{user.email}</span>

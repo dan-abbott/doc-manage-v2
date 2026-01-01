@@ -1,120 +1,273 @@
+// app/actions/admin.ts
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { logger, logServerAction, logError } from '@/lib/logger'
+import { uuidSchema } from '@/lib/validation/schemas'
 
 /**
- * Change the owner of a document
- * Admin only action
+ * Admin-only: Force delete any document regardless of status
+ * Creates audit log before deletion to preserve record
+ * Deletes associated files, approvers, and audit logs
  */
-export async function changeDocumentOwner(
-  documentId: string,
-  newOwnerEmail: string
-) {
+export async function adminDeleteDocument(documentId: string) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
   try {
-    const supabase = await createClient()
-
-    // Get current user and verify admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated' }
+    // Validate ID
+    const idValidation = uuidSchema.safeParse(documentId)
+    if (!idValidation.success) {
+      logger.warn('Invalid document ID for admin deletion', { providedId: documentId })
+      return { success: false, error: 'Invalid document ID' }
     }
 
-    const { data: userData } = await supabase
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.warn('Unauthorized admin deletion attempt', { error: userError?.message })
+      return { 
+        success: false, 
+        error: 'You must be logged in to delete documents' 
+      }
+    }
+
+    const userId = user.id
+    const userEmail = user.email
+
+    // Check admin status
+    const { data: userData, error: adminCheckError } = await supabase
       .from('users')
       .select('is_admin')
-      .eq('id', user.id)
+      .eq('id', userId)
       .single()
 
-    if (!userData?.is_admin) {
-      return { success: false, error: 'Admin access required' }
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted force delete', { 
+        userId, 
+        userEmail,
+        documentId,
+        isAdmin: userData?.is_admin 
+      })
+      return { 
+        success: false, 
+        error: 'Only administrators can force delete documents' 
+      }
     }
 
-    // Look up new owner by email
-    const { data: newOwner, error: ownerError } = await supabase
-      .from('users')
-      .select('id, email')
-      .eq('email', newOwnerEmail.toLowerCase().trim())
-      .single()
+    logger.info('Admin force delete initiated', {
+      userId,
+      userEmail,
+      documentId
+    })
 
-    if (ownerError || !newOwner) {
-      return { success: false, error: 'User not found with that email' }
-    }
-
-    // Update document owner
-    const { error: updateError } = await supabase
+    // Get document details before deletion (for logging)
+    const { data: document, error: fetchError } = await supabase
       .from('documents')
-      .update({ created_by: newOwner.id })
+      .select(`
+        id,
+        document_number,
+        version,
+        title,
+        status,
+        is_production,
+        created_by,
+        created_at,
+        document_type_id,
+        document_types (
+          name,
+          prefix
+        )
+      `)
       .eq('id', documentId)
+      .single()
 
-    if (updateError) {
-      console.error('Update error:', updateError)
-      return { success: false, error: 'Failed to change owner' }
+    if (fetchError || !document) {
+      logger.error('Document not found for admin deletion', {
+        userId,
+        userEmail,
+        documentId,
+        error: fetchError
+      })
+      return { 
+        success: false, 
+        error: 'Document not found' 
+      }
     }
 
-    // Create audit log
-    await supabase
+    // Get file count for logging
+    const { data: files, error: filesError } = await supabase
+      .from('document_files')
+      .select('id, file_name, file_path')
+      .eq('document_id', documentId)
+
+    const fileCount = files?.length || 0
+
+    // Get approver count for logging
+    const { data: approvers, error: approversError } = await supabase
+      .from('approvers')
+      .select('id')
+      .eq('document_id', documentId)
+
+    const approverCount = approvers?.length || 0
+
+    logger.info('Document deletion details', {
+      userId,
+      userEmail,
+      documentId,
+      documentNumber: document.document_number,
+      version: document.version,
+      status: document.status,
+      fileCount,
+      approverCount
+    })
+
+    // Create comprehensive audit log BEFORE deletion
+    const { error: auditError } = await supabase
       .from('audit_log')
       .insert({
         document_id: documentId,
-        action: 'owner_changed',
-        performed_by: user.id,
-        performed_by_email: user.email,
-        details: { 
-          new_owner_id: newOwner.id,
-          new_owner_email: newOwner.email
-        },
+        action: 'admin_force_delete',
+        performed_by: userId,
+        performed_by_email: userEmail || '',
+        details: {
+          document_number: document.document_number,
+          version: document.version,
+          title: document.title,
+          status: document.status,
+          is_production: document.is_production,
+          document_type: document.document_types?.name,
+          original_creator: document.created_by,
+          created_at: document.created_at,
+          file_count: fileCount,
+          approver_count: approverCount,
+          deletion_reason: 'Admin force delete',
+          deleted_at: new Date().toISOString()
+        }
       })
 
-    revalidatePath(`/documents/${documentId}`)
-    revalidatePath('/documents')
+    if (auditError) {
+      logger.error('Failed to create deletion audit log', {
+        userId,
+        documentId,
+        error: auditError
+      })
+      // Don't proceed without audit trail
+      return {
+        success: false,
+        error: 'Failed to create audit trail. Deletion aborted for safety.'
+      }
+    }
 
+    // Delete associated files from storage
+    if (files && files.length > 0) {
+      for (const file of files) {
+        const { error: storageError } = await supabase.storage
+          .from('documents')
+          .remove([file.file_path])
+
+        if (storageError) {
+          logger.warn('Failed to delete file from storage', {
+            documentId,
+            fileName: file.file_name,
+            filePath: file.file_path,
+            error: storageError
+          })
+          // Continue with deletion even if storage fails
+        }
+      }
+    }
+
+    // Delete document_files records
+    const { error: filesDeleteError } = await supabase
+      .from('document_files')
+      .delete()
+      .eq('document_id', documentId)
+
+    if (filesDeleteError) {
+      logger.error('Failed to delete document files', {
+        documentId,
+        error: filesDeleteError
+      })
+      throw filesDeleteError
+    }
+
+    // Delete approvers records
+    const { error: approversDeleteError } = await supabase
+      .from('approvers')
+      .delete()
+      .eq('document_id', documentId)
+
+    if (approversDeleteError) {
+      logger.error('Failed to delete approvers', {
+        documentId,
+        error: approversDeleteError
+      })
+      throw approversDeleteError
+    }
+
+    // Finally, delete the document itself
+    const { error: documentDeleteError } = await supabase
+      .from('documents')
+      .delete()
+      .eq('id', documentId)
+
+    if (documentDeleteError) {
+      logger.error('Failed to delete document', {
+        documentId,
+        error: documentDeleteError
+      })
+      throw documentDeleteError
+    }
+
+    const duration = Date.now() - startTime
+    
+    logger.warn('Document force deleted by admin', {
+      userId,
+      userEmail,
+      documentId,
+      documentNumber: document.document_number,
+      version: document.version,
+      status: document.status,
+      filesDeleted: fileCount,
+      approversDeleted: approverCount,
+      duration
+    })
+
+    logServerAction('adminDeleteDocument', {
+      userId,
+      userEmail,
+      documentId,
+      documentNumber: document.document_number,
+      version: document.version,
+      status: document.status,
+      duration,
+      success: true
+    })
+
+    revalidatePath('/documents')
+    revalidatePath('/dashboard')
+    
     return { 
       success: true,
-      newOwnerEmail: newOwner.email 
-    }
-  } catch (error: any) {
-    console.error('Change owner error:', error)
-    return { success: false, error: error.message || 'An unexpected error occurred' }
-  }
-}
-
-/**
- * Get all users for admin actions
- * Admin only action
- */
-export async function getAllUsers() {
-  try {
-    const supabase = await createClient()
-
-    // Get current user and verify admin
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
-    if (authError || !user) {
-      return { success: false, error: 'Not authenticated', users: [] }
+      message: `Document ${document.document_number}${document.version} deleted successfully`
     }
 
-    const { data: userData } = await supabase
-      .from('users')
-      .select('is_admin')
-      .eq('id', user.id)
-      .single()
+  } catch (error) {
+    const duration = Date.now() - startTime
+    
+    logError(error, {
+      action: 'adminDeleteDocument',
+      documentId,
+      userId: (await supabase.auth.getUser()).data.user?.id,
+      duration
+    })
 
-    if (!userData?.is_admin) {
-      return { success: false, error: 'Admin access required', users: [] }
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to delete document' 
     }
-
-    // Get all users
-    const { data: users, error } = await supabase
-      .from('users')
-      .select('id, email, is_admin, created_at')
-      .order('email')
-
-    if (error) {
-      return { success: false, error: 'Failed to fetch users', users: [] }
-    }
-
-    return { success: true, users }
-  } catch (error: any) {
-    return { success: false, error: error.message, users: [] }
   }
 }

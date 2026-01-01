@@ -18,6 +18,7 @@ import PromoteToProductionButton from './PromoteToProductionButton'
 import CollapsibleAdminSection from './CollapsibleAdminSection'
 import AdminActions from './AdminActions'
 import AdminFileActions from './AdminFileActions'
+import AdminDeleteButton from './AdminDeleteButton'
 
 // Disable static generation, but allow caching with revalidation
 export const revalidate = 0
@@ -387,6 +388,23 @@ export default async function DocumentDetailPage({ params }: PageProps) {
           currentVersionId={document.id}
         />
       </div>
+      {isAdmin && (
+  <div className="bg-red-50 border border-red-200 rounded-lg p-4 mt-6">
+    <h3 className="text-sm font-semibold text-red-800 mb-3">
+      ⚠️ Admin Actions
+    </h3>
+    <p className="text-xs text-red-600 mb-3">
+      These actions are irreversible and should only be used when necessary.
+    </p>
+    <AdminDeleteButton
+      documentId={document.id}
+      documentNumber={document.document_number}
+      version={document.version}
+      status={document.status}
+    />
+  </div>
+)}
+
     </div>
   )
 }
