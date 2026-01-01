@@ -527,3 +527,73 @@ export async function getVersionHistory(documentNumber: string) {
   if (error) throw error
   return data || []
 }
+
+/**
+ * Get the immediate predecessor version of a document
+ * Used for obsolescence handling when a new version is released
+ */
+export async function getImmediatePredecessor(documentNumber: string, currentVersion: string) {
+  const supabase = await createClient()
+  
+  try {
+    // Determine if this is a production document (numeric version) or prototype (alpha version)
+    const isProduction = /^v\d+$/.test(currentVersion)
+    
+    let predecessorVersion: string | null = null
+    
+    if (isProduction) {
+      // Production: v1, v2, v3... -> get previous number
+      const versionNum = parseInt(currentVersion.substring(1))
+      if (versionNum > 1) {
+        predecessorVersion = `v${versionNum - 1}`
+      }
+    } else {
+      // Prototype: vA, vB, vC... -> get previous letter
+      const versionLetter = currentVersion.substring(1)
+      if (versionLetter.length === 1 && versionLetter !== 'A') {
+        const prevLetter = String.fromCharCode(versionLetter.charCodeAt(0) - 1)
+        predecessorVersion = `v${prevLetter}`
+      }
+    }
+    
+    // If there's no predecessor (first version), return null
+    if (!predecessorVersion) {
+      return { success: true, data: null }
+    }
+    
+    // Query for the predecessor version
+    const { data, error } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('document_number', documentNumber)
+      .eq('version', predecessorVersion)
+      .single()
+    
+    if (error) {
+      // If no predecessor found, that's okay (might have been deleted)
+      if (error.code === 'PGRST116') {
+        return { success: true, data: null }
+      }
+      
+      logger.error('Failed to fetch predecessor version', { 
+        documentNumber, 
+        currentVersion, 
+        predecessorVersion,
+        error 
+      })
+      return { success: false, error: error.message }
+    }
+    
+    return { success: true, data }
+  } catch (error) {
+    logger.error('Error in getImmediatePredecessor', { 
+      documentNumber, 
+      currentVersion, 
+      error 
+    })
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to get predecessor version' 
+    }
+  }
+}
