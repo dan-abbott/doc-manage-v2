@@ -264,7 +264,9 @@ export async function promoteToProduction(prototypeDocumentId: string) {
     revalidatePath(`/documents/${productionDoc.id}`)
     
     return { 
-      success: true, 
+      success: true,
+      documentNumber: prototypeDoc.document_number,
+      documentId: productionDoc.id,
       data: productionDoc 
     }
 
