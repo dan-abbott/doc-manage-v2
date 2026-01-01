@@ -77,10 +77,7 @@ export async function adminDeleteDocument(documentId: string) {
         created_by,
         created_at,
         document_type_id,
-        document_type:document_types!documents_document_type_id_fkey (
-          name,
-          prefix
-        )
+        document_type:document_types(name, prefix)
       `)
       .eq('id', documentId)
       .single()
