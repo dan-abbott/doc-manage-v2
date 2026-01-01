@@ -87,12 +87,12 @@ export async function getAllUsers() {
     // Get document counts for each user
     const usersWithStats = await Promise.all(
       (users || []).map(async (u) => {
-        const { data: docCount } = await supabase
+        const { count: docCount } = await supabase
           .from('documents')
           .select('id', { count: 'exact', head: true })
           .eq('created_by', u.id)
 
-        const { data: approvalCount } = await supabase
+        const { count: approvalCount } = await supabase
           .from('approvers')
           .select('id', { count: 'exact', head: true })
           .eq('user_id', u.id)
