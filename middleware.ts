@@ -23,6 +23,7 @@ export function middleware(request: NextRequest) {
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
+      domain: '.baselinedocs.com'
     })
   }
   
