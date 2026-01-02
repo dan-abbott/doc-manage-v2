@@ -381,7 +381,10 @@ export async function adminDeleteDocument(documentId: string) {
     revalidatePath('/documents')
     revalidatePath(`/documents/${documentId}`)
 
-    return { success: true }
+    return { 
+      success: true, 
+      message: `Document ${document.document_number}${document.version} has been permanently deleted`
+    }
   } catch (error) {
     logger.error('Unexpected error in admin delete', { error })
     return { success: false, error: 'An unexpected error occurred' }
@@ -473,7 +476,11 @@ export async function changeDocumentOwner(documentId: string, newOwnerEmail: str
     revalidatePath('/documents')
     revalidatePath(`/documents/${documentId}`)
 
-    return { success: true, newOwnerEmail: newOwner.email }
+    return { 
+      success: true, 
+      newOwnerEmail: newOwner.email,
+      message: `Document ownership transferred to ${newOwner.email}`
+    }
   } catch (error) {
     logger.error('Unexpected error changing owner', { error })
     return { success: false, error: 'An unexpected error occurred' }
