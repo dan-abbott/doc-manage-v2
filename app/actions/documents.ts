@@ -7,6 +7,7 @@ import { logError, logServerAction, logFileOperation, measureTime } from '@/lib/
 import { createDocumentSchema } from '@/lib/validation/schemas'
 import { validateFormData, validateFile } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } from '@/lib/security/sanitize'
+import { getCurrentTenantId } from '@/lib/tenant'
 
 // ==========================================
 // Action: Create Document
@@ -54,6 +55,21 @@ export async function createDocument(formData: FormData) {
     }
     
     userId = user.id
+
+
+    // Get user's tenant_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .single()
+
+    const tenantId = userData?.tenant_id
+
+    if (!tenantId) {
+      logger.error('User has no tenant_id', { userId })
+      return { success: false, error: 'User not associated with a tenant' }
+    }
 
         // Check write permission
     const { allowed, role } = await checkWritePermission(supabase, userId)
@@ -178,6 +194,7 @@ export async function createDocument(formData: FormData) {
         project_code: project_code,
         status: 'Draft',
         created_by: user.id,
+        tenant_id: tenantId,
       })
       .select()
       .single()
