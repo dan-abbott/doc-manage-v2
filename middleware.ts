@@ -5,45 +5,34 @@ export function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
   
   // Extract subdomain from hostname
-  // Examples:
-  // - app.baselinedocs.com -> 'app'
-  // - acme.baselinedocs.com -> 'acme'
-  // - localhost:3000 -> 'localhost' (development)
-  // - baselinedocs.com -> null (apex domain)
-  
   const subdomain = extractSubdomain(hostname)
   
   // Store subdomain in cookie for auth callback
   const response = NextResponse.next()
   
-  if (subdomain && subdomain !== 'www') {
+  if (subdomain) {
     response.cookies.set('tenant_subdomain', subdomain, {
       httpOnly: true,
       secure: process.env.NODE_ENV === 'production',
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
-      domain: '.baselinedocs.com'
+      domain: '.baselinedocs.com', // Works for all subdomains
     })
+    
+    console.log('Middleware set cookie:', subdomain, 'for hostname:', hostname)
   }
   
   return response
 }
 
-/**
- * Extract subdomain from hostname
- * Handles various cases:
- * - Production: acme.baselinedocs.com -> 'acme'
- * - Development: localhost:3000 -> 'app' (default)
- * - Apex domain: baselinedocs.com -> 'app' (default)
- */
-function extractSubdomain(hostname: string): string | null {
+function extractSubdomain(hostname: string): string {
   // Remove port if present
   const host = hostname.split(':')[0]
   
   // Development: localhost or 127.0.0.1
   if (host === 'localhost' || host === '127.0.0.1') {
-    return 'app' // Default to 'app' subdomain in development
+    return 'app'
   }
   
   // Split by dots
@@ -59,19 +48,11 @@ function extractSubdomain(hostname: string): string | null {
     return parts[0]
   }
   
-  return null
+  return 'app'
 }
 
-// Configure which routes the middleware should run on
 export const config = {
   matcher: [
-    /*
-     * Match all request paths except:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - public files (public folder)
-     */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
 }
