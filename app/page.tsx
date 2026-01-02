@@ -1,69 +1,89 @@
-import { redirect } from 'next/navigation'
 import { createClient } from '@/lib/supabase/server'
-import { SignInButton } from '@/components/auth/SignInButton'
+import { redirect } from 'next/navigation'
+import { Button } from '@/components/ui/button'
 
-export default async function Home() {
+export default async function LandingPage() {
   const supabase = await createClient()
   
+  // Check if user is already authenticated
   const { data: { user } } = await supabase.auth.getUser()
   
-  // Redirect if already authenticated
   if (user) {
     redirect('/dashboard')
   }
 
   return (
-    <main className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100">
-      <div className="max-w-md w-full mx-4">
-        <div className="bg-white rounded-lg shadow-xl p-8">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">
-              Document Control System
-            </h1>
-            <p className="text-gray-600">
-              Professional document management with version control and approval workflows
-            </p>
-          </div>
-
-          <div className="space-y-4">
-            <SignInButton />
-            
-            <div className="text-center text-sm text-gray-500">
-              <p>Sign in with your Google account to get started</p>
-            </div>
-          </div>
-
-          <div className="mt-8 pt-6 border-t border-gray-200">
-            <h2 className="text-sm font-semibold text-gray-700 mb-3">Features</h2>
-            <ul className="space-y-2 text-sm text-gray-600">
-              <li className="flex items-start">
-                <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Version control with automated numbering
-              </li>
-              <li className="flex items-start">
-                <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Multi-approver review workflows
-              </li>
-              <li className="flex items-start">
-                <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Complete audit trail
-              </li>
-              <li className="flex items-start">
-                <svg className="h-5 w-5 text-green-500 mr-2 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20">
-                  <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm3.707-9.293a1 1 0 00-1.414-1.414L9 10.586 7.707 9.293a1 1 0 00-1.414 1.414l2 2a1 1 0 001.414 0l4-4z" clipRule="evenodd" />
-                </svg>
-                Prototype to Production workflows
-              </li>
-            </ul>
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
+      <div className="container mx-auto px-4 py-16">
+        {/* Header */}
+        <div className="text-center mb-16">
+          <h1 className="text-6xl font-bold text-gray-900 mb-4">
+            Baseline Docs
+          </h1>
+          <p className="text-xl text-gray-600 mb-8">
+            Professional Document Control & Version Management
+          </p>
+          <div className="flex justify-center gap-4">
+            <form action="/auth/signin" method="GET">
+              <Button 
+                size="lg" 
+                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg"
+              >
+                Sign In with Google
+              </Button>
+            </form>
           </div>
         </div>
+
+        {/* Features Grid */}
+        <div className="grid md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+          <FeatureCard
+            icon="📄"
+            title="Document Control"
+            description="Create, manage, and track documents with automated numbering and version control"
+          />
+          <FeatureCard
+            icon="✅"
+            title="Approval Workflows"
+            description="Multi-approver workflows ensure proper review and authorization before release"
+          />
+          <FeatureCard
+            icon="🔒"
+            title="Audit Trail"
+            description="Complete history of all document changes, approvals, and releases for compliance"
+          />
+          <FeatureCard
+            icon="📊"
+            title="Version Management"
+            description="Track document revisions with automatic versioning (vA, vB, v1, v2)"
+          />
+          <FeatureCard
+            icon="🏢"
+            title="Multi-Tenant"
+            description="Secure data isolation for each organization with custom branding"
+          />
+          <FeatureCard
+            icon="🚀"
+            title="Production Ready"
+            description="Promote prototype documents to production with full approval workflow"
+          />
+        </div>
+
+        {/* Footer */}
+        <div className="text-center mt-16 text-gray-600">
+          <p>&copy; 2025 Baseline Docs. All rights reserved.</p>
+        </div>
       </div>
-    </main>
+    </div>
+  )
+}
+
+function FeatureCard({ icon, title, description }: { icon: string, title: string, description: string }) {
+  return (
+    <div className="bg-white rounded-lg shadow-md p-6 hover:shadow-lg transition-shadow">
+      <div className="text-4xl mb-4">{icon}</div>
+      <h3 className="text-xl font-semibold text-gray-900 mb-2">{title}</h3>
+      <p className="text-gray-600">{description}</p>
+    </div>
   )
 }

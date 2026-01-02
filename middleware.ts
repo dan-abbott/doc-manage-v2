@@ -1,107 +1,75 @@
-import { createServerClient, type CookieOptions } from '@supabase/ssr'
-import { NextResponse, type NextRequest } from 'next/server'
+import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 
-export async function middleware(request: NextRequest) {
-  let response = NextResponse.next({
-    request: {
-      headers: request.headers,
-    },
-  })
-
-  // Add cache-control headers for document pages to prevent stale data
-  const isDocumentPage = request.nextUrl.pathname.startsWith('/documents') || 
-                         request.nextUrl.pathname.startsWith('/dashboard') ||
-                         request.nextUrl.pathname.startsWith('/approvals')
+export function middleware(request: NextRequest) {
+  const hostname = request.headers.get('host') || ''
   
-  if (isDocumentPage) {
-    response.headers.set('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate')
-    response.headers.set('Pragma', 'no-cache')
-    response.headers.set('Expires', '0')
+  // Extract subdomain from hostname
+  // Examples:
+  // - app.baselinedocs.com -> 'app'
+  // - acme.baselinedocs.com -> 'acme'
+  // - localhost:3000 -> 'localhost' (development)
+  // - baselinedocs.com -> null (apex domain)
+  
+  const subdomain = extractSubdomain(hostname)
+  
+  // Store subdomain in cookie for auth callback
+  const response = NextResponse.next()
+  
+  if (subdomain && subdomain !== 'www') {
+    response.cookies.set('tenant_subdomain', subdomain, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === 'production',
+      sameSite: 'lax',
+      maxAge: 60 * 60 * 24 * 7, // 7 days
+      path: '/',
+    })
   }
-
-  const supabase = createServerClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-    {
-      cookies: {
-        get(name: string) {
-          return request.cookies.get(name)?.value
-        },
-        set(name: string, value: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value,
-            ...options,
-          })
-        },
-        remove(name: string, options: CookieOptions) {
-          request.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-          response = NextResponse.next({
-            request: {
-              headers: request.headers,
-            },
-          })
-          response.cookies.set({
-            name,
-            value: '',
-            ...options,
-          })
-        },
-      },
-    }
-  )
-
-  const { data: { user } } = await supabase.auth.getUser()
-
-  // Define public routes (don't require authentication)
-  const publicRoutes = [
-    '/',
-    '/auth/callback',
-  ]
-
-  const isPublicRoute = publicRoutes.some(route => 
-    request.nextUrl.pathname === route || 
-    request.nextUrl.pathname.startsWith('/auth/callback')
-  )
-
-  // Redirect unauthenticated users to landing page (except on public routes)
-  if (!user && !isPublicRoute) {
-    const redirectUrl = new URL('/', request.url)
-    // Add the attempted URL as a query param so we can redirect back after login
-    redirectUrl.searchParams.set('redirect', request.nextUrl.pathname)
-    return NextResponse.redirect(redirectUrl)
-  }
-
-  // Redirect authenticated users away from landing page to dashboard
-  if (user && request.nextUrl.pathname === '/') {
-    return NextResponse.redirect(new URL('/dashboard', request.url))
-  }
-
+  
   return response
 }
 
+/**
+ * Extract subdomain from hostname
+ * Handles various cases:
+ * - Production: acme.baselinedocs.com -> 'acme'
+ * - Development: localhost:3000 -> 'app' (default)
+ * - Apex domain: baselinedocs.com -> 'app' (default)
+ */
+function extractSubdomain(hostname: string): string | null {
+  // Remove port if present
+  const host = hostname.split(':')[0]
+  
+  // Development: localhost or 127.0.0.1
+  if (host === 'localhost' || host === '127.0.0.1') {
+    return 'app' // Default to 'app' subdomain in development
+  }
+  
+  // Split by dots
+  const parts = host.split('.')
+  
+  // Apex domain (baselinedocs.com) - default to 'app'
+  if (parts.length === 2) {
+    return 'app'
+  }
+  
+  // Subdomain present (acme.baselinedocs.com)
+  if (parts.length >= 3) {
+    return parts[0]
+  }
+  
+  return null
+}
+
+// Configure which routes the middleware should run on
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
+     * Match all request paths except:
      * - _next/static (static files)
      * - _next/image (image optimization files)
      * - favicon.ico (favicon file)
-     * Feel free to modify this pattern to include more paths.
+     * - public files (public folder)
      */
     '/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
   ],
