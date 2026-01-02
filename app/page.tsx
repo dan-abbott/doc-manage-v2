@@ -1,6 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { Button } from '@/components/ui/button'
+import { SignInButton } from '@/components/auth/SignInButton'
 
 export default async function LandingPage() {
   const supabase = await createClient()
@@ -24,14 +24,9 @@ export default async function LandingPage() {
             Professional Document Control & Version Management
           </p>
           <div className="flex justify-center gap-4">
-            <form action="/auth/signin" method="GET">
-              <Button 
-                size="lg" 
-                className="bg-blue-600 hover:bg-blue-700 text-white px-8 py-6 text-lg"
-              >
-                Sign In with Google
-              </Button>
-            </form>
+            <div className="w-full max-w-sm">
+              <SignInButton />
+            </div>
           </div>
         </div>
 
