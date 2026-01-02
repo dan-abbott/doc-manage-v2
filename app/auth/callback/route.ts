@@ -19,11 +19,19 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/auth/error`)
     }
 
+    // Get current user
+    const { data: { user } } = await supabase.auth.getUser()
+    
+    if (!user) {
+      console.error('No user found after auth')
+      return NextResponse.redirect(`${origin}/`)
+    }
+
     // Get subdomain from cookie (set by middleware)
     const subdomainCookie = cookieStore.get('tenant_subdomain')
     const subdomain = subdomainCookie?.value || 'app'
 
-    console.log('Auth callback - subdomain:', subdomain)
+    console.log('Auth callback - subdomain:', subdomain, 'user:', user.email)
 
     // Look up tenant by subdomain
     const { data: tenant, error: tenantError } = await supabase
@@ -33,53 +41,31 @@ export async function GET(request: Request) {
       .eq('is_active', true)
       .single()
 
+    let tenantId = '00000000-0000-0000-0000-000000000001' // default
+
     if (tenantError || !tenant) {
-      console.error('Tenant not found for subdomain:', subdomain, tenantError)
-      // Fall back to default tenant
-      const tenantId = '00000000-0000-0000-0000-000000000001'
-      await updateUserTenant(supabase, tenantId)
+      console.log('Tenant not found for subdomain:', subdomain, '- using default tenant')
     } else {
-      console.log('Found tenant:', tenant.id)
-      await updateUserTenant(supabase, tenant.id)
+      console.log('Found tenant:', tenant.id, 'for subdomain:', subdomain)
+      tenantId = tenant.id
     }
 
-    // Redirect to dashboard
+    // Update user's tenant_id in the users table
+    const { error: updateError } = await supabase
+      .from('users')
+      .update({ tenant_id: tenantId })
+      .eq('id', user.id)
+
+    if (updateError) {
+      console.error('Error updating user tenant:', updateError)
+    } else {
+      console.log('User tenant updated successfully:', user.email, '→', tenantId)
+    }
+
+    // Redirect to dashboard (preserves subdomain from origin)
     return NextResponse.redirect(`${origin}/dashboard`)
   }
 
   // No code present, redirect to home
   return NextResponse.redirect(`${origin}/`)
-}
-
-/**
- * Update the user's tenant_id in their app_metadata
- * This is used by the database trigger when creating the user record
- */
-async function updateUserTenant(supabase: any, tenantId: string) {
-  try {
-    const { data: { user } } = await supabase.auth.getUser()
-    
-    if (!user) {
-      console.error('No user found in session')
-      return
-    }
-
-    console.log('Updating user tenant:', user.id, 'to tenant:', tenantId)
-
-    // Update user's app_metadata with tenant_id
-    // This will be read by the database trigger when creating the user record
-    const { error } = await supabase.auth.admin.updateUserById(user.id, {
-      app_metadata: { 
-        tenant_id: tenantId 
-      }
-    })
-
-    if (error) {
-      console.error('Error updating user metadata:', error)
-    } else {
-      console.log('User metadata updated successfully')
-    }
-  } catch (error) {
-    console.error('Error in updateUserTenant:', error)
-  }
 }
