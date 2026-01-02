@@ -7,6 +7,8 @@ export function middleware(request: NextRequest) {
   // Extract subdomain from hostname
   const subdomain = extractSubdomain(hostname)
   
+  console.log('[Middleware] hostname:', hostname, '→ subdomain:', subdomain)
+  
   // Store subdomain in cookie for auth callback
   const response = NextResponse.next()
   
@@ -19,8 +21,6 @@ export function middleware(request: NextRequest) {
       path: '/',
       domain: '.baselinedocs.com', // Works for all subdomains
     })
-    
-    console.log('Middleware set cookie:', subdomain, 'for hostname:', hostname)
   }
   
   return response
@@ -35,8 +35,11 @@ function extractSubdomain(hostname: string): string {
     return 'app'
   }
   
+  // Remove www - treat as apex domain
+  const cleanHost = host.replace(/^www\./, '')
+  
   // Split by dots
-  const parts = host.split('.')
+  const parts = cleanHost.split('.')
   
   // Apex domain (baselinedocs.com) - default to 'app'
   if (parts.length === 2) {
