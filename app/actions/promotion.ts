@@ -110,22 +110,7 @@ export async function promoteToProduction(prototypeDocumentId: string) {
       }
     }
 
-    // Validate: User must be creator (or admin in future)
-    if (prototypeDoc.created_by !== userId) {
-      logger.warn('Non-creator attempted to promote document', {
-        userId,
-        userEmail,
-        documentId: prototypeDocumentId,
-        documentNumber: prototypeDoc.document_number,
-        creatorId: prototypeDoc.created_by
-      })
-      return { 
-        success: false, 
-        error: 'Only the document creator can promote to Production' 
-      }
-    }
-
-    // Check if Production v1 already exists
+        // Check if Production v1 already exists
     const { data: existingProduction, error: checkError } = await supabase
       .from('documents')
       .select('id, version, status')

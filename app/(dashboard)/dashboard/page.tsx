@@ -1,7 +1,8 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Clock, User, CheckCircle } from 'lucide-react'
+import { FileText, Clock, User, CheckCircle, Plus } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { getGreetingWithName } from '@/lib/utils/greetings'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
 
@@ -63,19 +64,29 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Greeting and Tenant */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {greeting}
-        </h1>
-        {tenant?.company_name && (
-          <p className="text-lg font-semibold text-blue-600 mb-1">
-            {tenant.company_name}
+      {/* Header with Greeting, Tenant, and New Document Button */}
+      <div className="flex justify-between items-start">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {greeting}
+          </h1>
+          {tenant?.company_name && (
+            <p className="text-lg font-semibold text-blue-600 mb-1">
+              {tenant.company_name}
+            </p>
+          )}
+          <p className="text-gray-600">
+            Here's what's happening with your documents
           </p>
-        )}
-        <p className="text-gray-600">
-          Here's what's happening with your documents
-        </p>
+        </div>
+        
+        {/* New Document Button */}
+        <Link href="/documents/new">
+          <Button className="bg-black hover:bg-gray-800 text-white">
+            <Plus className="h-4 w-4 mr-2" />
+            New Document
+          </Button>
+        </Link>
       </div>
 
       {/* Statistics Cards */}
