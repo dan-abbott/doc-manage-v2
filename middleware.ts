@@ -41,12 +41,21 @@ export async function middleware(request: NextRequest) {
     // Get user's tenant and master admin status
     const { data: userData } = await supabase
       .from('users')
-      .select('tenant_id, is_master_admin, tenants!inner(subdomain)')
+      .select('tenant_id, is_master_admin')
       .eq('id', user.id)
       .single()
 
     if (userData) {
-      console.log('[Middleware] User tenant:', userData.tenants.subdomain, 'Current subdomain:', subdomain, 'Master admin:', userData.is_master_admin)
+      // Get tenant subdomain separately
+      const { data: tenant } = await supabase
+        .from('tenants')
+        .select('subdomain')
+        .eq('id', userData.tenant_id)
+        .single()
+
+      const userTenantSubdomain = tenant?.subdomain || 'app'
+
+      console.log('[Middleware] User tenant:', userTenantSubdomain, 'Current subdomain:', subdomain, 'Master admin:', userData.is_master_admin)
 
       // Master admin can access any tenant
       if (userData.is_master_admin) {
@@ -55,8 +64,6 @@ export async function middleware(request: NextRequest) {
       }
 
       // Regular users: verify they're accessing their assigned tenant
-      const userTenantSubdomain = userData.tenants.subdomain
-      
       if (userTenantSubdomain !== subdomain) {
         console.log('[Middleware] TENANT MISMATCH - User belongs to:', userTenantSubdomain, 'but accessing:', subdomain)
         
