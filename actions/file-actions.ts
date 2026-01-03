@@ -14,6 +14,64 @@ export interface UploadFileInput {
 }
 
 // ==========================================
+// Helper: Smart File Renaming
+// ==========================================
+
+/**
+ * Smart file renaming that:
+ * 1. Checks if file already has doc number prefix
+ * 2. Removes old/incorrect prefix if present
+ * 3. Adds correct prefix if auto_rename is enabled
+ */
+function smartRenameFile(
+  originalFileName: string,
+  documentNumber: string,
+  version: string,
+  autoRename: boolean
+): { fileName: string; wasRenamed: boolean } {
+  const expectedPrefix = `${documentNumber}${version}_`
+  
+  // Pattern to match any doc number prefix: FORM-00001vA_ or PROC-00123v2_
+  // Matches: PREFIX-#####v[A-Z or number]_
+  const docPrefixPattern = /^[A-Z]+-\d{5}v[A-Z0-9]+_/
+  
+  // Check if file already has a doc number prefix
+  const hasExistingPrefix = docPrefixPattern.test(originalFileName)
+  
+  if (hasExistingPrefix) {
+    // Remove the existing prefix (could be old/incorrect)
+    const cleanFileName = originalFileName.replace(docPrefixPattern, '')
+    
+    // If auto-rename is enabled, add the correct prefix
+    if (autoRename) {
+      return {
+        fileName: `${expectedPrefix}${cleanFileName}`,
+        wasRenamed: true
+      }
+    } else {
+      // Auto-rename disabled, just use the clean filename
+      return {
+        fileName: cleanFileName,
+        wasRenamed: true
+      }
+    }
+  } else {
+    // No existing prefix
+    if (autoRename) {
+      return {
+        fileName: `${expectedPrefix}${originalFileName}`,
+        wasRenamed: true
+      }
+    } else {
+      return {
+        fileName: originalFileName,
+        wasRenamed: false
+      }
+    }
+  }
+}
+
+// ==========================================
 // Helper: Log Audit Entry
 // ==========================================
 
@@ -63,7 +121,7 @@ export async function uploadFile(formData: FormData) {
     // Get document to verify ownership and get document number
     const { data: document, error: docError } = await supabase
       .from('documents')
-      .select('id, created_by, status, document_number, version')
+      .select('id, created_by, status, document_number, version, tenant_id')
       .eq('id', documentId)
       .single()
 
@@ -83,6 +141,20 @@ export async function uploadFile(formData: FormData) {
         error: 'Files can only be uploaded to Draft documents' 
       }
     }
+
+    // Get tenant settings for auto-rename
+    const { data: tenant, error: tenantError } = await supabase
+      .from('tenants')
+      .select('auto_rename_files')
+      .eq('id', document.tenant_id)
+      .single()
+
+    if (tenantError) {
+      console.error('Error fetching tenant settings:', tenantError)
+      // Continue with default (no auto-rename)
+    }
+
+    const autoRename = tenant?.auto_rename_files || false
 
     // Validate file size (50MB limit)
     const maxSize = 50 * 1024 * 1024 // 50MB in bytes
@@ -113,11 +185,26 @@ export async function uploadFile(formData: FormData) {
       }
     }
 
-    // Generate file path: documents/{document-id}/{filename}
+    // Smart file renaming
     const originalFileName = file.name
-    const displayName = `${document.document_number}${document.version}_${originalFileName}`
-    const filePath = `${documentId}/${displayName}`  
+    const { fileName: displayName, wasRenamed } = smartRenameFile(
+      originalFileName,
+      document.document_number,
+      document.version,
+      autoRename
+    )
 
+    console.log('[File Upload] Smart rename:', {
+      original: originalFileName,
+      final: displayName,
+      wasRenamed,
+      autoRename,
+      docNumber: document.document_number,
+      version: document.version
+    })
+
+    // Generate file path: documents/{document-id}/{filename}
+    const filePath = `${documentId}/${displayName}`
 
     // Upload to storage
     const { error: uploadError } = await supabase.storage
@@ -126,11 +213,6 @@ export async function uploadFile(formData: FormData) {
         cacheControl: '3600',
         upsert: false // Don't overwrite existing files
       })
-      console.log('=== UPLOAD DEBUG ===')
-      console.log('File path:', filePath)
-      console.log('Upload error:', uploadError)
-      console.log('Upload error details:', JSON.stringify(uploadError, null, 2))
-
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
@@ -163,10 +245,6 @@ export async function uploadFile(formData: FormData) {
       })
       .select()
       .single()
-
-      console.log('=== DATABASE INSERT DEBUG ===')
-      console.log('DB Error:', dbError)
-      console.log('DB Error details:', JSON.stringify(dbError, null, 2))
       
     if (dbError) {
       console.error('Database insert error:', dbError)
@@ -186,6 +264,8 @@ export async function uploadFile(formData: FormData) {
       user.email || '',
       {
         file_name: originalFileName,
+        renamed_to: displayName,
+        auto_renamed: wasRenamed,
         file_size: file.size,
         mime_type: file.type
       }
@@ -196,7 +276,10 @@ export async function uploadFile(formData: FormData) {
     return { 
       success: true, 
       file: fileRecord,
-      message: 'File uploaded successfully' 
+      wasRenamed,
+      message: wasRenamed 
+        ? `File uploaded and renamed to: ${displayName}`
+        : 'File uploaded successfully'
     }
   } catch (error: any) {
     console.error('Upload file error:', error)
