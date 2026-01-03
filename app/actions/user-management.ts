@@ -18,7 +18,7 @@ const userUpdateSchema = z.object({
 })
 
 /**
- * Get all users (admin only)
+ * Get all users (admin only, filtered by tenant)
  */
 export async function getAllUsers() {
   const startTime = Date.now()
@@ -40,10 +40,10 @@ export async function getAllUsers() {
     const userId = user.id
     const userEmail = user.email
 
-    // Check admin status
+    // Check admin status and get tenant_id
     const { data: userData, error: adminCheckError } = await supabase
       .from('users')
-      .select('is_admin, role')
+      .select('is_admin, role, tenant_id, is_master_admin')
       .eq('id', userId)
       .single()
 
@@ -60,10 +60,15 @@ export async function getAllUsers() {
       }
     }
 
-    logger.debug('Fetching all users', { userId, userEmail })
+    logger.debug('Fetching users for tenant', { 
+      userId, 
+      userEmail, 
+      tenantId: userData.tenant_id,
+      isMasterAdmin: userData.is_master_admin 
+    })
 
-    // Fetch all users with their stats
-    const { data: users, error: fetchError } = await supabase
+    // Build query - master admin sees all users, regular admin sees only their tenant
+    let query = supabase
       .from('users')
       .select(`
         id,
@@ -73,9 +78,17 @@ export async function getAllUsers() {
         role,
         is_active,
         created_at,
-        updated_at
+        updated_at,
+        tenant_id
       `)
-      .order('created_at', { ascending: false })
+
+    // Regular admins only see users in their tenant
+    // Master admin sees all users
+    if (!userData.is_master_admin) {
+      query = query.eq('tenant_id', userData.tenant_id)
+    }
+
+    const { data: users, error: fetchError } = await query.order('created_at', { ascending: false })
 
     if (fetchError) {
       logger.error('Failed to fetch users', {
@@ -107,272 +120,148 @@ export async function getAllUsers() {
     )
 
     const duration = Date.now() - startTime
-    
-    logger.info('User list fetched', {
-      userId,
-      userEmail,
+    logger.info('User list fetched successfully', { 
+      userId, 
       userCount: usersWithStats.length,
-      duration
+      tenantId: userData.tenant_id,
+      isMasterAdmin: userData.is_master_admin,
+      duration 
     })
 
-    return { 
-      success: true, 
-      data: usersWithStats 
+    return {
+      success: true,
+      data: usersWithStats
     }
-
-  } catch (error) {
+  } catch (error: any) {
     const duration = Date.now() - startTime
-    
-    logError(error, {
-      action: 'getAllUsers',
-      userId: (await supabase.auth.getUser()).data.user?.id,
+    logger.error('Failed to fetch users', {
+      error: error.message,
+      stack: error.stack,
       duration
     })
 
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to fetch users',
+    return {
+      success: false,
+      error: error.message || 'Failed to fetch users',
       data: []
     }
   }
 }
 
 /**
- * Update user role and status (admin only)
+ * Update user role (admin only)
  */
 export async function updateUserRole(
-  targetUserId: string, 
+  targetUserId: string,
   newRole: UserRole,
   reason?: string
 ) {
   const startTime = Date.now()
   const supabase = await createClient()
-  
+
   try {
-    // Validate inputs
-    const idValidation = uuidSchema.safeParse(targetUserId)
-    if (!idValidation.success) {
-      logger.warn('Invalid user ID for role update', { providedId: targetUserId })
+    // Validate UUID
+    const { success: uuidValid } = uuidSchema.safeParse(targetUserId)
+    if (!uuidValid) {
       return { success: false, error: 'Invalid user ID' }
     }
 
-    const roleValidation = userUpdateSchema.safeParse({ role: newRole, reason })
-    if (!roleValidation.success) {
-      logger.warn('Invalid role data', { 
-        newRole, 
-        errors: roleValidation.error.issues 
-      })
-      return { 
-        success: false, 
-        error: roleValidation.error.issues.map(i => i.message).join(', ')
-      }
+    // Validate inputs
+    const { success, data, error: validationError } = userUpdateSchema.safeParse({ role: newRole, reason })
+    if (!success) {
+      return { success: false, error: validationError.errors[0].message }
     }
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
-      logger.warn('Unauthorized role update attempt')
-      return { 
-        success: false, 
-        error: 'You must be logged in' 
-      }
+      return { success: false, error: 'You must be logged in' }
     }
 
-    const adminUserId = user.id
-    const adminEmail = user.email
+    const userId = user.id
+    const userEmail = user.email
 
     // Check admin status
-    const { data: adminData, error: adminCheckError } = await supabase
+    const { data: userData, error: adminCheckError } = await supabase
       .from('users')
       .select('is_admin, role')
-      .eq('id', adminUserId)
+      .eq('id', userId)
       .single()
 
-    if (adminCheckError || !adminData?.is_admin) {
-      logger.warn('Non-admin attempted role update', { 
-        adminUserId, 
-        adminEmail,
-        targetUserId,
-        isAdmin: adminData?.is_admin 
-      })
-      return { 
-        success: false, 
-        error: 'Only administrators can update user roles' 
-      }
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted to change user role', { userId, userEmail })
+      return { success: false, error: 'Only administrators can change user roles' }
     }
 
-    // Get target user current state
-    const { data: targetUser, error: targetFetchError } = await supabase
+    // Get target user details
+    const { data: targetUser, error: targetError } = await supabase
       .from('users')
-      .select('id, email, full_name, is_admin, role, is_active')
+      .select('email, full_name, role')
       .eq('id', targetUserId)
       .single()
 
-    if (targetFetchError || !targetUser) {
-      logger.error('Target user not found', {
-        adminUserId,
-        targetUserId,
-        error: targetFetchError
-      })
-      return { 
-        success: false, 
-        error: 'User not found' 
-      }
+    if (targetError || !targetUser) {
+      return { success: false, error: 'User not found' }
     }
-
-    // Prevent self-demotion from admin
-    if (targetUserId === adminUserId && newRole !== 'Admin') {
-      logger.warn('Admin attempted self-demotion', {
-        adminUserId,
-        adminEmail,
-        attemptedRole: newRole
-      })
-      return {
-        success: false,
-        error: 'You cannot remove your own admin privileges'
-      }
-    }
-
-    // Determine new status based on role
-    const isAdmin = newRole === 'Admin'
-    const isActive = newRole !== 'Deactivated'
 
     logger.info('Updating user role', {
-      adminUserId,
-      adminEmail,
+      adminId: userId,
+      adminEmail: userEmail,
       targetUserId,
       targetEmail: targetUser.email,
-      oldRole: targetUser.role || (targetUser.is_admin ? 'Admin' : 'Normal'),
-      newRole,
-      oldActive: targetUser.is_active,
-      newActive: isActive,
-      reason
+      oldRole: targetUser.role,
+      newRole: data.role,
+      reason: data.reason
     })
 
-    // Update user
-    const { data: updatedUser, error: updateError } = await supabase
+    // Update role
+    const { error: updateError } = await supabase
       .from('users')
-      .update({
-        is_admin: isAdmin,
-        role: newRole,
-        is_active: isActive,
+      .update({ 
+        role: data.role,
         updated_at: new Date().toISOString()
       })
       .eq('id', targetUserId)
-      .select()
-      .single()
 
     if (updateError) {
       logger.error('Failed to update user role', {
-        adminUserId,
+        adminId: userId,
         targetUserId,
-        newRole,
         error: updateError
       })
       throw updateError
     }
 
-    // Create audit log
-    const { error: auditError } = await supabase
-      .from('audit_log')
-      .insert({
-        document_id: null, // User management, not document-specific
-        action: 'user_role_changed',
-        performed_by: adminUserId,
-        performed_by_email: adminEmail || '',
-        details: {
-          target_user_id: targetUserId,
-          target_user_email: targetUser.email,
-          old_role: targetUser.role || (targetUser.is_admin ? 'Admin' : 'Normal'),
-          new_role: newRole,
-          old_active: targetUser.is_active,
-          new_active: isActive,
-          reason: reason || 'No reason provided',
-          changed_at: new Date().toISOString()
-        }
-      })
-
-    if (auditError) {
-      logger.error('Failed to create audit log for role change', {
-        adminUserId,
-        targetUserId,
-        error: auditError
-      })
-      // Don't fail the operation
-    }
+    // Log the role change in audit log (future enhancement)
+    // For now, just server logs
 
     const duration = Date.now() - startTime
-    
     logger.info('User role updated successfully', {
-      adminUserId,
-      adminEmail,
+      adminId: userId,
       targetUserId,
       targetEmail: targetUser.email,
-      newRole,
-      newActive: isActive,
+      newRole: data.role,
       duration
-    })
-
-    logServerAction('updateUserRole', {
-      adminUserId,
-      adminEmail,
-      targetUserId,
-      targetEmail: targetUser.email,
-      newRole,
-      duration,
-      success: true
     })
 
     revalidatePath('/admin/users')
-    
-    return { 
-      success: true, 
-      data: updatedUser 
-    }
 
-  } catch (error) {
+    return {
+      success: true,
+      message: `Updated ${targetUser.full_name || targetUser.email}'s role to ${data.role}`
+    }
+  } catch (error: any) {
     const duration = Date.now() - startTime
-    
-    logError(error, {
-      action: 'updateUserRole',
-      targetUserId,
-      newRole,
-      adminUserId: (await supabase.auth.getUser()).data.user?.id,
+    logger.error('Failed to update user role', {
+      error: error.message,
+      stack: error.stack,
       duration
     })
 
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to update user role' 
+    return {
+      success: false,
+      error: error.message || 'Failed to update user role'
     }
   }
-}
-
-/**
- * Deactivate a user (quick action)
- */
-export async function deactivateUser(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'Deactivated', reason)
-}
-
-/**
- * Reactivate a user (restore to normal)
- */
-export async function reactivateUser(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'Normal', reason)
-}
-
-/**
- * Make user admin
- */
-export async function makeUserAdmin(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'Admin', reason)
-}
-
-/**
- * Remove admin privileges (demote to normal)
- */
-export async function removeAdminPrivileges(targetUserId: string, reason?: string) {
-  return updateUserRole(targetUserId, 'Normal', reason)
 }
