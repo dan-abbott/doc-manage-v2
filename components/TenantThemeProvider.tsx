@@ -52,14 +52,16 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
     }
   }
 
+  const styleContent = `
+    :root {
+      --primary-color: ${primaryColor};
+      --secondary-color: ${secondaryColor};
+    }
+  `
+
   return (
     <>
-      <style jsx global>{`
-        :root {
-          --primary-color: ${primaryColor};
-          --secondary-color: ${secondaryColor};
-        }
-      `}</style>
+      <style dangerouslySetInnerHTML={{ __html: styleContent }} />
       {children}
     </>
   )
