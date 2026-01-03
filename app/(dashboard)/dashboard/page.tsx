@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Clock, User, CheckCircle, Plus } from 'lucide-react'
+import { FileText, Clock, User, CheckCircle, Plus, ClipboardList } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getGreetingWithName } from '@/lib/utils/greetings'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
@@ -18,22 +18,26 @@ export default async function DashboardPage() {
     return null
   }
 
-  // Get user's full name and tenant for greeting
+  // Get user's full name and tenant_id
   const { data: userData } = await supabase
     .from('users')
     .select('full_name, tenant_id')
     .eq('id', user.id)
     .single()
 
-  // Get tenant name
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('company_name')
-    .select('timezone')
-    .eq('id', userData?.tenant_id)
-    .single()
+  // Get tenant info (company name and timezone)
+  let tenant = null
+  if (userData?.tenant_id) {
+    const { data: tenantData } = await supabase
+      .from('tenants')
+      .select('company_name, timezone')
+      .eq('id', userData.tenant_id)
+      .single()
+    
+    tenant = tenantData
+  }
 
-  // Server-side greeting (no client component needed)
+  // Server-side greeting with timezone
   const greeting = getGreetingWithName(userData?.full_name, tenant?.timezone)
 
   // Get total documents count
@@ -65,29 +69,19 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Greeting, Tenant, and New Document Button */}
-      <div className="flex justify-between items-center">
-        <div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">
-            {greeting}
-          </h1>
-          {tenant?.company_name && (
-            <p className="text-lg font-semibold text-blue-600 mb-1">
-              {tenant.company_name}
-            </p>
-          )}
-          <p className="text-gray-600">
-            Here's what's happening with your documents
+      {/* Header with Greeting */}
+      <div>
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">
+          {greeting}
+        </h1>
+        {tenant?.company_name && (
+          <p className="text-lg font-semibold text-blue-600 mb-1">
+            {tenant.company_name}
           </p>
-        </div>
-        
-        {/* New Document Button */}
-        <Link href="/documents/new">
-          <Button className="bg-black hover:bg-gray-800 text-white">
-            <Plus className="h-4 w-4 mr-2" />
-            New Document
-          </Button>
-        </Link>
+        )}
+        <p className="text-gray-600">
+          Here's what's happening with your documents
+        </p>
       </div>
 
       {/* Statistics Cards */}
@@ -151,21 +145,43 @@ export default async function DashboardPage() {
             </CardHeader>
             <CardContent>
               <div className="text-3xl font-bold text-gray-900">{releasedDocumentsCount || 0}</div>
-              <p className="text-xs text-gray-500 mt-1">Active & approved</p>
+              <p className="text-xs text-gray-500 mt-1">Active documents</p>
             </CardContent>
           </Card>
         </Link>
       </div>
 
-      {/* Recent Activity */}
+      {/* Quick Actions - Limited Width */}
       <Card>
         <CardHeader>
-          <CardTitle>Recent Activity</CardTitle>
+          <CardTitle className="text-base">Quick Actions</CardTitle>
         </CardHeader>
-        <CardContent>
-          <RecentActivityFeed />
+        <CardContent className="flex flex-wrap gap-3">
+          <Link href="/documents/new">
+            <Button className="w-auto">
+              <Plus className="mr-2 h-4 w-4" />
+              Create New Document
+            </Button>
+          </Link>
+          {pendingApprovalsCount > 0 && (
+            <Link href="/approvals">
+              <Button variant="outline" className="w-auto">
+                <ClipboardList className="mr-2 h-4 w-4" />
+                My Approvals ({pendingApprovalsCount})
+              </Button>
+            </Link>
+          )}
+          <Link href="/documents">
+            <Button variant="outline" className="w-auto">
+              <FileText className="mr-2 h-4 w-4" />
+              View All Documents
+            </Button>
+          </Link>
         </CardContent>
       </Card>
+
+      {/* Recent Activity */}
+      <RecentActivityFeed />
     </div>
   )
 }
