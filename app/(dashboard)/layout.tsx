@@ -17,6 +17,12 @@ export default async function DashboardLayout({
   }
 
   // Navigation is now handled by root layout
-  // This layout just ensures authentication and provides container
-  return <>{children}</>;
+  // This layout provides consistent padding for all dashboard pages
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        {children}
+      </div>
+    </div>
+  );
 }
