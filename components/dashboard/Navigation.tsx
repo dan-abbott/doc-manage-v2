@@ -83,100 +83,98 @@ export default function Navigation({ user, isAdmin }: Props) {
   return (
     <nav className="bg-white border-b border-slate-200">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex justify-between h-16">
-          {/* Left side - Logo and nav items */}
-          <div className="flex">
-            <div className="flex-shrink-0 flex items-center gap-3">
-              <Link href="/dashboard" className="flex items-center gap-3">
-                {/* Baseline Docs Logo - STATIC COLORS */}
-                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" className="h-8 w-8">
-                  <rect x="100" y="80" width="200" height="240" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
-                  <path d="M 300 80 L 300 120 L 260 120 Z" fill="#2E7DB5"/>
-                  <path d="M 260 120 L 300 120 L 300 80" fill="none" stroke="#2E7DB5" strokeWidth="8" strokeLinejoin="miter"/>
-                  <rect x="130" y="130" width="90" height="8" rx="4" fill="#2E7DB5"/>
-                  <rect x="130" y="160" width="140" height="8" rx="4" fill="#2E7DB5"/>
-                  <rect x="130" y="190" width="140" height="8" rx="4" fill="#6B7280"/>
-                  <rect x="130" y="220" width="90" height="8" rx="4" fill="#6B7280"/>
-                  <rect x="80" y="240" width="240" height="12" rx="6" fill="#1E3A5F"/>
-                  <path d="M 200 250 L 190 280 L 200 290 L 210 280 Z" fill="#2E7DB5"/>
-                  <rect x="110" y="280" width="180" height="40" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
-                </svg>
-                <span className="text-xl font-bold text-gray-900">Baseline Docs</span>
-                
-                {/* Company Logo */}
-                {companyLogo && (
-                  <>
-                    <div className="h-8 w-px bg-gray-300 mx-2"></div>
-                    <div className="relative h-8 w-32">
-                      <Image
-                        src={companyLogo}
-                        alt="Company logo"
-                        fill
-                        className="object-contain"
-                      />
-                    </div>
-                  </>
-                )}
-              </Link>
-            </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-2 lg:space-x-4">
-              {navItems.map((item) => {
-                // Parse href to get base path and query
-                const [basePath, query] = item.href.split('?');
-                const itemFilter = query?.includes('filter=my') ? 'my' : null;
-                const currentFilter = searchParams.get('filter');
-                
-                // Check if active: must match path AND filter state
-                const isActive = pathname === basePath && 
-                  (itemFilter ? currentFilter === itemFilter : !currentFilter);
+        <div className="flex justify-between items-center h-16 gap-2">
+          {/* Left side - Logo */}
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <Link href="/dashboard" className="flex items-center gap-2">
+              {/* Baseline Docs Logo - STATIC COLORS */}
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" className="h-8 w-8">
+                <rect x="100" y="80" width="200" height="240" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
+                <path d="M 300 80 L 300 120 L 260 120 Z" fill="#2E7DB5"/>
+                <path d="M 260 120 L 300 120 L 300 80" fill="none" stroke="#2E7DB5" strokeWidth="8" strokeLinejoin="miter"/>
+                <rect x="130" y="130" width="90" height="8" rx="4" fill="#2E7DB5"/>
+                <rect x="130" y="160" width="140" height="8" rx="4" fill="#2E7DB5"/>
+                <rect x="130" y="190" width="140" height="8" rx="4" fill="#6B7280"/>
+                <rect x="130" y="220" width="90" height="8" rx="4" fill="#6B7280"/>
+                <rect x="80" y="240" width="240" height="12" rx="6" fill="#1E3A5F"/>
+                <path d="M 200 250 L 190 280 L 200 290 L 210 280 Z" fill="#2E7DB5"/>
+                <rect x="110" y="280" width="180" height="40" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
+              </svg>
+              <span className="text-lg font-bold text-gray-900 hidden lg:inline">Baseline Docs</span>
+              
+              {/* Company Logo */}
+              {companyLogo && (
+                <>
+                  <div className="h-6 w-px bg-gray-300 hidden lg:block"></div>
+                  <div className="relative h-6 w-24 hidden lg:block">
+                    <Image
+                      src={companyLogo}
+                      alt="Company logo"
+                      fill
+                      className="object-contain"
+                    />
+                  </div>
+                </>
+              )}
+            </Link>
+          </div>
 
-                return (
-                  <Link
-                    key={item.href}
-                    href={item.href}
-                    className={`inline-flex items-center px-2 lg:px-3 py-2 text-sm font-medium whitespace-nowrap ${
-                      isActive
-                        ? 'border-b-2'
-                        : 'text-slate-500 hover:text-slate-700'
-                    }`}
-                    style={isActive ? { 
-                      color: 'var(--primary-color, #2563eb)',
-                      borderColor: 'var(--primary-color, #2563eb)'
-                    } : {}}
+          {/* Center - Nav items */}
+          <div className="hidden sm:flex items-center gap-1 lg:gap-2">
+            {navItems.map((item) => {
+              // Parse href to get base path and query
+              const [basePath, query] = item.href.split('?');
+              const itemFilter = query?.includes('filter=my') ? 'my' : null;
+              const currentFilter = searchParams.get('filter');
+              
+              // Check if active: must match path AND filter state
+              const isActive = pathname === basePath && 
+                (itemFilter ? currentFilter === itemFilter : !currentFilter);
+
+              return (
+                <Link
+                  key={item.href}
+                  href={item.href}
+                  className={`inline-flex items-center px-2 py-2 text-sm font-medium whitespace-nowrap ${
+                    isActive
+                      ? 'border-b-2'
+                      : 'text-slate-500 hover:text-slate-700'
+                  }`}
+                  style={isActive ? { 
+                    color: 'var(--primary-color, #2563eb)',
+                    borderColor: 'var(--primary-color, #2563eb)'
+                  } : {}}
+                >
+                  <svg
+                    className="w-4 h-4 mr-1.5"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
                   >
-                    <svg
-                      className="w-4 h-4 mr-1.5"
-                      fill="none"
-                      stroke="currentColor"
-                      viewBox="0 0 24 24"
-                    >
-                      <path
-                        strokeLinecap="round"
-                        strokeLinejoin="round"
-                        strokeWidth={2}
-                        d={item.icon}
-                      />
-                    </svg>
-                    {item.label}
-                  </Link>
-                );
-              })}
-            </div>
+                    <path
+                      strokeLinecap="round"
+                      strokeLinejoin="round"
+                      strokeWidth={2}
+                      d={item.icon}
+                    />
+                  </svg>
+                  {item.label}
+                </Link>
+              );
+            })}
           </div>
 
           {/* Right side - User menu */}
-          <div className="flex items-center">
-            <div className="flex items-center gap-3">
-              <span className="text-sm text-slate-700 font-medium">
-                {user.fullName || user.email}
-              </span>
-              <button
-                onClick={handleSignOut}
-                className="inline-flex items-center px-3 py-2 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50"
-              >
-                Sign Out
-              </button>
-            </div>
+          <div className="flex-shrink-0 flex items-center gap-2">
+            <span className="text-sm text-slate-700 font-medium hidden md:inline truncate max-w-[150px]">
+              {user.fullName || user.email}
+            </span>
+            <button
+              onClick={handleSignOut}
+              className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 whitespace-nowrap"
+            >
+              Sign Out
+            </button>
           </div>
         </div>
       </div>

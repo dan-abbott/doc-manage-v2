@@ -29,11 +29,12 @@ export default async function DashboardPage() {
   const { data: tenant } = await supabase
     .from('tenants')
     .select('company_name')
+    .select('timezone')
     .eq('id', userData?.tenant_id)
     .single()
 
   // Server-side greeting (no client component needed)
-  const greeting = getGreetingWithName(userData?.full_name)
+  const greeting = getGreetingWithName(userData?.full_name, tenant?.timezone)
 
   // Get total documents count
   const { count: totalDocuments } = await supabase

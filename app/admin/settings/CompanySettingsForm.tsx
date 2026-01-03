@@ -19,6 +19,7 @@ interface CompanySettingsFormProps {
     primary_color: string
     secondary_color: string
     auto_rename_files: boolean
+    timezone: string
   }
 }
 
@@ -30,6 +31,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
   const [primaryColor, setPrimaryColor] = useState(tenant.primary_color)
   const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color)
   const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)
+  const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
@@ -114,6 +116,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         primary_color: primaryColor,
         secondary_color: secondaryColor,
         auto_rename_files: autoRenameFiles,
+        timezone: timezone,
       })
 
       if (result.success) {
@@ -169,6 +172,59 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         />
         <p className="text-sm text-gray-500 mt-1">
           Subdomain cannot be changed. Contact support if needed.
+        </p>
+      </div>
+
+      {/* Timezone */}
+      <div>
+        <Label htmlFor="timezone">Company Timezone</Label>
+        <select
+          id="timezone"
+          value={timezone}
+          onChange={(e) => setTimezone(e.target.value)}
+          className="flex h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm ring-offset-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+        >
+          <optgroup label="United States">
+            <option value="America/New_York">Eastern Time (ET)</option>
+            <option value="America/Chicago">Central Time (CT)</option>
+            <option value="America/Denver">Mountain Time (MT)</option>
+            <option value="America/Los_Angeles">Pacific Time (PT)</option>
+            <option value="America/Anchorage">Alaska Time (AKT)</option>
+            <option value="Pacific/Honolulu">Hawaii Time (HT)</option>
+          </optgroup>
+          <optgroup label="Canada">
+            <option value="America/Toronto">Toronto (ET)</option>
+            <option value="America/Vancouver">Vancouver (PT)</option>
+            <option value="America/Edmonton">Edmonton (MT)</option>
+          </optgroup>
+          <optgroup label="Europe">
+            <option value="Europe/London">London (GMT/BST)</option>
+            <option value="Europe/Paris">Paris (CET/CEST)</option>
+            <option value="Europe/Berlin">Berlin (CET/CEST)</option>
+            <option value="Europe/Rome">Rome (CET/CEST)</option>
+            <option value="Europe/Madrid">Madrid (CET/CEST)</option>
+            <option value="Europe/Amsterdam">Amsterdam (CET/CEST)</option>
+          </optgroup>
+          <optgroup label="Asia">
+            <option value="Asia/Tokyo">Tokyo (JST)</option>
+            <option value="Asia/Shanghai">Shanghai (CST)</option>
+            <option value="Asia/Hong_Kong">Hong Kong (HKT)</option>
+            <option value="Asia/Singapore">Singapore (SGT)</option>
+            <option value="Asia/Dubai">Dubai (GST)</option>
+            <option value="Asia/Kolkata">India (IST)</option>
+          </optgroup>
+          <optgroup label="Australia">
+            <option value="Australia/Sydney">Sydney (AEST/AEDT)</option>
+            <option value="Australia/Melbourne">Melbourne (AEST/AEDT)</option>
+            <option value="Australia/Brisbane">Brisbane (AEST)</option>
+            <option value="Australia/Perth">Perth (AWST)</option>
+          </optgroup>
+          <optgroup label="Other">
+            <option value="UTC">UTC (Coordinated Universal Time)</option>
+          </optgroup>
+        </select>
+        <p className="text-sm text-gray-500 mt-1">
+          Used for time-based greetings (Good morning, Good afternoon, Good evening)
         </p>
       </div>
 

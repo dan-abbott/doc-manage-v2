@@ -11,6 +11,7 @@ const companySettingsSchema = z.object({
   primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   secondary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   auto_rename_files: z.boolean(),
+  timezone: z.string().min(1, 'Timezone is required'),
 })
 
 /**
@@ -132,6 +133,7 @@ export async function updateCompanySettings(data: {
   primary_color: string
   secondary_color: string
   auto_rename_files: boolean
+  timezone: string
 }) {
   const supabase = await createClient()
 
@@ -172,6 +174,7 @@ export async function updateCompanySettings(data: {
         primary_color: validation.data.primary_color,
         secondary_color: validation.data.secondary_color,
         auto_rename_files: validation.data.auto_rename_files,
+        timezone: validation.data.timezone,
         updated_at: new Date().toISOString(),
       })
       .eq('id', userData.tenant_id)
