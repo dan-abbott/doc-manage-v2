@@ -37,10 +37,11 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
     const file = e.target.files?.[0]
     if (!file) return
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
+    // Validate file type - only PNG, JPG, SVG
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
+    if (!validTypes.includes(file.type)) {
       toast.error('Invalid File Type', {
-        description: 'Please select an image file (PNG, JPG, SVG)'
+        description: 'Please select a PNG, JPG, or SVG image file'
       })
       return
     }
@@ -200,7 +201,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
           <div className="flex items-center gap-2">
             <Input
               type="file"
-              accept="image/*"
+              accept="image/png,image/jpeg,image/svg+xml"
               onChange={handleLogoFileChange}
               className="flex-1"
             />
@@ -217,7 +218,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
             )}
           </div>
           <p className="text-sm text-gray-500">
-            Upload your company logo (PNG, JPG, or SVG, max 5MB). Logo appears next to Baseline Docs branding.
+            Upload your company logo (PNG, JPG, or SVG - max 5MB). Logo appears next to Baseline Docs branding.
           </p>
         </div>
       </div>

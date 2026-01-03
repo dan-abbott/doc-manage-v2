@@ -45,9 +45,10 @@ export async function uploadCompanyLogo(formData: FormData) {
       return { success: false, error: 'No file provided' }
     }
 
-    // Validate file type
-    if (!file.type.startsWith('image/')) {
-      return { success: false, error: 'File must be an image' }
+    // Validate file type - only PNG, JPG, SVG
+    const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
+    if (!validTypes.includes(file.type)) {
+      return { success: false, error: 'Invalid file type. Only PNG, JPG, and SVG are allowed' }
     }
 
     // Validate file size (5MB limit)
