@@ -3,6 +3,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import SignInButton from '@/components/SignInButton'
 import Image from 'next/image'
+import Link from 'next/link'
 
 export default async function LandingPage() {
   const supabase = await createClient()
