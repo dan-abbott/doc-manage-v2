@@ -119,7 +119,7 @@ export default function Navigation({ user, isAdmin }: Props) {
                 )}
               </Link>
             </div>
-            <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
+            <div className="hidden sm:ml-6 sm:flex sm:space-x-2 lg:space-x-4">
               {navItems.map((item) => {
                 // Parse href to get base path and query
                 const [basePath, query] = item.href.split('?');
@@ -134,7 +134,7 @@ export default function Navigation({ user, isAdmin }: Props) {
                   <Link
                     key={item.href}
                     href={item.href}
-                    className={`inline-flex items-center px-3 py-2 text-sm font-medium ${
+                    className={`inline-flex items-center px-2 lg:px-3 py-2 text-sm font-medium whitespace-nowrap ${
                       isActive
                         ? 'border-b-2'
                         : 'text-slate-500 hover:text-slate-700'
@@ -145,7 +145,7 @@ export default function Navigation({ user, isAdmin }: Props) {
                     } : {}}
                   >
                     <svg
-                      className="w-4 h-4 mr-2"
+                      className="w-4 h-4 mr-1.5"
                       fill="none"
                       stroke="currentColor"
                       viewBox="0 0 24 24"
