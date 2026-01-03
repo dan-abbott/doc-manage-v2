@@ -15,7 +15,7 @@ type Props = {
   userRole: string | null;
 };
 
-export default function Navigation({ user, isAdmin, userRole }: Props) {
+export default function Navigation({ user, isAdmin }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -114,29 +114,8 @@ export default function Navigation({ user, isAdmin, userRole }: Props) {
           {/* Right side - User menu */}
           <div className="flex items-center">
             <div className="flex items-center gap-3">
-              {/* Role badge - show for all users */}
-              {userRole === 'Admin' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800">
-                  Admin
-                </span>
-              )}
-              {userRole === 'Read Only' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
-                  Read Only
-                </span>
-              )}
-              {userRole === 'Deactivated' && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-800">
-                  Deactivated
-                </span>
-              )}
-              {(userRole === 'Normal' || !userRole) && !isAdmin && (
-                <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-green-100 text-green-800">
-                  Normal
-                </span>
-              )}
               <span className="text-sm text-slate-700 font-medium">
-                {getGreetingWithName(user.fullName)}
+                {user.fullName || user.email}
               </span>
               <button
                 onClick={handleSignOut}
@@ -149,7 +128,7 @@ export default function Navigation({ user, isAdmin, userRole }: Props) {
         </div>
       </div>
 
-      {/* Mobile menu - simplified for now */}
+      {/* Mobile menu */}
       <div className="sm:hidden border-t border-slate-200">
         <div className="px-2 pt-2 pb-3 space-y-1">
           {navItems.map((item) => {

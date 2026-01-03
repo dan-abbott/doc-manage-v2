@@ -18,15 +18,19 @@ export default async function LandingPage() {
   const subdomainCookie = cookieStore.get('tenant_subdomain')
   const subdomain = subdomainCookie?.value || 'app'
 
-  // Get tenant info if not default
+  console.log('[Landing] Subdomain from cookie:', subdomain)
+
+  // Get tenant info
   let tenantName = null
   if (subdomain && subdomain !== 'app') {
-    const { data: tenant } = await supabase
+    const { data: tenant, error } = await supabase
       .from('tenants')
       .select('company_name')
       .eq('subdomain', subdomain)
+      .eq('is_active', true)
       .single()
     
+    console.log('[Landing] Tenant lookup:', { subdomain, tenant, error })
     tenantName = tenant?.company_name
   }
 
@@ -56,9 +60,11 @@ export default async function LandingPage() {
               Baseline Docs
             </h1>
             {tenantName && (
-              <p className="text-xl text-blue-600 font-semibold mb-2">
-                {tenantName}
-              </p>
+              <div className="mb-3">
+                <p className="text-2xl font-semibold text-blue-600">
+                  {tenantName}
+                </p>
+              </div>
             )}
             <p className="text-gray-600">
               Professional Document Control & Version Management

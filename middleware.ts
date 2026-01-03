@@ -1,13 +1,15 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
 
-export function middleware(request: NextRequest) {
+export async function middleware(request: NextRequest) {
   const hostname = request.headers.get('host') || ''
+  const pathname = request.nextUrl.pathname
   
   // Extract subdomain from hostname
   const subdomain = extractSubdomain(hostname)
   
-  console.log('[Middleware] hostname:', hostname, '→ subdomain:', subdomain)
+  console.log('[Middleware] hostname:', hostname, '→ subdomain:', subdomain, 'path:', pathname)
   
   // Store subdomain in cookie for auth callback
   const response = NextResponse.next()
@@ -19,8 +21,53 @@ export function middleware(request: NextRequest) {
       sameSite: 'lax',
       maxAge: 60 * 60 * 24 * 7, // 7 days
       path: '/',
-      domain: '.baselinedocs.com', // Works for all subdomains
+      domain: '.baselinedocs.com',
     })
+  }
+
+  // Skip tenant verification for:
+  // - Landing page (/)
+  // - Auth routes (/auth/*)
+  // - Static files
+  if (pathname === '/' || pathname.startsWith('/auth/') || pathname.startsWith('/_next')) {
+    return response
+  }
+
+  // For authenticated routes, verify tenant access
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+
+  if (user) {
+    // Get user's tenant and master admin status
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id, is_master_admin, tenants!inner(subdomain)')
+      .eq('id', user.id)
+      .single()
+
+    if (userData) {
+      console.log('[Middleware] User tenant:', userData.tenants.subdomain, 'Current subdomain:', subdomain, 'Master admin:', userData.is_master_admin)
+
+      // Master admin can access any tenant
+      if (userData.is_master_admin) {
+        console.log('[Middleware] Master admin - access granted to all tenants')
+        return response
+      }
+
+      // Regular users: verify they're accessing their assigned tenant
+      const userTenantSubdomain = userData.tenants.subdomain
+      
+      if (userTenantSubdomain !== subdomain) {
+        console.log('[Middleware] TENANT MISMATCH - User belongs to:', userTenantSubdomain, 'but accessing:', subdomain)
+        
+        // Redirect to error page with message
+        const redirectUrl = new URL('/auth/error', request.url)
+        redirectUrl.searchParams.set('message', 'You do not have access to this organization')
+        return NextResponse.redirect(redirectUrl)
+      }
+
+      console.log('[Middleware] Tenant match - access granted')
+    }
   }
   
   return response

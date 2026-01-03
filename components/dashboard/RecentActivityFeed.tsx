@@ -1,4 +1,3 @@
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Activity, FileText, CheckCircle, XCircle, ArrowUp, GitBranch, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
@@ -49,177 +48,93 @@ function ActivityLabel({ action }: { action: string }) {
 }
 
 export default async function RecentActivityFeed() {
-  try {
-    const supabase = await createClient()
-
-    // Get recent audit logs (no join - avoid RLS issues)
-    const { data: auditLogs, error: auditError } = await supabase
-      .from('audit_log')
-      .select('id, document_id, action, performed_by_email, created_at')
-      .order('created_at', { ascending: false })
-      .limit(10)
-
-    if (auditError) {
-      console.error('Audit log error:', auditError)
-      throw auditError
-    }
-
-    if (!auditLogs || auditLogs.length === 0) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-4 w-4" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-8 text-sm text-gray-500">
-              No recent activity. Create or release a document to get started!
-            </p>
-          </CardContent>
-        </Card>
+  const supabase = await createClient()
+  
+  // Get recent activities (get more to ensure we have 10 unique docs)
+  const { data: activities, error } = await supabase
+    .from('audit_log')
+    .select(`
+      id,
+      document_id,
+      action,
+      performed_by_email,
+      created_at,
+      documents (
+        document_number,
+        title,
+        version
       )
-    }
+    `)
+    .order('created_at', { ascending: false })
+    .limit(50) // Get 50 to ensure 10 unique documents
 
-    // Get unique document IDs
-    const documentIds = [...new Set(auditLogs.map(log => log.document_id))]
-
-    // Fetch documents separately (RLS will filter what user can see)
-    const { data: documents, error: docError } = await supabase
-      .from('documents')
-      .select('id, document_number, version, title')
-      .in('id', documentIds)
-
-    if (docError) {
-      console.error('Documents error:', docError)
-      // Don't throw - just show what we can
-    }
-
-    // Create lookup map
-    const docMap = new Map()
-    documents?.forEach(doc => {
-      docMap.set(doc.id, doc)
-    })
-
-    // Combine the data
-    const activities = auditLogs
-      .map(log => {
-        const doc = docMap.get(log.document_id)
-        if (!doc) return null // Skip if user can't see this document
-        
-        return {
-          ...log,
-          document: doc
-        }
-      })
-      .filter(Boolean) // Remove nulls
-
-    if (activities.length === 0) {
-      return (
-        <Card>
-          <CardHeader>
-            <CardTitle className="flex items-center gap-2 text-base">
-              <Activity className="h-4 w-4" />
-              Recent Activity
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <p className="text-center py-8 text-sm text-gray-500">
-              No recent activity visible.
-            </p>
-          </CardContent>
-        </Card>
-      )
-    }
-
+  if (error) {
+    console.error('Error loading recent activity:', error)
     return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          {/* Table-like layout for horizontal, compact display */}
-          <div className="overflow-x-auto">
-            <table className="w-full">
-              <thead>
-                <tr className="border-b text-left">
-                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Document</th>
-                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Title</th>
-                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">Action</th>
-                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider">User</th>
-                  <th className="pb-2 text-xs font-medium text-gray-500 uppercase tracking-wider text-right">Time</th>
-                </tr>
-              </thead>
-              <tbody>
-                {activities.map((activity: any) => {
-                  const doc = activity.document
-
-                  return (
-                    <tr key={activity.id} className="border-b last:border-b-0 hover:bg-gray-50">
-                      <td className="py-3">
-                        <Link 
-                          href={`/documents/${activity.document_id}`}
-                          className="text-sm font-medium text-blue-600 hover:underline"
-                        >
-                          {doc.document_number}{doc.version}
-                        </Link>
-                      </td>
-                      <td className="py-3">
-                        <Link 
-                          href={`/documents/${activity.document_id}`}
-                          className="text-sm text-gray-900 hover:underline truncate max-w-xs block"
-                        >
-                          {doc.title || 'Untitled Document'}
-                        </Link>
-                      </td>
-                      <td className="py-3">
-                        <div className="flex items-center gap-1.5">
-                          <ActivityIcon action={activity.action} />
-                          <span className="text-sm text-gray-600">
-                            {ActivityLabel({ action: activity.action })}
-                          </span>
-                        </div>
-                      </td>
-                      <td className="py-3">
-                        <span className="text-sm text-gray-600">
-                          {activity.performed_by_email?.split('@')[0] || 'Unknown'}
-                        </span>
-                      </td>
-                      <td className="py-3 text-right">
-                        <span className="text-xs text-gray-500">
-                          {formatTimeAgo(activity.created_at)}
-                        </span>
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
-          </div>
-        </CardContent>
-      </Card>
-    )
-  } catch (error) {
-    console.error('RecentActivityFeed error:', error)
-    
-    return (
-      <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2 text-base">
-            <Activity className="h-4 w-4" />
-            Recent Activity
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <p className="text-center py-8 text-sm text-red-500">
-            Unable to load recent activity
-          </p>
-        </CardContent>
-      </Card>
+      <div className="text-sm text-gray-500">
+        Unable to load recent activity
+      </div>
     )
   }
+
+  if (!activities || activities.length === 0) {
+    return (
+      <div className="text-sm text-gray-500">
+        No recent activity to display
+      </div>
+    )
+  }
+
+  // Roll up activities by document - only show latest activity per document
+  const uniqueActivities: any[] = []
+  const seenDocuments = new Set<string>()
+
+  for (const activity of activities) {
+    if (!seenDocuments.has(activity.document_id)) {
+      uniqueActivities.push(activity)
+      seenDocuments.add(activity.document_id)
+      
+      if (uniqueActivities.length >= 10) break
+    }
+  }
+
+  return (
+    <div className="space-y-3">
+      {uniqueActivities.map((activity) => {
+        const document = activity.documents as any
+        return (
+          <div
+            key={activity.id}
+            className="flex items-start gap-3 p-3 rounded-lg hover:bg-gray-50 transition-colors"
+          >
+            <div className="mt-0.5">
+              <ActivityIcon action={activity.action} />
+            </div>
+            <div className="flex-1 min-w-0">
+              <div className="flex items-start justify-between gap-2">
+                <div className="min-w-0">
+                  <Link
+                    href={`/documents/${activity.document_id}`}
+                    className="font-medium text-sm text-gray-900 hover:text-blue-600 hover:underline"
+                  >
+                    {document?.document_number || 'Unknown Document'}
+                    {document?.version && ` ${document.version}`}
+                  </Link>
+                  <p className="text-sm text-gray-600 truncate mt-0.5">
+                    {document?.title || 'No title'}
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    <ActivityLabel action={activity.action} /> by {activity.performed_by_email}
+                  </p>
+                </div>
+                <span className="text-xs text-gray-500 whitespace-nowrap">
+                  {formatTimeAgo(activity.created_at)}
+                </span>
+              </div>
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
 }
