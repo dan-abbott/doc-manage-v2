@@ -116,7 +116,16 @@ export default async function LandingPage() {
         </div>
 
         {/* Footer */}
-        <div className="text-center mt-8 text-gray-600 text-sm">
+        <div className="text-center mt-8 text-gray-600 text-sm space-y-2">
+          <div className="flex justify-center gap-4">
+            <Link href="/terms" className="hover:text-blue-600 transition-colors">
+              Terms of Service
+            </Link>
+            <span>•</span>
+            <Link href="/privacy" className="hover:text-blue-600 transition-colors">
+              Privacy Policy
+            </Link>
+          </div>
           <p>&copy; 2025 Baseline Docs. All rights reserved.</p>
         </div>
       </div>
