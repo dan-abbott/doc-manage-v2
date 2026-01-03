@@ -13,6 +13,118 @@ const companySettingsSchema = z.object({
   auto_rename_files: z.boolean(),
 })
 
+/**
+ * Upload company logo to Supabase Storage
+ */
+export async function uploadCompanyLogo(formData: FormData) {
+  const supabase = await createClient()
+
+  try {
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      return { success: false, error: 'You must be logged in' }
+    }
+
+    // Get user's tenant and verify admin
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id, is_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_admin) {
+      return { success: false, error: 'Only administrators can upload logos' }
+    }
+
+    // Get the file
+    const file = formData.get('logo') as File
+    
+    if (!file) {
+      return { success: false, error: 'No file provided' }
+    }
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      return { success: false, error: 'File must be an image' }
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      return { success: false, error: 'File size must be less than 5MB' }
+    }
+
+    // Get tenant subdomain for filename
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('subdomain')
+      .eq('id', userData.tenant_id)
+      .single()
+
+    if (!tenant) {
+      return { success: false, error: 'Tenant not found' }
+    }
+
+    // Generate filename: {subdomain}-logo.{extension}
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${tenant.subdomain}-logo.${fileExt}`
+    const filePath = `logos/${fileName}`
+
+    // Upload to storage (upsert to replace existing logo)
+    const { error: uploadError } = await supabase.storage
+      .from('company-logos')
+      .upload(filePath, file, {
+        cacheControl: '3600',
+        upsert: true // Replace existing logo
+      })
+
+    if (uploadError) {
+      console.error('Logo upload error:', uploadError)
+      return { success: false, error: uploadError.message || 'Failed to upload logo' }
+    }
+
+    // Get public URL
+    const { data: { publicUrl } } = supabase.storage
+      .from('company-logos')
+      .getPublicUrl(filePath)
+
+    // Update tenant with logo URL
+    const { error: updateError } = await supabase
+      .from('tenants')
+      .update({ 
+        logo_url: publicUrl,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userData.tenant_id)
+
+    if (updateError) {
+      console.error('Update tenant error:', updateError)
+      return { success: false, error: 'Failed to save logo URL' }
+    }
+
+    revalidatePath('/')
+    revalidatePath('/dashboard')
+    revalidatePath('/admin/settings')
+
+    return { 
+      success: true,
+      logoUrl: publicUrl,
+      message: 'Logo uploaded successfully'
+    }
+
+  } catch (error: any) {
+    console.error('Upload logo error:', error)
+    return { 
+      success: false, 
+      error: error.message || 'Failed to upload logo' 
+    }
+  }
+}
+
+/**
+ * Update company settings
+ */
 export async function updateCompanySettings(data: {
   company_name: string
   logo_url: string | null

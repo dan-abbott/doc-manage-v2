@@ -4,6 +4,7 @@ import './globals.css'
 import Navigation from '@/components/dashboard/Navigation'
 import { createClient } from '@/lib/supabase/server'
 import { Toaster } from 'sonner'
+import { TenantThemeProvider } from '@/components/TenantThemeProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -39,16 +40,18 @@ export default async function RootLayout({
 return (
     <html lang="en">
       <body className={inter.className}>
-        {/* Show styled navigation only when user is authenticated */}
-        {user && <Navigation user={{ email: user.email || '', fullName }} isAdmin={isAdmin} userRole={userRole} />}
-        
-        {/* Main content */}
-        <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
-          {children}
-        </main>
-        
-        {/* Toast notifications */}
-        <Toaster position="top-right" />
+        <TenantThemeProvider>
+          {/* Show styled navigation only when user is authenticated */}
+          {user && <Navigation user={{ email: user.email || '', fullName }} isAdmin={isAdmin} userRole={userRole} />}
+          
+          {/* Main content */}
+          <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+            {children}
+          </main>
+          
+          {/* Toast notifications */}
+          <Toaster position="top-right" />
+        </TenantThemeProvider>
       </body>
     </html>
   )

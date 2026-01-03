@@ -1,12 +1,14 @@
 'use client'
 
 import { useState } from 'react'
-import { updateCompanySettings } from '@/app/actions/company-settings'
+import { updateCompanySettings, uploadCompanyLogo } from '@/app/actions/company-settings'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Switch } from '@/components/ui/switch'
+import { Upload, X } from 'lucide-react'
+import Image from 'next/image'
 
 interface CompanySettingsFormProps {
   tenant: {
@@ -23,10 +25,82 @@ interface CompanySettingsFormProps {
 export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps) {
   const [companyName, setCompanyName] = useState(tenant.company_name)
   const [logoUrl, setLogoUrl] = useState(tenant.logo_url || '')
+  const [logoFile, setLogoFile] = useState<File | null>(null)
+  const [logoPreview, setLogoPreview] = useState<string | null>(tenant.logo_url)
   const [primaryColor, setPrimaryColor] = useState(tenant.primary_color)
   const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color)
   const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [isUploadingLogo, setIsUploadingLogo] = useState(false)
+
+  const handleLogoFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    // Validate file type
+    if (!file.type.startsWith('image/')) {
+      toast.error('Invalid File Type', {
+        description: 'Please select an image file (PNG, JPG, SVG)'
+      })
+      return
+    }
+
+    // Validate file size (5MB limit)
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File Too Large', {
+        description: 'Logo must be smaller than 5MB'
+      })
+      return
+    }
+
+    setLogoFile(file)
+    
+    // Create preview
+    const reader = new FileReader()
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string)
+    }
+    reader.readAsDataURL(file)
+  }
+
+  const handleUploadLogo = async () => {
+    if (!logoFile) return
+
+    setIsUploadingLogo(true)
+
+    try {
+      const formData = new FormData()
+      formData.append('logo', logoFile)
+
+      const result = await uploadCompanyLogo(formData)
+
+      if (result.success && result.logoUrl) {
+        setLogoUrl(result.logoUrl)
+        setLogoPreview(result.logoUrl)
+        setLogoFile(null)
+        
+        toast.success('Logo Uploaded', {
+          description: 'Company logo has been uploaded successfully'
+        })
+      } else {
+        toast.error('Upload Failed', {
+          description: result.error || 'Failed to upload logo'
+        })
+      }
+    } catch (error) {
+      toast.error('Upload Failed', {
+        description: 'An unexpected error occurred'
+      })
+    } finally {
+      setIsUploadingLogo(false)
+    }
+  }
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null)
+    setLogoPreview(null)
+    setLogoUrl('')
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -45,6 +119,11 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         toast.success('Settings Updated', {
           description: 'Company settings have been saved successfully'
         })
+        
+        // Reload page to apply new theme
+        setTimeout(() => {
+          window.location.reload()
+        }, 1000)
       } else {
         toast.error('Update Failed', {
           description: result.error || 'Failed to update settings'
@@ -92,19 +171,55 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         </p>
       </div>
 
-      {/* Logo URL */}
+      {/* Logo Upload */}
       <div>
-        <Label htmlFor="logo_url">Logo URL</Label>
-        <Input
-          id="logo_url"
-          type="url"
-          value={logoUrl}
-          onChange={(e) => setLogoUrl(e.target.value)}
-          placeholder="https://example.com/logo.png"
-        />
-        <p className="text-sm text-gray-500 mt-1">
-          URL to your company logo (optional). Future: File upload coming soon.
-        </p>
+        <Label>Company Logo</Label>
+        <div className="mt-2 space-y-4">
+          {/* Logo Preview */}
+          {logoPreview && (
+            <div className="relative w-48 h-48 border-2 border-gray-200 rounded-lg p-4 bg-white">
+              <button
+                type="button"
+                onClick={handleRemoveLogo}
+                className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 hover:bg-red-600"
+              >
+                <X className="h-4 w-4" />
+              </button>
+              <div className="relative w-full h-full">
+                <Image
+                  src={logoPreview}
+                  alt="Company logo"
+                  fill
+                  className="object-contain"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* File Input */}
+          <div className="flex items-center gap-2">
+            <Input
+              type="file"
+              accept="image/*"
+              onChange={handleLogoFileChange}
+              className="flex-1"
+            />
+            {logoFile && (
+              <Button
+                type="button"
+                onClick={handleUploadLogo}
+                disabled={isUploadingLogo}
+                variant="outline"
+              >
+                <Upload className="h-4 w-4 mr-2" />
+                {isUploadingLogo ? 'Uploading...' : 'Upload'}
+              </Button>
+            )}
+          </div>
+          <p className="text-sm text-gray-500">
+            Upload your company logo (PNG, JPG, or SVG, max 5MB). Logo appears next to Baseline Docs branding.
+          </p>
+        </div>
       </div>
 
       {/* Brand Colors */}
@@ -127,6 +242,9 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
               className="flex-1"
             />
           </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Used for buttons, links, and accents
+          </p>
         </div>
 
         <div>
@@ -147,6 +265,9 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
               className="flex-1"
             />
           </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Used for headers and backgrounds
+          </p>
         </div>
       </div>
 

@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { getGreetingWithName } from '@/lib/utils/greetings';
+import { useState, useEffect } from 'react';
+import Image from 'next/image';
 
 type Props = {
   user: {
@@ -19,6 +21,37 @@ export default function Navigation({ user, isAdmin }: Props) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
+  const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+
+  // Fetch company logo
+  useEffect(() => {
+    async function fetchLogo() {
+      const supabase = createClient();
+      const { data: { user: currentUser } } = await supabase.auth.getUser();
+      
+      if (currentUser) {
+        const { data: userData } = await supabase
+          .from('users')
+          .select('tenant_id')
+          .eq('id', currentUser.id)
+          .single();
+
+        if (userData?.tenant_id) {
+          const { data: tenant } = await supabase
+            .from('tenants')
+            .select('logo_url')
+            .eq('id', userData.tenant_id)
+            .single();
+
+          if (tenant?.logo_url) {
+            setCompanyLogo(tenant.logo_url);
+          }
+        }
+      }
+    }
+    
+    fetchLogo();
+  }, []);
 
   const handleSignOut = async () => {
     const supabase = createClient();
@@ -54,20 +87,36 @@ export default function Navigation({ user, isAdmin }: Props) {
           {/* Left side - Logo and nav items */}
           <div className="flex">
             <div className="flex-shrink-0 flex items-center gap-3">
-              <Link href="/dashboard" className="flex items-center gap-2">
+              <Link href="/dashboard" className="flex items-center gap-3">
+                {/* Baseline Docs Logo */}
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" className="h-8 w-8">
-                  <rect x="100" y="80" width="200" height="240" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
-                  <path d="M 300 80 L 300 120 L 260 120 Z" fill="#2E7DB5"/>
-                  <path d="M 260 120 L 300 120 L 300 80" fill="none" stroke="#2E7DB5" strokeWidth="8" strokeLinejoin="miter"/>
-                  <rect x="130" y="130" width="90" height="8" rx="4" fill="#2E7DB5"/>
-                  <rect x="130" y="160" width="140" height="8" rx="4" fill="#2E7DB5"/>
+                  <rect x="100" y="80" width="200" height="240" rx="8" fill="none" stroke="var(--primary-color, #2E7DB5)" strokeWidth="8"/>
+                  <path d="M 300 80 L 300 120 L 260 120 Z" fill="var(--primary-color, #2E7DB5)"/>
+                  <path d="M 260 120 L 300 120 L 300 80" fill="none" stroke="var(--primary-color, #2E7DB5)" strokeWidth="8" strokeLinejoin="miter"/>
+                  <rect x="130" y="130" width="90" height="8" rx="4" fill="var(--primary-color, #2E7DB5)"/>
+                  <rect x="130" y="160" width="140" height="8" rx="4" fill="var(--primary-color, #2E7DB5)"/>
                   <rect x="130" y="190" width="140" height="8" rx="4" fill="#6B7280"/>
                   <rect x="130" y="220" width="90" height="8" rx="4" fill="#6B7280"/>
-                  <rect x="80" y="240" width="240" height="12" rx="6" fill="#1E3A5F"/>
-                  <path d="M 200 250 L 190 280 L 200 290 L 210 280 Z" fill="#2E7DB5"/>
-                  <rect x="110" y="280" width="180" height="40" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
+                  <rect x="80" y="240" width="240" height="12" rx="6" fill="var(--secondary-color, #1E3A5F)"/>
+                  <path d="M 200 250 L 190 280 L 200 290 L 210 280 Z" fill="var(--primary-color, #2E7DB5)"/>
+                  <rect x="110" y="280" width="180" height="40" rx="8" fill="none" stroke="var(--primary-color, #2E7DB5)" strokeWidth="8"/>
                 </svg>
-                <span className="text-xl font-bold text-blue-600">Baseline Docs</span>
+                <span className="text-xl font-bold" style={{ color: 'var(--primary-color, #2563eb)' }}>Baseline Docs</span>
+                
+                {/* Company Logo */}
+                {companyLogo && (
+                  <>
+                    <div className="h-8 w-px bg-gray-300 mx-2"></div>
+                    <div className="relative h-8 w-32">
+                      <Image
+                        src={companyLogo}
+                        alt="Company logo"
+                        fill
+                        className="object-contain"
+                      />
+                    </div>
+                  </>
+                )}
               </Link>
             </div>
             <div className="hidden sm:ml-6 sm:flex sm:space-x-4">
@@ -87,9 +136,13 @@ export default function Navigation({ user, isAdmin }: Props) {
                     href={item.href}
                     className={`inline-flex items-center px-3 py-2 text-sm font-medium ${
                       isActive
-                        ? 'text-blue-600 border-b-2 border-blue-600'
+                        ? 'border-b-2'
                         : 'text-slate-500 hover:text-slate-700'
                     }`}
+                    style={isActive ? { 
+                      color: 'var(--primary-color, #2563eb)',
+                      borderColor: 'var(--primary-color, #2563eb)'
+                    } : {}}
                   >
                     <svg
                       className="w-4 h-4 mr-2"
@@ -145,9 +198,10 @@ export default function Navigation({ user, isAdmin }: Props) {
                 href={item.href}
                 className={`block px-3 py-2 rounded-md text-base font-medium ${
                   isActive
-                    ? 'bg-blue-50 text-blue-600'
+                    ? 'bg-blue-50'
                     : 'text-slate-500 hover:bg-slate-50 hover:text-slate-700'
                 }`}
+                style={isActive ? { color: 'var(--primary-color, #2563eb)' } : {}}
               >
                 {item.label}
               </Link>
