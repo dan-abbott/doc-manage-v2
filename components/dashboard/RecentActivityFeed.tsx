@@ -51,6 +51,7 @@ export default async function RecentActivityFeed() {
   const supabase = await createClient()
   
   // Get recent activities (get more to ensure we have 10 unique docs)
+  // Use explicit foreign key relationship to avoid ambiguity
   const { data: activities, error } = await supabase
     .from('audit_log')
     .select(`
@@ -59,7 +60,7 @@ export default async function RecentActivityFeed() {
       action,
       performed_by_email,
       created_at,
-      documents (
+      documents!audit_log_document_id_fkey (
         document_number,
         title,
         version
