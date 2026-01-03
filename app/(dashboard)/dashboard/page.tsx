@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { FileText, Clock, User, CheckCircle, Plus, ClipboardList } from 'lucide-react'
+import { FileText, Clock, User, CheckCircle, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { getGreetingWithName } from '@/lib/utils/greetings'
 import RecentActivityFeed from '@/components/dashboard/RecentActivityFeed'
@@ -69,19 +69,27 @@ export default async function DashboardPage() {
 
   return (
     <div className="space-y-6">
-      {/* Header with Greeting */}
-      <div>
-        <h1 className="text-3xl font-bold text-gray-900 mb-2">
-          {greeting}
-        </h1>
-        {tenant?.company_name && (
-          <p className="text-lg font-semibold text-blue-600 mb-1">
-            {tenant.company_name}
+      {/* Header with Greeting and New Document Button */}
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-3xl font-bold text-gray-900 mb-2">
+            {greeting}
+          </h1>
+          {tenant?.company_name && (
+            <p className="text-lg font-semibold text-blue-600 mb-1">
+              {tenant.company_name}
+            </p>
+          )}
+          <p className="text-gray-600">
+            Here's what's happening with your documents
           </p>
-        )}
-        <p className="text-gray-600">
-          Here's what's happening with your documents
-        </p>
+        </div>
+        <Link href="/documents/new">
+          <Button className="bg-blue-600 hover:bg-blue-700">
+            <Plus className="mr-2 h-4 w-4" />
+            New Document
+          </Button>
+        </Link>
       </div>
 
       {/* Statistics Cards */}
@@ -150,35 +158,6 @@ export default async function DashboardPage() {
           </Card>
         </Link>
       </div>
-
-      {/* Quick Actions - Limited Width */}
-      <Card>
-        <CardHeader>
-          <CardTitle className="text-base">Quick Actions</CardTitle>
-        </CardHeader>
-        <CardContent className="flex flex-wrap gap-3">
-          <Link href="/documents/new">
-            <Button className="w-auto">
-              <Plus className="mr-2 h-4 w-4" />
-              Create New Document
-            </Button>
-          </Link>
-          {pendingApprovalsCount > 0 && (
-            <Link href="/approvals">
-              <Button variant="outline" className="w-auto">
-                <ClipboardList className="mr-2 h-4 w-4" />
-                My Approvals ({pendingApprovalsCount})
-              </Button>
-            </Link>
-          )}
-          <Link href="/documents">
-            <Button variant="outline" className="w-auto">
-              <FileText className="mr-2 h-4 w-4" />
-              View All Documents
-            </Button>
-          </Link>
-        </CardContent>
-      </Card>
 
       {/* Recent Activity */}
       <RecentActivityFeed />
