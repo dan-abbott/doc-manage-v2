@@ -1,22 +1,25 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronDown, ChevronUp } from 'lucide-react'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
 import ReleaseDocumentButton from './[id]/ReleaseDocumentButton'
 import SubmitForApprovalButton from './[id]/SubmitForApprovalButton'
 import DeleteDocumentButton from './[id]/DeleteDocumentButton'
 import CreateNewVersionButton from './[id]/CreateNewVersionButton'
 import PromoteToProductionButton from './[id]/PromoteToProductionButton'
-import ApprovalWorkflow from './[id]/ApprovalWorkflow'
-import AuditTrail from './[id]/AuditTrail'
 import SeeLatestReleasedButton from './[id]/SeeLatestReleasedButton'
-import AdminActions from './[id]/AdminActions'
-import AdminFileActions from './[id]/AdminFileActions'
 import ChangeOwnerButton from './[id]/ChangeOwnerButton'
 import AdminViewAllToggle from './AdminViewAllToggle'
+
+// Dynamically import components that might have hydration issues
+const ApprovalWorkflow = dynamic(() => import('./[id]/ApprovalWorkflow'), { ssr: false })
+const AuditTrail = dynamic(() => import('./[id]/AuditTrail'), { ssr: false })
+const AdminActions = dynamic(() => import('./[id]/AdminActions'), { ssr: false })
+const AdminFileActions = dynamic(() => import('./[id]/AdminFileActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
   document: any
@@ -35,6 +38,11 @@ interface CollapsibleSectionProps {
 
 function CollapsibleSection({ title, children, defaultOpen = false }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   return (
     <Card>
@@ -51,7 +59,7 @@ function CollapsibleSection({ title, children, defaultOpen = false }: Collapsibl
           )}
         </CardHeader>
       </button>
-      {isOpen && (
+      {isOpen && mounted && (
         <CardContent className="pt-0">
           {children}
         </CardContent>
@@ -68,6 +76,12 @@ export default function DocumentActionsPanel({
   currentUserId,
   currentUserEmail
 }: DocumentActionsPanelProps) {
+  const [mounted, setMounted] = useState(false)
+  
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const hasApprovers = approvers && approvers.length > 0
   
   // Determine button visibility and actions
@@ -162,7 +176,7 @@ export default function DocumentActionsPanel({
       )}
 
       {/* Approval Workflow Section */}
-      {hasApprovers && (
+      {hasApprovers && mounted && (
         <CollapsibleSection title="Approval Workflow" defaultOpen={document.status === 'In Approval'}>
           <ApprovalWorkflow
             approvers={approvers}
@@ -176,12 +190,14 @@ export default function DocumentActionsPanel({
       )}
 
       {/* Audit Trail Section */}
-      <CollapsibleSection title="Audit Trail" defaultOpen={false}>
-        <AuditTrail documentId={document.id} />
-      </CollapsibleSection>
+      {mounted && (
+        <CollapsibleSection title="Audit Trail" defaultOpen={false}>
+          <AuditTrail documentId={document.id} />
+        </CollapsibleSection>
+      )}
 
       {/* Admin Section */}
-      {isAdmin && (
+      {isAdmin && mounted && (
         <>
           <CollapsibleSection title="Admin Actions" defaultOpen={false}>
             <div className="space-y-4">
