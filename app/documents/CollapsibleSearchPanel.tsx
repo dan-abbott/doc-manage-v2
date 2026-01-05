@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,7 +43,7 @@ export default function CollapsibleSearchPanel({
   const router = useRouter()
   const searchParams = useSearchParams()
   
-  // Panel is open by default if no document is selected
+  // Panel starts collapsed if document is selected
   const [isOpen, setIsOpen] = useState(!currentFilters.selected)
   
   const [search, setSearch] = useState(currentFilters.search || '')
@@ -51,13 +51,6 @@ export default function CollapsibleSearchPanel({
   const [status, setStatus] = useState(currentFilters.status || '')
   const [project, setProject] = useState(currentFilters.project || '')
   const [myDocs, setMyDocs] = useState(currentFilters.myDocs === 'true')
-
-  // Auto-collapse when document is selected
-  useEffect(() => {
-    if (currentFilters.selected && isOpen) {
-      setIsOpen(false)
-    }
-  }, [currentFilters.selected])
 
   const applyFilters = () => {
     const params = new URLSearchParams()
@@ -97,6 +90,8 @@ export default function CollapsibleSearchPanel({
     const params = new URLSearchParams(searchParams.toString())
     params.set('selected', docId)
     router.push(`/documents?${params.toString()}`)
+    // Collapse panel after selection
+    setIsOpen(false)
   }
 
   if (!isOpen) {

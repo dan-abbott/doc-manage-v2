@@ -25,6 +25,14 @@ const STATUS_COLORS: Record<string, string> = {
   'Obsolete': 'bg-gray-700',
 }
 
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
+}
+
 export default function DocumentDetailPanel({
   document,
   files,
@@ -124,12 +132,8 @@ export default function DocumentDetailPanel({
                 <div className="space-y-3">
                   <div>
                     <p className="text-xs font-medium text-gray-500 mb-0.5">Created</p>
-                    <p className="text-sm text-gray-900">
-                      {new Date(document.created_at).toLocaleDateString('en-US', {
-                        month: 'short',
-                        day: 'numeric',
-                        year: 'numeric',
-                      })}
+                    <p className="text-sm text-gray-900" suppressHydrationWarning>
+                      {formatDate(document.created_at)}
                     </p>
                     <p className="text-xs text-gray-500">{document.creator?.email?.split('@')[0] || 'Unknown'}</p>
                   </div>
@@ -137,12 +141,8 @@ export default function DocumentDetailPanel({
                   {document.released_at && (
                     <div>
                       <p className="text-xs font-medium text-gray-500 mb-0.5">Released</p>
-                      <p className="text-sm text-gray-900">
-                        {new Date(document.released_at).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          year: 'numeric',
-                        })}
+                      <p className="text-sm text-gray-900" suppressHydrationWarning>
+                        {formatDate(document.released_at)}
                       </p>
                       <p className="text-xs text-gray-500">{document.releaser?.email?.split('@')[0] || 'Unknown'}</p>
                     </div>

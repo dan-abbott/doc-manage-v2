@@ -64,7 +64,9 @@ export default function DocumentsTable({ documents, onDocumentSelect, selectedId
             </p>
             <div className="flex items-center justify-between text-xs text-gray-500">
               <span>{doc.document_type?.name || 'Unknown'}</span>
-              <span>{formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}</span>
+              <span suppressHydrationWarning>
+                {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}
+              </span>
             </div>
           </div>
         </button>
