@@ -1,6 +1,7 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,  // Add this temporarily
+  productionBrowserSourceMaps: true,
   experimental: {
     serverActions: {
       bodySizeLimit: '50mb',
