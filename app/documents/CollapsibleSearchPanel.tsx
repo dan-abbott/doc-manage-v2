@@ -41,7 +41,6 @@ export default function CollapsibleSearchPanel({
   isAdmin 
 }: CollapsibleSearchPanelProps) {
   const router = useRouter()
-  const searchParams = useSearchParams()
   
   // Panel starts collapsed if document is selected
   const [isOpen, setIsOpen] = useState(!currentFilters.selected)
@@ -65,7 +64,7 @@ export default function CollapsibleSearchPanel({
     if (currentFilters.selected) params.set('selected', currentFilters.selected)
     if (currentFilters.viewAll) params.set('viewAll', currentFilters.viewAll)
     
-    router.push(`/documents?${params.toString()}`)
+    router.replace(`/documents?${params.toString()}`)
   }
 
   const clearFilters = () => {
@@ -80,16 +79,28 @@ export default function CollapsibleSearchPanel({
     if (currentFilters.selected) params.set('selected', currentFilters.selected)
     if (currentFilters.viewAll) params.set('viewAll', currentFilters.viewAll)
     
-    router.push(`/documents?${params.toString()}`)
+    router.replace(`/documents?${params.toString()}`)
   }
 
   const hasActiveFilters = search || type || status || project || myDocs
 
-  // Handle document selection
+  // Handle document selection - use replace to avoid history spam
   const handleDocumentSelect = (docId: string) => {
-    const params = new URLSearchParams(searchParams.toString())
+    const params = new URLSearchParams()
+    
+    // Preserve all current filters
+    if (search) params.set('search', search)
+    if (type) params.set('type', type)
+    if (status) params.set('status', status)
+    if (project) params.set('project', project)
+    if (myDocs) params.set('myDocs', 'true')
+    if (currentFilters.viewAll) params.set('viewAll', currentFilters.viewAll)
+    
+    // Set selected document
     params.set('selected', docId)
-    router.push(`/documents?${params.toString()}`)
+    
+    router.replace(`/documents?${params.toString()}`)
+    
     // Collapse panel after selection
     setIsOpen(false)
   }

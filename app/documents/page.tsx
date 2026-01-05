@@ -3,14 +3,12 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Plus } from 'lucide-react'
-import { Suspense } from 'react'
 import CollapsibleSearchPanel from './CollapsibleSearchPanel'
 import DocumentDetailPanel from './DocumentDetailPanel'
 import DocumentActionsPanel from './DocumentActionsPanel'
 
 // Disable caching but allow dynamic rendering
 export const revalidate = 0
-export const dynamic = 'force-dynamic'
 
 interface PageProps {
   searchParams: {
@@ -23,32 +21,6 @@ interface PageProps {
     viewAll?: string
     selected?: string
   }
-}
-
-function EmptyState() {
-  return (
-    <div className="flex-1 flex items-center justify-center bg-gray-50">
-      <div className="text-center">
-        <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
-          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-          </svg>
-        </div>
-        <h3 className="text-lg font-medium text-gray-900 mb-2">
-          Select a document to view details
-        </h3>
-        <p className="text-sm text-gray-500 mb-6">
-          Use the search and filters to find documents, then click on one to see its details
-        </p>
-        <Button asChild>
-          <Link href="/documents/new">
-            <Plus className="mr-2 h-4 w-4" />
-            Create New Document
-          </Link>
-        </Button>
-      </div>
-    </div>
-  )
 }
 
 export default async function DocumentsPage({ searchParams }: PageProps) {
@@ -142,6 +114,8 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     console.error('Error fetching documents:', error)
   }
 
+  const totalPages = count ? Math.ceil(count / pageSize) : 0
+
   // Get selected document if ID provided
   let selectedDocument = null
   let selectedDocumentFiles = null
@@ -173,15 +147,13 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
   return (
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
       {/* Collapsible Search/Filter Panel */}
-      <Suspense fallback={<div className="w-8 bg-gray-100 border-r" />}>
-        <CollapsibleSearchPanel
-          documentTypes={documentTypes || []}
-          documents={documents || []}
-          totalCount={count || 0}
-          currentFilters={searchParams}
-          isAdmin={isAdmin}
-        />
-      </Suspense>
+      <CollapsibleSearchPanel
+        documentTypes={documentTypes || []}
+        documents={documents || []}
+        totalCount={count || 0}
+        currentFilters={searchParams}
+        isAdmin={isAdmin}
+      />
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
@@ -189,35 +161,52 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
           <>
             {/* Left: Document Detail with Version Tabs */}
             <div className="w-1/2 overflow-y-auto border-r">
-              <Suspense fallback={<div className="p-6">Loading document...</div>}>
-                <DocumentDetailPanel
-                  document={selectedDocument}
-                  files={selectedDocumentFiles}
-                  approvers={selectedDocumentApprovers}
-                  isCreator={isCreator}
-                  isAdmin={isAdmin}
-                  currentUserId={user.id}
-                  currentUserEmail={user.email || ''}
-                />
-              </Suspense>
+              <DocumentDetailPanel
+                document={selectedDocument}
+                files={selectedDocumentFiles}
+                approvers={selectedDocumentApprovers}
+                isCreator={isCreator}
+                isAdmin={isAdmin}
+                currentUserId={user.id}
+                currentUserEmail={user.email || ''}
+              />
             </div>
 
             {/* Right: Actions Panel */}
             <div className="w-1/2 overflow-y-auto">
-              <Suspense fallback={<div className="p-6">Loading actions...</div>}>
-                <DocumentActionsPanel
-                  document={selectedDocument}
-                  approvers={selectedDocumentApprovers}
-                  isCreator={isCreator}
-                  isAdmin={isAdmin}
-                  currentUserId={user.id}
-                  currentUserEmail={user.email || ''}
-                />
-              </Suspense>
+              <DocumentActionsPanel
+                document={selectedDocument}
+                approvers={selectedDocumentApprovers}
+                isCreator={isCreator}
+                isAdmin={isAdmin}
+                currentUserId={user.id}
+                currentUserEmail={user.email || ''}
+              />
             </div>
           </>
         ) : (
-          <EmptyState />
+          /* No Document Selected - Show Message */
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Select a document to view details
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Use the search and filters to find documents, then click on one to see its details
+              </p>
+              <Button asChild>
+                <Link href="/documents/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Document
+                </Link>
+              </Button>
+            </div>
+          </div>
         )}
       </div>
     </div>
