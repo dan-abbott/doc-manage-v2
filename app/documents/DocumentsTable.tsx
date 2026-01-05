@@ -1,19 +1,25 @@
 'use client'
 
 import { Badge } from '@/components/ui/badge'
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table'
 import { formatDistanceToNow } from 'date-fns'
-import Link from 'next/link'
+import { cn } from '@/lib/utils'
+
+interface Document {
+  id: string
+  document_number: string
+  version: string
+  title: string
+  status: string
+  updated_at: string
+  document_type?: {
+    name: string
+  }
+}
 
 interface DocumentsTableProps {
-  documents: any[]
+  documents: Document[]
+  onDocumentSelect: (docId: string) => void
+  selectedId?: string
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -23,72 +29,46 @@ const STATUS_COLORS: Record<string, string> = {
   Obsolete: 'bg-gray-700',
 }
 
-export default function DocumentsTable({ documents }: DocumentsTableProps) {
+export default function DocumentsTable({ documents, onDocumentSelect, selectedId }: DocumentsTableProps) {
+  if (documents.length === 0) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-sm text-gray-500">No documents found</p>
+        <p className="text-xs text-gray-400 mt-1">Try adjusting your filters</p>
+      </div>
+    )
+  }
+
   return (
-    <div className="overflow-x-auto">
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>Number</TableHead>
-            <TableHead>Title</TableHead>
-            <TableHead>Type</TableHead>
-            <TableHead>Status</TableHead>
-            <TableHead>Project</TableHead>
-            <TableHead>Version</TableHead>
-            <TableHead>Updated</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {documents.map((doc) => (
-            <TableRow 
-              key={doc.id}
-              className="cursor-pointer hover:bg-muted/50"
-            >
-              <TableCell>
-                <Link 
-                  href={`/documents/${doc.id}`}
-                  className="font-medium hover:underline"
-                >
-                  {doc.document_number}{doc.version}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <Link 
-                  href={`/documents/${doc.id}`}
-                  className="hover:underline"
-                >
-                  {doc.title}
-                </Link>
-              </TableCell>
-              <TableCell>
-                <span className="text-sm text-muted-foreground">
-                  {doc.document_type?.name || 'Unknown'}
-                </span>
-              </TableCell>
-              <TableCell>
-                <Badge className={STATUS_COLORS[doc.status] || 'bg-gray-500'}>
-                  {doc.status}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <span className="text-sm font-mono">
-                  {doc.project_code || '—'}
-                </span>
-              </TableCell>
-              <TableCell>
-                <Badge variant="outline">
-                  {doc.is_production ? 'Production' : 'Prototype'}
-                </Badge>
-              </TableCell>
-              <TableCell>
-                <span className="text-sm text-muted-foreground">
-                  {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}
-                </span>
-              </TableCell>
-            </TableRow>
-          ))}
-        </TableBody>
-      </Table>
+    <div className="divide-y">
+      {documents.map((doc) => (
+        <button
+          key={doc.id}
+          onClick={() => onDocumentSelect(doc.id)}
+          className={cn(
+            "w-full text-left p-3 hover:bg-gray-50 transition-colors",
+            selectedId === doc.id && "bg-blue-50 border-l-4 border-l-blue-500"
+          )}
+        >
+          <div className="space-y-1">
+            <div className="flex items-center justify-between gap-2">
+              <span className="font-medium text-sm truncate">
+                {doc.document_number}{doc.version}
+              </span>
+              <Badge className={cn("text-xs px-1.5 py-0", STATUS_COLORS[doc.status] || 'bg-gray-500')}>
+                {doc.status}
+              </Badge>
+            </div>
+            <p className="text-sm text-gray-900 truncate">
+              {doc.title}
+            </p>
+            <div className="flex items-center justify-between text-xs text-gray-500">
+              <span>{doc.document_type?.name || 'Unknown'}</span>
+              <span>{formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}</span>
+            </div>
+          </div>
+        </button>
+      ))}
     </div>
   )
 }

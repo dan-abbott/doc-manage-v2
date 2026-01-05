@@ -2,11 +2,10 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Plus, FileText } from 'lucide-react'
-import DocumentsTable from './DocumentsTable'
-import DocumentsFilters from './DocumentsFilters'
-import AdminViewAllToggle from './AdminViewAllToggle'
+import { Plus } from 'lucide-react'
+import CollapsibleSearchPanel from './CollapsibleSearchPanel'
+import DocumentDetailPanel from './DocumentDetailPanel'
+import DocumentActionsPanel from './DocumentActionsPanel'
 
 // Disable caching but allow dynamic rendering
 export const revalidate = 0
@@ -17,9 +16,10 @@ interface PageProps {
     type?: string
     status?: string
     project?: string
-    filter?: string
+    myDocs?: string  // Changed from 'filter' to 'myDocs' for clarity
     page?: string
-    viewAll?: string  // NEW: Admin view all parameter
+    viewAll?: string
+    selected?: string  // Selected document ID
   }
 }
 
@@ -29,26 +29,11 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
  
- // DEBUG: Log user info
-  console.log('=== DEBUG ===')
-  console.log('User ID:', user?.id)
-  console.log('User email:', user?.email)
-
-   // Try a direct query without RLS to test
-  const { data: testData, error: testError } = await supabase
-    .from('documents')
-    .select('id, document_number, status, created_by')
-    .limit(5)
-  
-  console.log('Test query result:', testData)
-  console.log('Test query error:', testError)
-  console.log('=== END DEBUG ===')
- 
   if (!user) {
     redirect('/auth/login')
   }
 
-  // NEW: Check if user is admin
+  // Check if user is admin
   const { data: userData } = await supabase
     .from('users')
     .select('is_admin')
@@ -77,15 +62,10 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
       document_type:document_types(name, prefix)
     `, { count: 'exact' })
 
-  // NEW: Apply RLS based on admin status and viewAll toggle
-  // If admin with viewAll enabled, no filter (see everything)
-  // Otherwise, apply normal RLS (own drafts + all released/obsolete)
+  // Apply RLS based on admin status and viewAll toggle
   if (!isAdmin || !viewAll) {
-    // Normal users and admins without viewAll:
-    // See own Drafts + all Released/Obsolete
     query = query.or(`created_by.eq.${user.id},status.eq.Released,status.eq.Obsolete`)
   }
-  // If admin with viewAll=true, no filter applied - see everything
 
   // Search filter
   if (searchParams.search) {
@@ -108,10 +88,8 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     query = query.eq('project_code', searchParams.project.toUpperCase())
   }
 
-  // My Documents filter
-  // Shows documents where user created THIS version OR ANY version of the same document
-  if (searchParams.filter === 'my') {
-    // First, get all document_numbers where user created at least one version
+  // My Documents filter - checkbox option
+  if (searchParams.myDocs === 'true') {
     const { data: userDocNumbers } = await supabase
       .from('documents')
       .select('document_number')
@@ -121,7 +99,6 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
       const docNumbers = [...new Set(userDocNumbers.map(d => d.document_number))]
       query = query.in('document_number', docNumbers)
     } else {
-      // User hasn't created any documents, show empty result
       query = query.eq('created_by', user.id)
     }
   }
@@ -139,105 +116,99 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
   const totalPages = count ? Math.ceil(count / pageSize) : 0
 
+  // Get selected document if ID provided
+  let selectedDocument = null
+  let selectedDocumentFiles = null
+  let selectedDocumentApprovers = null
+  let isCreator = false
+
+  if (searchParams.selected) {
+    const { data: docData } = await supabase
+      .from('documents')
+      .select(`
+        *,
+        document_type:document_types(name, prefix),
+        creator:users!documents_created_by_fkey(email, full_name),
+        releaser:users!documents_released_by_fkey(email, full_name),
+        document_files(*),
+        approvers!approvers_document_id_fkey(*)
+      `)
+      .eq('id', searchParams.selected)
+      .single()
+
+    if (docData) {
+      selectedDocument = docData
+      selectedDocumentFiles = docData.document_files || []
+      selectedDocumentApprovers = docData.approvers || []
+      isCreator = docData.created_by === user.id
+    }
+  }
+
   return (
-    <div className="container mx-auto py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-3xl font-bold">
-            {searchParams.filter === 'my' ? 'My Documents' : 'All Documents'}
-          </h1>
-          <p className="text-muted-foreground">
-            {count !== null ? `${count} ${searchParams.filter === 'my' ? 'document' : 'total document'}${count === 1 ? '' : 's'}` : 'Loading...'}
-          </p>
-        </div>
-        <Button asChild>
-          <Link href="/documents/new">
-            <Plus className="mr-2 h-4 w-4" />
-            New Document
-          </Link>
-        </Button>
-      </div>
+    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+      {/* Collapsible Search/Filter Panel */}
+      <CollapsibleSearchPanel
+        documentTypes={documentTypes || []}
+        documents={documents || []}
+        totalCount={count || 0}
+        currentFilters={searchParams}
+        isAdmin={isAdmin}
+      />
 
-      {/* NEW: Admin View All Toggle */}
-      {isAdmin && (
-        <div className="mb-4">
-          <AdminViewAllToggle />
-        </div>
-      )}
-
-      {/* Filters */}
-      <Card className="mb-6">
-        <CardHeader>
-          <CardTitle>Filters</CardTitle>
-        </CardHeader>
-        <CardContent>
-          <DocumentsFilters 
-            documentTypes={documentTypes || []}
-            currentFilters={searchParams}
-          />
-        </CardContent>
-      </Card>
-
-      {/* Documents Table */}
-      <Card>
-        <CardContent className="pt-6">
-          {documents && documents.length > 0 ? (
-            <>
-              <DocumentsTable documents={documents} />
-              
-              {/* Pagination */}
-              {totalPages > 1 && (
-                <div className="flex items-center justify-center gap-2 mt-6">
-                  {page > 1 && (
-                    <Button
-                      variant="outline"
-                      asChild
-                    >
-                      <Link
-                        href={{
-                          pathname: '/documents',
-                          query: { ...searchParams, page: String(page - 1) },
-                        }}
-                      >
-                        Previous
-                      </Link>
-                    </Button>
-                  )}
-                  <span className="text-sm text-muted-foreground">
-                    Page {page} of {totalPages}
-                  </span>
-                  {page < totalPages && (
-                    <Button
-                      variant="outline"
-                      asChild
-                    >
-                      <Link
-                        href={{
-                          pathname: '/documents',
-                          query: { ...searchParams, page: String(page + 1) },
-                        }}
-                      >
-                        Next
-                      </Link>
-                    </Button>
-                  )}
-                </div>
-              )}
-            </>
-          ) : (
-            <div className="text-center py-12">
-              <FileText className="mx-auto h-12 w-12 text-gray-400" />
-              <h3 className="mt-2 text-sm font-semibold text-gray-900">No documents found</h3>
-              <p className="mt-1 text-sm text-gray-500">
-                {searchParams.search || searchParams.type || searchParams.status || searchParams.project
-                  ? 'Try adjusting your filters'
-                  : 'Get started by creating a new document'}
-              </p>
+      {/* Main Content Area */}
+      <div className="flex-1 flex overflow-hidden">
+        {selectedDocument ? (
+          <>
+            {/* Left: Document Detail with Version Tabs */}
+            <div className="w-1/2 overflow-y-auto border-r">
+              <DocumentDetailPanel
+                document={selectedDocument}
+                files={selectedDocumentFiles}
+                approvers={selectedDocumentApprovers}
+                isCreator={isCreator}
+                isAdmin={isAdmin}
+                currentUserId={user.id}
+                currentUserEmail={user.email || ''}
+              />
             </div>
-          )}
-        </CardContent>
-      </Card>
+
+            {/* Right: Actions Panel */}
+            <div className="w-1/2 overflow-y-auto">
+              <DocumentActionsPanel
+                document={selectedDocument}
+                approvers={selectedDocumentApprovers}
+                isCreator={isCreator}
+                isAdmin={isAdmin}
+                currentUserId={user.id}
+                currentUserEmail={user.email || ''}
+              />
+            </div>
+          </>
+        ) : (
+          /* No Document Selected - Show Message */
+          <div className="flex-1 flex items-center justify-center bg-gray-50">
+            <div className="text-center">
+              <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
+                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-medium text-gray-900 mb-2">
+                Select a document to view details
+              </h3>
+              <p className="text-sm text-gray-500 mb-6">
+                Use the search and filters to find documents, then click on one to see its details
+              </p>
+              <Button asChild>
+                <Link href="/documents/new">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create New Document
+                </Link>
+              </Button>
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   )
 }
