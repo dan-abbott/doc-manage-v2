@@ -6,6 +6,22 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
+import dynamic from 'next/dynamic'
+
+// Dynamically import VersionHistory to prevent hydration issues
+const VersionHistory = dynamic(() => import('./[id]/VersionHistory'), { 
+  ssr: false,
+  loading: () => (
+    <Card>
+      <CardHeader>
+        <CardTitle className="text-base">Version History</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <p className="text-sm text-gray-500">Loading version history...</p>
+      </CardContent>
+    </Card>
+  )
+})
 
 interface DocumentDetailPanelProps {
   document: any
@@ -196,17 +212,11 @@ export default function DocumentDetailPanel({
             </CardContent>
           </Card>
 
-          {/* Version History - TEMPORARILY REMOVED FOR DEBUGGING */}
-          <Card>
-            <CardHeader>
-              <CardTitle className="text-base">Version History</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <p className="text-sm text-gray-500">
-                Version history temporarily disabled for debugging. Will be re-enabled once tab switching is stable.
-              </p>
-            </CardContent>
-          </Card>
+          {/* Version History */}
+          <VersionHistory 
+            documentNumber={document.document_number}
+            currentVersionId={document.id}
+          />
         </div>
       ) : (
         /* WIP Tab */

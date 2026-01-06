@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronDown, ChevronUp } from 'lucide-react'
@@ -15,7 +15,7 @@ import SeeLatestReleasedButton from './[id]/SeeLatestReleasedButton'
 import ChangeOwnerButton from './[id]/ChangeOwnerButton'
 import AdminViewAllToggle from './AdminViewAllToggle'
 
-// Dynamically import components that might have hydration issues
+// Dynamically import components that might cause hydration or re-render issues
 const ApprovalWorkflow = dynamic(() => import('./[id]/ApprovalWorkflow'), { ssr: false })
 const AuditTrail = dynamic(() => import('./[id]/AuditTrail'), { ssr: false })
 const AdminActions = dynamic(() => import('./[id]/AdminActions'), { ssr: false })
@@ -34,21 +34,22 @@ interface CollapsibleSectionProps {
   title: string
   children: React.ReactNode
   defaultOpen?: boolean
+  sectionKey: string  // Unique key to prevent re-render issues
 }
 
-function CollapsibleSection({ title, children, defaultOpen = false }: CollapsibleSectionProps) {
+function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
-  const [mounted, setMounted] = useState(false)
 
-  useEffect(() => {
-    setMounted(true)
+  const toggle = useCallback(() => {
+    setIsOpen(prev => !prev)
   }, [])
 
   return (
-    <Card>
+    <Card key={sectionKey}>
       <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full"
+        onClick={toggle}
+        className="w-full text-left"
+        type="button"
       >
         <CardHeader className="flex flex-row items-center justify-between py-3">
           <CardTitle className="text-sm font-medium">{title}</CardTitle>
@@ -59,7 +60,7 @@ function CollapsibleSection({ title, children, defaultOpen = false }: Collapsibl
           )}
         </CardHeader>
       </button>
-      {isOpen && mounted && (
+      {isOpen && (
         <CardContent className="pt-0">
           {children}
         </CardContent>
@@ -76,12 +77,6 @@ export default function DocumentActionsPanel({
   currentUserId,
   currentUserEmail
 }: DocumentActionsPanelProps) {
-  const [mounted, setMounted] = useState(false)
-  
-  useEffect(() => {
-    setMounted(true)
-  }, [])
-
   const hasApprovers = approvers && approvers.length > 0
   
   // Determine button visibility and actions
@@ -108,7 +103,7 @@ export default function DocumentActionsPanel({
       </div>
 
       {/* Primary Actions Section */}
-      <CollapsibleSection title="Primary Actions" defaultOpen={true}>
+      <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary-actions">
         <div className="space-y-2">
           {canEdit && (
             <Button asChild className="w-full">
@@ -167,7 +162,7 @@ export default function DocumentActionsPanel({
 
       {/* See Latest Released (for obsolete documents) */}
       {document.status === 'Obsolete' && (
-        <CollapsibleSection title="Latest Version" defaultOpen={true}>
+        <CollapsibleSection title="Latest Version" defaultOpen={true} sectionKey="latest-version">
           <SeeLatestReleasedButton 
             documentNumber={document.document_number}
             currentVersion={document.version}
@@ -176,8 +171,12 @@ export default function DocumentActionsPanel({
       )}
 
       {/* Approval Workflow Section */}
-      {hasApprovers && mounted && (
-        <CollapsibleSection title="Approval Workflow" defaultOpen={document.status === 'In Approval'}>
+      {hasApprovers && (
+        <CollapsibleSection 
+          title="Approval Workflow" 
+          defaultOpen={document.status === 'In Approval'}
+          sectionKey="approval-workflow"
+        >
           <ApprovalWorkflow
             approvers={approvers}
             documentId={document.id}
@@ -190,16 +189,14 @@ export default function DocumentActionsPanel({
       )}
 
       {/* Audit Trail Section */}
-      {mounted && (
-        <CollapsibleSection title="Audit Trail" defaultOpen={false}>
-          <AuditTrail documentId={document.id} />
-        </CollapsibleSection>
-      )}
+      <CollapsibleSection title="Audit Trail" defaultOpen={false} sectionKey="audit-trail">
+        <AuditTrail documentId={document.id} />
+      </CollapsibleSection>
 
       {/* Admin Section */}
-      {isAdmin && mounted && (
+      {isAdmin && (
         <>
-          <CollapsibleSection title="Admin Actions" defaultOpen={false}>
+          <CollapsibleSection title="Admin Actions" defaultOpen={false} sectionKey="admin-actions">
             <div className="space-y-4">
               <ChangeOwnerButton 
                 documentId={document.id}
@@ -226,7 +223,7 @@ export default function DocumentActionsPanel({
             </div>
           </CollapsibleSection>
 
-          <CollapsibleSection title="Admin Settings" defaultOpen={false}>
+          <CollapsibleSection title="Admin Settings" defaultOpen={false} sectionKey="admin-settings">
             <AdminViewAllToggle />
           </CollapsibleSection>
         </>
