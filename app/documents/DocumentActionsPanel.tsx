@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { ChevronDown, ChevronUp } from 'lucide-react'
@@ -34,11 +34,16 @@ interface CollapsibleSectionProps {
   title: string
   children: React.ReactNode
   defaultOpen?: boolean
-  sectionKey: string  // Unique key to prevent re-render issues
+  sectionKey: string
 }
 
 function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }: CollapsibleSectionProps) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   const toggle = useCallback(() => {
     setIsOpen(prev => !prev)
@@ -60,7 +65,7 @@ function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }
           )}
         </CardHeader>
       </button>
-      {isOpen && (
+      {isOpen && mounted && (
         <CardContent className="pt-0">
           {children}
         </CardContent>
@@ -77,6 +82,12 @@ export default function DocumentActionsPanel({
   currentUserId,
   currentUserEmail
 }: DocumentActionsPanelProps) {
+  const [mounted, setMounted] = useState(false)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   const hasApprovers = approvers && approvers.length > 0
   
   // Determine button visibility and actions
@@ -93,6 +104,17 @@ export default function DocumentActionsPanel({
     (isCreator || isAdmin) && 
     document.status === 'Draft' &&
     (hasApprovers || document.is_production)
+
+  if (!mounted) {
+    return (
+      <div className="p-6 space-y-4">
+        <div>
+          <h2 className="text-lg font-semibold mb-1">Actions</h2>
+          <p className="text-sm text-gray-500">Loading...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div className="p-6 space-y-4">
