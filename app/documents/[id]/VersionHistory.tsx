@@ -21,7 +21,7 @@ interface Version {
   releaser?: {
     email: string
     full_name: string
-  }
+  } | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -66,7 +66,17 @@ export default function VersionHistory({ documentNumber, currentVersionId }: Ver
         return
       }
 
-      setVersions(data || [])
+      // Transform the data to match our Version type
+      const transformedData = (data || []).map((item: any) => ({
+        id: item.id,
+        version: item.version,
+        status: item.status,
+        released_at: item.released_at,
+        released_by: item.released_by,
+        releaser: Array.isArray(item.releaser) ? item.releaser[0] : item.releaser
+      }))
+
+      setVersions(transformedData)
       setLoading(false)
     }
 
