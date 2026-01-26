@@ -156,7 +156,10 @@ export default function DocumentActionsPanel({
           )}
 
           {canRelease && (
-            <ReleaseDocumentButton documentId={primaryDocument.id} />
+            <ReleaseDocumentButton 
+              documentId={primaryDocument.id} 
+              isProduction={primaryDocument.is_production}
+            />
           )}
 
           {canSubmitForApproval && (
