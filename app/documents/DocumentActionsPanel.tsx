@@ -3,28 +3,25 @@
 import { useState, useCallback, useEffect } from 'react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ChevronDown, ChevronUp } from 'lucide-react'
+import { ChevronDown, ChevronUp, History } from 'lucide-react'
 import Link from 'next/link'
+import { Badge } from '@/components/ui/badge'
+import type { DocumentVersionsData } from '@/lib/document-helpers'
+import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
 import ReleaseDocumentButton from './[id]/ReleaseDocumentButton'
 import SubmitForApprovalButton from './[id]/SubmitForApprovalButton'
 import DeleteDocumentButton from './[id]/DeleteDocumentButton'
 import CreateNewVersionButton from './[id]/CreateNewVersionButton'
 import PromoteToProductionButton from './[id]/PromoteToProductionButton'
-import SeeLatestReleasedButton from './[id]/SeeLatestReleasedButton'
-import ChangeOwnerButton from './[id]/ChangeOwnerButton'
-import AdminViewAllToggle from './AdminViewAllToggle'
 
-// Dynamically import components that might cause hydration or re-render issues
+// Dynamically import components
 const ApprovalWorkflow = dynamic(() => import('./[id]/ApprovalWorkflow'), { ssr: false })
 const AuditTrail = dynamic(() => import('./[id]/AuditTrail'), { ssr: false })
 const AdminActions = dynamic(() => import('./[id]/AdminActions'), { ssr: false })
-const AdminFileActions = dynamic(() => import('./[id]/AdminFileActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
-  document: any
-  approvers: any[]
-  isCreator: boolean
+  documentData: DocumentVersionsData
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
@@ -35,6 +32,21 @@ interface CollapsibleSectionProps {
   children: React.ReactNode
   defaultOpen?: boolean
   sectionKey: string
+}
+
+const STATUS_COLORS: Record<string, string> = {
+  'Draft': 'bg-gray-500',
+  'In Approval': 'bg-yellow-500',
+  'Released': 'bg-green-500',
+  'Obsolete': 'bg-gray-700',
+}
+
+function formatDate(dateString: string) {
+  return new Date(dateString).toLocaleDateString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  })
 }
 
 function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }: CollapsibleSectionProps) {
@@ -75,9 +87,7 @@ function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }
 }
 
 export default function DocumentActionsPanel({
-  document,
-  approvers,
-  isCreator,
+  documentData,
   isAdmin,
   currentUserId,
   currentUserEmail
@@ -88,93 +98,93 @@ export default function DocumentActionsPanel({
     setMounted(true)
   }, [])
 
-  const hasApprovers = approvers && approvers.length > 0
+  const { latestReleased, wipVersions, allVersions, documentNumber } = documentData
+
+  // Use latest released for primary actions, or first WIP if no released version
+  const primaryDocument = latestReleased || wipVersions[0]
   
-  // Determine button visibility and actions
-  const canEdit = (isCreator || isAdmin) && document.status === 'Draft'
-  const canDelete = (isCreator || isAdmin) && document.status === 'Draft'
+  if (!primaryDocument) {
+    return <div className="p-6 text-center text-gray-500">No document data available</div>
+  }
+
+  const isCreator = primaryDocument.created_by === currentUserId
+  const approvers = primaryDocument.approvers || []
+  const hasApprovers = approvers.length > 0
+  
+  // Determine button visibility
+  const canEdit = (isCreator || isAdmin) && primaryDocument.status === 'Draft'
+  const canDelete = (isCreator || isAdmin) && primaryDocument.status === 'Draft'
   
   const canRelease = 
     (isCreator || isAdmin) && 
-    document.status === 'Draft' && 
-    !document.is_production &&
+    primaryDocument.status === 'Draft' && 
+    !primaryDocument.is_production &&
     !hasApprovers
-  
+
   const canSubmitForApproval = 
     (isCreator || isAdmin) && 
-    document.status === 'Draft' &&
-    (hasApprovers || document.is_production)
+    primaryDocument.status === 'Draft' && 
+    hasApprovers
 
-  if (!mounted) {
-    return (
-      <div className="p-6 space-y-4">
-        <div>
-          <h2 className="text-lg font-semibold mb-1">Actions</h2>
-          <p className="text-sm text-gray-500">Loading...</p>
-        </div>
-      </div>
-    )
-  }
+  const canCreateNewVersion = 
+    (isCreator || isAdmin) && 
+    latestReleased && 
+    latestReleased.status === 'Released'
+
+  const canPromoteToProduction = 
+    (isCreator || isAdmin) && 
+    latestReleased &&
+    latestReleased.status === 'Released' && 
+    !latestReleased.is_production
+
+  const userIsApprover = approvers.some((a: any) => a.user_email === currentUserEmail)
+  const userPendingApproval = approvers.some(
+    (a: any) => a.user_email === currentUserEmail && a.status === 'Pending'
+  )
 
   return (
     <div className="p-6 space-y-4">
-      {/* Header */}
-      <div>
-        <h2 className="text-lg font-semibold mb-1">Actions</h2>
-        <p className="text-sm text-gray-500">Available actions for this document</p>
-      </div>
-
-      {/* Primary Actions Section */}
-      <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary-actions">
+      {/* Primary Actions */}
+      <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary">
         <div className="space-y-2">
           {canEdit && (
             <Button asChild className="w-full">
-              <Link href={`/documents/${document.id}/edit`}>
+              <Link href={`/documents/${primaryDocument.id}/edit`}>
                 Edit Document
               </Link>
             </Button>
           )}
 
           {canRelease && (
-            <ReleaseDocumentButton 
-              documentId={document.id}
-              isProduction={document.is_production}
-            />
+            <ReleaseDocumentButton documentId={primaryDocument.id} />
           )}
 
           {canSubmitForApproval && (
-            <SubmitForApprovalButton
-              documentId={document.id}
-              documentNumber={`${document.document_number}${document.version}`}
-              approverCount={approvers.length}
-            />
+            <SubmitForApprovalButton documentId={primaryDocument.id} />
           )}
 
-          {document.status === 'Released' && (isCreator || isAdmin) && (
+          {canCreateNewVersion && (
             <CreateNewVersionButton
-              documentId={document.id}
-              documentNumber={document.document_number}
-              version={document.version}
-              isProduction={document.is_production}
+              documentId={latestReleased.id}
+              documentNumber={latestReleased.document_number}
+              version={latestReleased.version}
+              isProduction={latestReleased.is_production}
             />
           )}
 
-          {document.status === 'Released' && 
-           !document.is_production && 
-           (isCreator || isAdmin) && (
+          {canPromoteToProduction && (
             <PromoteToProductionButton
-              documentId={document.id}
-              documentNumber={document.document_number}
-              version={document.version}
+              documentId={latestReleased.id}
+              documentNumber={latestReleased.document_number}
+              version={latestReleased.version}
             />
           )}
 
           {canDelete && (
-            <DeleteDocumentButton documentId={document.id} />
+            <DeleteDocumentButton documentId={primaryDocument.id} />
           )}
 
-          {!canEdit && !canRelease && !canSubmitForApproval && 
-           document.status !== 'Released' && !canDelete && (
+          {!canEdit && !canRelease && !canSubmitForApproval && !canCreateNewVersion && !canPromoteToProduction && !canDelete && (
             <p className="text-sm text-gray-500 text-center py-4">
               No actions available for this document
             </p>
@@ -182,73 +192,85 @@ export default function DocumentActionsPanel({
         </div>
       </CollapsibleSection>
 
-      {/* See Latest Released (for obsolete documents) */}
-      {document.status === 'Obsolete' && (
-        <CollapsibleSection title="Latest Version" defaultOpen={true} sectionKey="latest-version">
-          <SeeLatestReleasedButton 
-            documentNumber={document.document_number}
-            currentVersion={document.version}
-          />
-        </CollapsibleSection>
-      )}
+      {/* Version History */}
+      <CollapsibleSection title="Version History" defaultOpen={true} sectionKey="version-history">
+        <div className="space-y-2">
+          {allVersions.map((version) => (
+            <div
+              key={version.id}
+              className={cn(
+                "p-3 rounded-lg border transition-colors",
+                version.status === 'Released' ? "bg-green-50 border-green-200" :
+                version.status === 'Obsolete' ? "bg-gray-50 border-gray-200" :
+                version.status === 'Draft' ? "bg-gray-50 border-gray-300" :
+                "bg-yellow-50 border-yellow-200"
+              )}
+            >
+              <div className="flex items-start justify-between gap-2">
+                <div className="flex-1 min-w-0">
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="font-medium text-sm">
+                      {version.version}
+                    </span>
+                    <Badge className={cn("text-xs", STATUS_COLORS[version.status])}>
+                      {version.status}
+                    </Badge>
+                    {version.is_production && (
+                      <Badge variant="outline" className="text-xs">Production</Badge>
+                    )}
+                  </div>
+                  {version.released_at && (
+                    <p className="text-xs text-gray-600" suppressHydrationWarning>
+                      Released {formatDate(version.released_at)}
+                    </p>
+                  )}
+                </div>
 
-      {/* Approval Workflow Section */}
-      {hasApprovers && (
-        <CollapsibleSection 
-          title="Approval Workflow" 
-          defaultOpen={document.status === 'In Approval'}
-          sectionKey="approval-workflow"
-        >
-          <ApprovalWorkflow
-            approvers={approvers}
-            documentId={document.id}
-            documentNumber={`${document.document_number}${document.version}`}
-            documentStatus={document.status}
-            currentUserId={currentUserId}
-            currentUserEmail={currentUserEmail}
-          />
-        </CollapsibleSection>
-      )}
-
-      {/* Audit Trail Section */}
-      <CollapsibleSection title="Audit Trail" defaultOpen={false} sectionKey="audit-trail">
-        <AuditTrail documentId={document.id} />
-      </CollapsibleSection>
-
-      {/* Admin Section */}
-      {isAdmin && (
-        <>
-          <CollapsibleSection title="Admin Actions" defaultOpen={false} sectionKey="admin-actions">
-            <div className="space-y-4">
-              <ChangeOwnerButton 
-                documentId={document.id}
-                currentOwnerEmail={document.creator?.email || 'Unknown'}
-              />
-              
-              <div className="pt-2 border-t">
-                <AdminActions
-                  documentId={document.id}
-                  documentNumber={`${document.document_number}${document.version}`}
-                  currentStatus={document.status}
-                  currentVersion={document.version}
-                  isProduction={document.is_production}
-                />
-              </div>
-              
-              <div className="pt-2 border-t">
-                <AdminFileActions
-                  documentId={document.id}
-                  documentNumber={`${document.document_number}${document.version}`}
-                  files={document.document_files || []}
-                />
+                {/* Link to obsolete versions */}
+                {version.status === 'Obsolete' && (
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    asChild
+                    className="text-xs"
+                  >
+                    <Link href={`/documents/${documentNumber}/versions/${version.version}`}>
+                      View
+                    </Link>
+                  </Button>
+                )}
               </div>
             </div>
-          </CollapsibleSection>
+          ))}
+        </div>
+      </CollapsibleSection>
 
-          <CollapsibleSection title="Admin Settings" defaultOpen={false} sectionKey="admin-settings">
-            <AdminViewAllToggle />
-          </CollapsibleSection>
-        </>
+      {/* Approval Workflow (if has approvers) */}
+      {hasApprovers && primaryDocument.status === 'In Approval' && (
+        <CollapsibleSection title="Approval Workflow" defaultOpen={true} sectionKey="approval">
+          <ApprovalWorkflow
+            documentId={primaryDocument.id}
+            approvers={approvers}
+            currentUserEmail={currentUserEmail}
+            userIsApprover={userIsApprover}
+            userPendingApproval={userPendingApproval}
+          />
+        </CollapsibleSection>
+      )}
+
+      {/* Audit Trail */}
+      <CollapsibleSection title="Audit Trail" defaultOpen={false} sectionKey="audit">
+        <AuditTrail documentId={primaryDocument.id} />
+      </CollapsibleSection>
+
+      {/* Admin Actions */}
+      {isAdmin && (
+        <CollapsibleSection title="Admin Actions" defaultOpen={false} sectionKey="admin">
+          <AdminActions
+            document={primaryDocument}
+            currentUserId={currentUserId}
+          />
+        </CollapsibleSection>
       )}
     </div>
   )

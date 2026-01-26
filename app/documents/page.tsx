@@ -116,32 +116,13 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
   const totalPages = count ? Math.ceil(count / pageSize) : 0
 
-  // Get selected document if ID provided
-  let selectedDocument = null
-  let selectedDocumentFiles = null
-  let selectedDocumentApprovers = null
-  let isCreator = false
+  // Get selected document versions if document_number provided
+  let selectedDocumentData = null
 
   if (searchParams.selected) {
-    const { data: docData } = await supabase
-      .from('documents')
-      .select(`
-        *,
-        document_type:document_types(name, prefix),
-        creator:users!documents_created_by_fkey(email, full_name),
-        releaser:users!documents_released_by_fkey(email, full_name),
-        document_files(*),
-        approvers!approvers_document_id_fkey(*)
-      `)
-      .eq('id', searchParams.selected)
-      .single()
-
-    if (docData) {
-      selectedDocument = docData
-      selectedDocumentFiles = docData.document_files || []
-      selectedDocumentApprovers = docData.approvers || []
-      isCreator = docData.created_by === user.id
-    }
+    // Import the helper function dynamically
+    const { fetchDocumentVersions } = await import('@/lib/document-helpers')
+    selectedDocumentData = await fetchDocumentVersions(searchParams.selected, user.id)
   }
 
   return (
@@ -157,15 +138,12 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
       {/* Main Content Area */}
       <div className="flex-1 flex overflow-hidden">
-        {selectedDocument ? (
+        {selectedDocumentData ? (
           <>
             {/* Left: Document Detail with Version Tabs */}
             <div className="w-1/2 overflow-y-auto border-r">
               <DocumentDetailPanel
-                document={selectedDocument}
-                files={selectedDocumentFiles}
-                approvers={selectedDocumentApprovers}
-                isCreator={isCreator}
+                documentData={selectedDocumentData}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}
@@ -175,9 +153,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
             {/* Right: Actions Panel */}
             <div className="w-1/2 overflow-y-auto">
               <DocumentActionsPanel
-                document={selectedDocument}
-                approvers={selectedDocumentApprovers}
-                isCreator={isCreator}
+                documentData={selectedDocumentData}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}

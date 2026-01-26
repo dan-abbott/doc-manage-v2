@@ -18,8 +18,8 @@ interface Document {
 
 interface DocumentsTableProps {
   documents: Document[]
-  onDocumentSelect: (docId: string) => void
-  selectedId?: string
+  onDocumentSelect: (documentNumber: string) => void
+  selectedDocumentNumber?: string
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -29,7 +29,7 @@ const STATUS_COLORS: Record<string, string> = {
   Obsolete: 'bg-gray-700',
 }
 
-export default function DocumentsTable({ documents, onDocumentSelect, selectedId }: DocumentsTableProps) {
+export default function DocumentsTable({ documents, onDocumentSelect, selectedDocumentNumber }: DocumentsTableProps) {
   if (documents.length === 0) {
     return (
       <div className="p-4 text-center">
@@ -44,10 +44,10 @@ export default function DocumentsTable({ documents, onDocumentSelect, selectedId
       {documents.map((doc) => (
         <button
           key={doc.id}
-          onClick={() => onDocumentSelect(doc.id)}
+          onClick={() => onDocumentSelect(doc.document_number)}
           className={cn(
             "w-full text-left p-3 hover:bg-gray-50 transition-colors",
-            selectedId === doc.id && "bg-blue-50 border-l-4 border-l-blue-500"
+            selectedDocumentNumber === doc.document_number && "bg-blue-50 border-l-4 border-l-blue-500"
           )}
         >
           <div className="space-y-1">
