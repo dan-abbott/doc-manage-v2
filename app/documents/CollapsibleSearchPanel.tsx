@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -44,6 +44,11 @@ export default function CollapsibleSearchPanel({
   
   // Panel starts collapsed if document is selected
   const [isOpen, setIsOpen] = useState(!currentFilters.selected)
+  
+  // Sync sidebar state when URL changes
+  useEffect(() => {
+    setIsOpen(!currentFilters.selected)
+  }, [currentFilters.selected])
   
   const [search, setSearch] = useState(currentFilters.search || '')
   const [type, setType] = useState(currentFilters.type || '')
