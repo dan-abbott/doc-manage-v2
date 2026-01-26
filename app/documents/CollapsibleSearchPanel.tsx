@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -52,8 +52,12 @@ export default function CollapsibleSearchPanel({
   }, [])
   
   // Sync sidebar state when selection changes (only after initial mount)
+  // Use a ref to track the last value to prevent unnecessary updates
+  const prevSelectedRef = React.useRef(currentFilters.selected)
+  
   useEffect(() => {
-    if (isMounted) {
+    if (isMounted && prevSelectedRef.current !== currentFilters.selected) {
+      prevSelectedRef.current = currentFilters.selected
       setIsOpen(!currentFilters.selected)
     }
   }, [currentFilters.selected, isMounted])
