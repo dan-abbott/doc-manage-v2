@@ -163,7 +163,11 @@ export default function DocumentActionsPanel({
           )}
 
           {canSubmitForApproval && (
-            <SubmitForApprovalButton documentId={primaryDocument.id} />
+            <SubmitForApprovalButton 
+              documentId={primaryDocument.id}
+              documentNumber={primaryDocument.document_number}
+              approverCount={approvers.length}
+            />
           )}
 
           {canCreateNewVersion && (
