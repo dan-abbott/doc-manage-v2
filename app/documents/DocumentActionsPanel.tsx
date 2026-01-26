@@ -257,10 +257,11 @@ export default function DocumentActionsPanel({
         <CollapsibleSection title="Approval Workflow" defaultOpen={true} sectionKey="approval">
           <ApprovalWorkflow
             documentId={primaryDocument.id}
+            documentNumber={primaryDocument.document_number}
+            documentStatus={primaryDocument.status}
             approvers={approvers}
+            currentUserId={currentUserId}
             currentUserEmail={currentUserEmail}
-            userIsApprover={userIsApprover}
-            userPendingApproval={userPendingApproval}
           />
         </CollapsibleSection>
       )}
