@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,12 +43,8 @@ export default function CollapsibleSearchPanel({
   const router = useRouter()
   
   // Panel starts collapsed if document is selected
+  // Use currentFilters.selected as key to force remount when it changes
   const [isOpen, setIsOpen] = useState(!currentFilters.selected)
-  
-  // Sync sidebar state when URL changes
-  useEffect(() => {
-    setIsOpen(!currentFilters.selected)
-  }, [currentFilters.selected])
   
   const [search, setSearch] = useState(currentFilters.search || '')
   const [type, setType] = useState(currentFilters.type || '')
@@ -253,11 +249,11 @@ export default function CollapsibleSearchPanel({
 
         {/* Admin View All Toggle */}
         {isAdmin && (
-          <div className="pt-4 border-t mt-4">
+          <div className="pt-4 border-t mt-4 p-3 border-2 border-red-300 rounded-lg bg-red-50">
             <div className="flex items-center justify-between mb-2">
               <div>
-                <p className="text-xs font-medium text-gray-700">Admin View</p>
-                <p className="text-xs text-gray-500">See all user drafts</p>
+                <p className="text-xs font-medium text-red-900">Admin View</p>
+                <p className="text-xs text-red-700">See all user drafts</p>
               </div>
             </div>
             <Button

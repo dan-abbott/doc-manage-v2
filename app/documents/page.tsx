@@ -130,6 +130,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
       {/* Collapsible Search/Filter Panel */}
       <CollapsibleSearchPanel
+        key={searchParams.selected || 'no-selection'}
         documentTypes={documentTypes || []}
         documents={documents || []}
         totalCount={count || 0}

@@ -66,7 +66,7 @@ function AuditLogEntry({ entry, isLast }: { entry: AuditLogEntry; isLast: boolea
               <span className="text-xs text-gray-500">by {entry.performed_by_email.split('@')[0]}</span>
             </div>
           </div>
-          <time className="text-xs text-gray-400 whitespace-nowrap">
+          <time className="text-xs text-gray-400 whitespace-nowrap" suppressHydrationWarning>
             {formatDate(entry.created_at)}
           </time>
         </div>
