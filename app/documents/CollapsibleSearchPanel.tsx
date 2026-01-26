@@ -48,15 +48,31 @@ export default function CollapsibleSearchPanel({
   
   // Track when component is mounted
   useEffect(() => {
+    console.log('[CollapsibleSearchPanel] Component mounted')
     setIsMounted(true)
   }, [])
   
   // Sync sidebar state when selection changes (only after initial mount)
   // Use a ref to track the last value to prevent unnecessary updates
   const prevSelectedRef = React.useRef(currentFilters.selected)
+  const renderCountRef = React.useRef(0)
+  
+  renderCountRef.current++
+  console.log(`[CollapsibleSearchPanel] Render #${renderCountRef.current}`, {
+    isMounted,
+    currentSelected: currentFilters.selected,
+    prevSelected: prevSelectedRef.current,
+    isOpen,
+    willUpdate: isMounted && prevSelectedRef.current !== currentFilters.selected
+  })
   
   useEffect(() => {
     if (isMounted && prevSelectedRef.current !== currentFilters.selected) {
+      console.log('[CollapsibleSearchPanel] useEffect triggering state update', {
+        from: prevSelectedRef.current,
+        to: currentFilters.selected,
+        newIsOpen: !currentFilters.selected
+      })
       prevSelectedRef.current = currentFilters.selected
       setIsOpen(!currentFilters.selected)
     }

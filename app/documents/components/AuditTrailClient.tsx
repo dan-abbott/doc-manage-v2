@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -94,6 +94,13 @@ function AuditLogEntry({ entry, isLast }: { entry: AuditLogEntry; isLast: boolea
 
 export default function AuditTrailClient({ auditLogs }: AuditTrailProps) {
   const [isExpanded, setIsExpanded] = useState(false)
+  const renderCountRef = React.useRef(0)
+  
+  renderCountRef.current++
+  console.log(`[AuditTrailClient] Render #${renderCountRef.current}`, {
+    auditLogsCount: auditLogs.length,
+    isExpanded
+  })
 
   // Show only most recent 3 when collapsed
   const displayLogs = isExpanded ? auditLogs : auditLogs.slice(0, 3)

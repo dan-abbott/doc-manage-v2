@@ -25,6 +25,7 @@ interface PageProps {
 }
 
 export default async function DocumentsPage({ searchParams }: PageProps) {
+  console.log('[DocumentsPage] Server rendering with searchParams:', searchParams)
   const supabase = await createClient()
 
   // Get current user
@@ -33,6 +34,8 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
   if (!user) {
     redirect('/auth/login')
   }
+
+  console.log('[DocumentsPage] User:', user.id, 'Selected:', searchParams.selected)
 
   // Check if user is admin
   const { data: userData } = await supabase
