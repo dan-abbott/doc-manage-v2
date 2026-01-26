@@ -18,7 +18,7 @@ interface Document {
 
 interface DocumentsTableProps {
   documents: Document[]
-  onDocumentSelect: (documentNumber: string) => void
+  onDocumentSelect: (documentNumber: string, version: string) => void
   selectedDocumentNumber?: string
 }
 
@@ -44,7 +44,7 @@ export default function DocumentsTable({ documents, onDocumentSelect, selectedDo
       {documents.map((doc) => (
         <button
           key={doc.id}
-          onClick={() => onDocumentSelect(doc.document_number)}
+          onClick={() => onDocumentSelect(doc.document_number, doc.version)}
           className={cn(
             "w-full text-left p-3 hover:bg-gray-50 transition-colors",
             selectedDocumentNumber === doc.document_number && "bg-blue-50 border-l-4 border-l-blue-500"

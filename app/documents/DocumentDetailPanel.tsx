@@ -11,6 +11,7 @@ import Link from 'next/link'
 
 interface DocumentDetailPanelProps {
   documentData: DocumentVersionsData
+  selectedVersion?: string
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
@@ -172,14 +173,16 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
 
 export default function DocumentDetailPanel({
   documentData,
+  selectedVersion,
   isAdmin,
   currentUserId,
   currentUserEmail
 }: DocumentDetailPanelProps) {
   const { latestReleased, wipVersions, documentNumber, title } = documentData
   
-  // Determine default tab
-  const defaultTab = latestReleased ? 'released' : 'wip'
+  // Determine default tab based on selected version
+  const isSelectedVersionWIP = selectedVersion && wipVersions.some(v => v.version === selectedVersion)
+  const defaultTab = isSelectedVersionWIP ? 'wip' : (latestReleased ? 'released' : 'wip')
   const [activeTab, setActiveTab] = useState<'released' | 'wip'>(defaultTab)
 
   // Check if current user is creator of any version

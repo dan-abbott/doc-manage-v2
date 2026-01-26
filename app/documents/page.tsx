@@ -20,6 +20,7 @@ interface PageProps {
     page?: string
     viewAll?: string
     selected?: string
+    version?: string
   }
 }
 
@@ -144,6 +145,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
             <div className="w-1/2 overflow-y-auto border-r">
               <DocumentDetailPanel
                 documentData={selectedDocumentData}
+                selectedVersion={searchParams.version}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}

@@ -90,7 +90,7 @@ export default function CollapsibleSearchPanel({
   const hasActiveFilters = search || type || status || project || myDocs
 
   // Handle document selection - use replace to avoid history spam
-  const handleDocumentSelect = (documentNumber: string) => {
+  const handleDocumentSelect = (documentNumber: string, version: string) => {
     const params = new URLSearchParams()
     
     // Preserve all current filters
@@ -101,8 +101,9 @@ export default function CollapsibleSearchPanel({
     if (myDocs) params.set('myDocs', 'true')
     if (currentFilters.viewAll) params.set('viewAll', currentFilters.viewAll)
     
-    // Set selected document number
+    // Set selected document number and version
     params.set('selected', documentNumber)
+    params.set('version', version)
     
     router.replace(`/documents?${params.toString()}`)
     
