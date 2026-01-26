@@ -9,16 +9,16 @@ import { Badge } from '@/components/ui/badge'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import { cn } from '@/lib/utils'
 import dynamic from 'next/dynamic'
-import ReleaseDocumentButton from './[id]/ReleaseDocumentButton'
-import SubmitForApprovalButton from './[id]/SubmitForApprovalButton'
-import DeleteDocumentButton from './[id]/DeleteDocumentButton'
-import CreateNewVersionButton from './[id]/CreateNewVersionButton'
-import PromoteToProductionButton from './[id]/PromoteToProductionButton'
+import ReleaseDocumentButton from './components/ReleaseDocumentButton'
+import SubmitForApprovalButton from './components/SubmitForApprovalButton'
+import DeleteDocumentButton from './components/DeleteDocumentButton'
+import CreateNewVersionButton from './components/CreateNewVersionButton'
+import PromoteToProductionButton from './components/PromoteToProductionButton'
 
 // Dynamically import components
-const ApprovalWorkflow = dynamic(() => import('./[id]/ApprovalWorkflow'), { ssr: false })
-const AuditTrail = dynamic(() => import('./[id]/AuditTrail'), { ssr: false })
-const AdminActions = dynamic(() => import('./[id]/AdminActions'), { ssr: false })
+const ApprovalWorkflow = dynamic(() => import('./components/ApprovalWorkflow'), { ssr: false })
+const AuditTrail = dynamic(() => import('./components/AuditTrail'), { ssr: false })
+const AdminActions = dynamic(() => import('./components/AdminActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
   documentData: DocumentVersionsData
