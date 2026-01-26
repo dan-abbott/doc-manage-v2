@@ -1,7 +1,7 @@
 // app/actions/versions.ts
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError } from '@/lib/logger'
@@ -44,10 +44,28 @@ export async function createNewVersion(sourceDocumentId: string) {
     const userId = user.id
     const userEmail = user.email
 
+    // Get user's tenant_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', userId)
+      .single()
+
+    if (!userData?.tenant_id) {
+      logger.error('User has no tenant_id', { userId, userEmail })
+      return {
+        success: false,
+        error: 'User tenant not found'
+      }
+    }
+
+    const tenantId = userData.tenant_id
+
     logger.info('Creating new document version', {
       userId,
       userEmail,
-      sourceDocumentId
+      sourceDocumentId,
+      tenantId
     })
 
     // Fetch source document with all needed info
@@ -63,7 +81,8 @@ export async function createNewVersion(sourceDocumentId: string) {
         is_production,
         project_code,
         document_type_id,
-        created_by
+        created_by,
+        tenant_id
       `)
       .eq('id', sourceDocumentId)
       .single()
@@ -156,7 +175,9 @@ export async function createNewVersion(sourceDocumentId: string) {
     }
 
     // Create new version as Draft
-    const { data: newVersion, error: insertError } = await supabase
+    // Use service role client to bypass RLS for this legitimate admin operation
+    const adminClient = createServiceRoleClient()
+    const { data: newVersion, error: insertError } = await adminClient
       .from('documents')
       .insert({
         document_type_id: sourceDoc.document_type_id,
@@ -167,7 +188,8 @@ export async function createNewVersion(sourceDocumentId: string) {
         status: 'Draft',
         is_production: sourceDoc.is_production,
         project_code: sourceDoc.project_code,
-        created_by: userId
+        created_by: userId,
+        tenant_id: tenantId
       })
       .select()
       .single()
