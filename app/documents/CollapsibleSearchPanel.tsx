@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,8 +43,20 @@ export default function CollapsibleSearchPanel({
   const router = useRouter()
   
   // Panel starts collapsed if document is selected
-  // Use currentFilters.selected as key to force remount when it changes
   const [isOpen, setIsOpen] = useState(!currentFilters.selected)
+  const [isMounted, setIsMounted] = useState(false)
+  
+  // Track when component is mounted
+  useEffect(() => {
+    setIsMounted(true)
+  }, [])
+  
+  // Sync sidebar state when selection changes (only after initial mount)
+  useEffect(() => {
+    if (isMounted) {
+      setIsOpen(!currentFilters.selected)
+    }
+  }, [currentFilters.selected, isMounted])
   
   const [search, setSearch] = useState(currentFilters.search || '')
   const [type, setType] = useState(currentFilters.type || '')
