@@ -275,8 +275,11 @@ export default function DocumentActionsPanel({
       {isAdmin && (
         <CollapsibleSection title="Admin Actions" defaultOpen={false} sectionKey="admin">
           <AdminActions
-            document={primaryDocument}
-            currentUserId={currentUserId}
+            documentId={primaryDocument.id}
+            documentNumber={primaryDocument.document_number}
+            currentStatus={primaryDocument.status}
+            currentVersion={primaryDocument.version}
+            isProduction={primaryDocument.is_production}
           />
         </CollapsibleSection>
       )}
