@@ -88,7 +88,7 @@ export default async function MyApprovalsPage() {
   }
 
   const ApprovalCard = ({ approval }: { approval: any }) => (
-    <Link href={`/documents/${approval.document.id}`}>
+    <Link href={`/documents?selected=${approval.document.document_number}`}>
       <Card className="hover:bg-gray-50 cursor-pointer transition-colors">
         <CardContent className="p-4">
           <div className="flex items-start justify-between gap-4">

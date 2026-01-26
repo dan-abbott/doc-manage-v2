@@ -50,7 +50,18 @@ export async function fetchDocumentVersions(
 ): Promise<DocumentVersionsData | null> {
   const supabase = await createClient()
 
-  // Fetch all versions of this document
+  // First get user's tenant_id
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', userId)
+    .single()
+
+  if (!userData?.tenant_id) {
+    return null
+  }
+
+  // Fetch all versions of this document within the user's tenant
   const { data: versions, error } = await supabase
     .from('documents')
     .select(`
@@ -62,9 +73,15 @@ export async function fetchDocumentVersions(
       approvers!approvers_document_id_fkey(*)
     `)
     .eq('document_number', documentNumber)
+    .eq('tenant_id', userData.tenant_id)
     .order('created_at', { ascending: true })
 
-  if (error || !versions || versions.length === 0) {
+  if (error) {
+    console.error('Error fetching document versions:', error)
+    return null
+  }
+
+  if (!versions || versions.length === 0) {
     return null
   }
 
@@ -113,6 +130,19 @@ export async function fetchSpecificVersion(
 ): Promise<DocumentVersion | null> {
   const supabase = await createClient()
 
+  // Get current user
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+
+  // Get user's tenant_id
+  const { data: userData } = await supabase
+    .from('users')
+    .select('tenant_id')
+    .eq('id', user.id)
+    .single()
+
+  if (!userData?.tenant_id) return null
+
   const { data, error } = await supabase
     .from('documents')
     .select(`
@@ -125,9 +155,11 @@ export async function fetchSpecificVersion(
     `)
     .eq('document_number', documentNumber)
     .eq('version', version)
+    .eq('tenant_id', userData.tenant_id)
     .single()
 
   if (error || !data) {
+    console.error('Error fetching specific version:', error)
     return null
   }
 

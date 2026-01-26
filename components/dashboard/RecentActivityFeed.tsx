@@ -115,7 +115,7 @@ export default async function RecentActivityFeed() {
               <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">
                   <Link
-                    href={`/documents/${activity.document_id}`}
+                    href={`/documents?selected=${document?.document_number}`}
                     className="font-medium text-sm text-gray-900 hover:text-blue-600 hover:underline"
                   >
                     {document?.document_number || 'Unknown Document'}
