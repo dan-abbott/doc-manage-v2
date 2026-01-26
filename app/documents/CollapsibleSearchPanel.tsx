@@ -244,6 +244,46 @@ export default function CollapsibleSearchPanel({
             </Button>
           )}
         </div>
+
+        {/* Admin View All Toggle */}
+        {isAdmin && (
+          <div className="pt-4 border-t mt-4">
+            <div className="flex items-center justify-between mb-2">
+              <div>
+                <p className="text-xs font-medium text-gray-700">Admin View</p>
+                <p className="text-xs text-gray-500">See all user drafts</p>
+              </div>
+            </div>
+            <Button
+              variant={currentFilters.viewAll === 'true' ? 'default' : 'outline'}
+              size="sm"
+              className="w-full h-9"
+              onClick={() => {
+                const params = new URLSearchParams()
+                
+                // Preserve filters
+                if (search) params.set('search', search)
+                if (type) params.set('type', type)
+                if (status) params.set('status', status)
+                if (project) params.set('project', project)
+                if (myDocs) params.set('myDocs', 'true')
+                if (currentFilters.selected) params.set('selected', currentFilters.selected)
+                
+                // Toggle viewAll
+                if (currentFilters.viewAll === 'true') {
+                  // Turn off
+                  router.replace(`/documents?${params.toString()}`)
+                } else {
+                  // Turn on
+                  params.set('viewAll', 'true')
+                  router.replace(`/documents?${params.toString()}`)
+                }
+              }}
+            >
+              {currentFilters.viewAll === 'true' ? 'Viewing All Docs' : 'View All Docs'}
+            </Button>
+          </div>
+        )}
       </div>
 
       {/* Document List */}

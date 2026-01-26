@@ -144,31 +144,6 @@ export default function DocumentActionsPanel({
 
   return (
     <div className="p-6 space-y-4">
-      {/* Admin View Toggle */}
-      {isAdmin && (
-        <CollapsibleSection title="Admin View" defaultOpen={true} sectionKey="admin-view">
-          <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 bg-gray-50 rounded-lg">
-              <div className="flex-1">
-                <p className="text-sm font-medium text-gray-900">View All Documents</p>
-                <p className="text-xs text-gray-500 mt-0.5">
-                  See drafts from all users (admin only)
-                </p>
-              </div>
-              <Button
-                variant="outline"
-                size="sm"
-                asChild
-              >
-                <Link href="/documents?viewAll=true">
-                  Enable
-                </Link>
-              </Button>
-            </div>
-          </div>
-        </CollapsibleSection>
-      )}
-
       {/* Primary Actions */}
       <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary">
         <div className="space-y-2">
