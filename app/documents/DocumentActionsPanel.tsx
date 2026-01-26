@@ -266,7 +266,7 @@ export default function DocumentActionsPanel({
                     asChild
                     className="text-xs"
                   >
-                    <Link href={`/documents/${documentNumber}/versions/${version.version}`}>
+                    <Link href={`/document-version/${documentNumber}/${version.version}`}>
                       View
                     </Link>
                   </Button>

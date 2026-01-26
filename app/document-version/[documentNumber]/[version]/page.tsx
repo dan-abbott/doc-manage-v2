@@ -9,7 +9,7 @@ import { fetchSpecificVersion } from '@/lib/document-helpers'
 
 interface PageProps {
   params: {
-    number: string
+    documentNumber: string
     version: string
   }
 }
@@ -40,7 +40,7 @@ export default async function ObsoleteVersionPage({ params }: PageProps) {
   }
 
   // Fetch the specific version
-  const version = await fetchSpecificVersion(params.number, params.version)
+  const version = await fetchSpecificVersion(params.documentNumber, params.version)
 
   if (!version) {
     redirect('/documents')
@@ -54,7 +54,7 @@ export default async function ObsoleteVersionPage({ params }: PageProps) {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Back Button */}
         <Button asChild variant="ghost" className="mb-6">
-          <Link href={`/documents?selected=${params.number}`}>
+          <Link href={`/documents?selected=${params.documentNumber}`}>
             <ArrowLeft className="mr-2 h-4 w-4" />
             Back to Current Version
           </Link>
