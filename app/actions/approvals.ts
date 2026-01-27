@@ -107,7 +107,7 @@ export async function addApprover(documentId: string, userId: string, userEmail:
       .select('id')
       .eq('document_id', documentId)
       .eq('user_id', userId)
-      .single()
+      .maybeSingle()
 
     if (existing) {
       logger.warn('Approver already exists', {

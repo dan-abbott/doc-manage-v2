@@ -183,6 +183,8 @@ export default function DocumentActionsPanel({
                   documentId={latestReleased.id}
                   documentNumber={latestReleased.document_number}
                   version={latestReleased.version}
+                  hasDraft={hasDraft}
+                  draftId={draftDocument?.id}
                 />
               )}
             </>

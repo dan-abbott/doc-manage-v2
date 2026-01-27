@@ -11,7 +11,11 @@ import { uuidSchema } from '@/lib/validation/schemas'
  * Promote a Released Prototype document to Production
  * Creates a new Production document starting at v1
  */
-export async function promoteToProduction(prototypeDocumentId: string) {
+export async function promoteToProduction(
+  prototypeDocumentId: string,
+  mode: 'create' | 'discard' | 'convert' = 'create',
+  draftId?: string
+) {
   const startTime = Date.now()
   const supabase = await createClient()
   
@@ -141,6 +145,104 @@ export async function promoteToProduction(prototypeDocumentId: string) {
       return { 
         success: false, 
         error: `Production version already exists for ${prototypeDoc.document_number} (Status: ${existingProduction.status})` 
+      }
+    }
+
+    // Handle existing draft based on mode
+    if (mode === 'discard' || mode === 'convert') {
+      // Find existing draft
+      const { data: existingDraft } = await supabase
+        .from('documents')
+        .select('id')
+        .eq('document_number', prototypeDoc.document_number)
+        .eq('status', 'Draft')
+        .eq('is_production', false)
+        .maybeSingle()
+
+      if (!existingDraft && mode === 'convert' && draftId) {
+        // Use provided draftId for convert mode
+        const { data: specificDraft } = await supabase
+          .from('documents')
+          .select('id')
+          .eq('id', draftId)
+          .single()
+        
+        if (specificDraft) {
+          // Convert this draft to production
+          const supabaseAdmin = createServiceRoleClient()
+          const { error: updateError } = await supabaseAdmin
+            .from('documents')
+            .update({ 
+              is_production: true,
+              version: 'v1'
+            })
+            .eq('id', draftId)
+
+          if (updateError) {
+            logger.error('Failed to convert draft to production', {
+              userId,
+              draftId,
+              error: updateError
+            })
+            throw updateError
+          }
+
+          logger.info('Converted draft to production', {
+            userId,
+            draftId,
+            documentNumber: prototypeDoc.document_number
+          })
+
+          // Create audit log
+          await supabaseAdmin
+            .from('audit_log')
+            .insert({
+              document_id: draftId,
+              action: 'converted_to_production',
+              performed_by: userId,
+              performed_by_email: userEmail || '',
+              tenant_id: prototypeDoc.tenant_id,
+              details: {
+                source_prototype_id: prototypeDocumentId,
+                document_number: prototypeDoc.document_number,
+                conversion_date: new Date().toISOString()
+              }
+            })
+
+          revalidatePath('/documents')
+          revalidatePath(`/documents/${prototypeDocumentId}`)
+          revalidatePath(`/documents/${draftId}`)
+
+          return {
+            success: true,
+            documentNumber: prototypeDoc.document_number,
+            documentId: draftId,
+            data: specificDraft
+          }
+        }
+      }
+
+      if (existingDraft && mode === 'discard') {
+        // Delete the existing draft
+        const { error: deleteError } = await supabase
+          .from('documents')
+          .delete()
+          .eq('id', existingDraft.id)
+
+        if (deleteError) {
+          logger.error('Failed to delete existing draft', {
+            userId,
+            draftId: existingDraft.id,
+            error: deleteError
+          })
+          // Continue anyway - we'll create a new one
+        } else {
+          logger.info('Deleted existing draft before promotion', {
+            userId,
+            draftId: existingDraft.id,
+            documentNumber: prototypeDoc.document_number
+          })
+        }
       }
     }
 

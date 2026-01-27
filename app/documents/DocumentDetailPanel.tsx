@@ -295,7 +295,7 @@ export default function DocumentDetailPanel({
                 currentUserId={currentUserId}
                 currentUserEmail={currentUserEmail}
                 availableUsers={availableUsers}
-                isCollapsible={true}
+                isCollapsible={false}
               />
             ))
           ) : (
