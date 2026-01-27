@@ -20,6 +20,7 @@ const actionConfig: Record<string, { label: string; icon: any; color: string }> 
   'submitted_for_approval': { label: 'Submitted', icon: Send, color: 'text-yellow-600' },
   'approved': { label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
   'rejected': { label: 'Rejected', icon: XCircle, color: 'text-red-600' },
+  'withdrawn_from_approval': { label: 'Withdrawn', icon: XCircle, color: 'text-orange-600' },
   'released': { label: 'Released', icon: CheckCircle, color: 'text-green-600' },
   'promoted_to_production': { label: 'Promoted', icon: FileText, color: 'text-purple-600' },
   'version_created': { label: 'New Version', icon: FileText, color: 'text-blue-600' },

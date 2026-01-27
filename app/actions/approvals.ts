@@ -457,6 +457,16 @@ export async function submitForApproval(documentId: string) {
       return { success: false, error: 'Failed to submit document' }
     }
 
+    // Reset all approvers to Pending (important for resubmissions after rejection)
+    await supabase
+      .from('approvers')
+      .update({
+        status: 'Pending',
+        comments: null,
+        action_date: null
+      })
+      .eq('document_id', documentId)
+
     logger.info('Document submitted for approval', {
       userId,
       documentId,
@@ -1018,6 +1028,135 @@ export async function getMyApprovals() {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch approvals',
       data: []
+    }
+  }
+}
+
+/**
+ * Withdraw a document from approval (return to Draft)
+ */
+export async function withdrawFromApproval(documentId: string) {
+  const startTime = Date.now()
+  let userId: string | undefined
+
+  try {
+    const supabase = await createClient()
+
+    // Get current user
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      logger.warn('Withdraw attempted without authentication', { authError, documentId })
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    userId = user.id
+
+    // Get document
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select('*, creator:users!documents_created_by_fkey(email)')
+      .eq('id', documentId)
+      .single()
+
+    if (docError || !document) {
+      logger.error('Document not found for withdrawal', {
+        userId,
+        documentId,
+        error: docError,
+      })
+      return { success: false, error: 'Document not found' }
+    }
+
+    // Check authorization
+    if (document.created_by !== user.id) {
+      logger.warn('Unauthorized withdrawal attempt', {
+        userId,
+        documentId,
+        ownerId: document.created_by,
+      })
+      return { success: false, error: 'Not authorized' }
+    }
+
+    // Check status
+    if (document.status !== 'In Approval') {
+      logger.warn('Attempt to withdraw document not in approval', {
+        userId,
+        documentId,
+        status: document.status,
+      })
+      return { success: false, error: 'Document is not in approval' }
+    }
+
+    // Return to Draft status
+    const supabaseAdmin = createServiceRoleClient()
+    const { error: updateError } = await supabaseAdmin
+      .from('documents')
+      .update({ status: 'Draft' })
+      .eq('id', documentId)
+
+    if (updateError) {
+      logError(updateError, {
+        action: 'withdrawFromApproval',
+        userId,
+        documentId,
+      })
+      return { success: false, error: 'Failed to withdraw document' }
+    }
+
+    // Reset all approvers to Pending
+    await supabase
+      .from('approvers')
+      .update({
+        status: 'Pending',
+        comments: null,
+        action_date: null
+      })
+      .eq('document_id', documentId)
+
+    // Create audit log
+    await supabaseAdmin
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        action: 'withdrawn_from_approval',
+        performed_by: user.id,
+        performed_by_email: user.email,
+        tenant_id: document.tenant_id,
+        details: {
+          document_number: `${document.document_number}${document.version}`
+        }
+      })
+
+    logger.info('Document withdrawn from approval', {
+      userId,
+      documentId,
+      documentNumber: `${document.document_number}${document.version}`,
+    })
+
+    revalidatePath(`/documents/${documentId}`)
+    revalidatePath('/documents')
+    revalidatePath('/approvals')
+
+    const duration = Date.now() - startTime
+    logServerAction('withdrawFromApproval', {
+      userId,
+      documentId,
+      success: true,
+      duration,
+    })
+
+    return { success: true }
+  } catch (error: any) {
+    logError(error, {
+      action: 'withdrawFromApproval',
+      userId,
+      documentId,
+      duration: Date.now() - startTime,
+    })
+
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to withdraw document',
     }
   }
 }

@@ -193,6 +193,34 @@ export default function DocumentActionsPanel({
           {/* WIP TAB: Show draft actions if draft exists */}
           {showingWIPTab && hasDraft && draftDocument && (isCreator || isAdmin) && (
             <>
+              {/* If In Approval - show Withdraw button */}
+              {draftDocument.status === 'In Approval' && (
+                <>
+                  <Button
+                    variant="outline"
+                    className="border-orange-200 text-orange-700 hover:bg-orange-50 col-span-2"
+                    onClick={async () => {
+                      if (confirm('Withdraw this document from approval? It will return to Draft status and you can make changes.')) {
+                        const { withdrawFromApproval } = await import('@/app/actions/approvals')
+                        const { toast } = await import('sonner')
+                        const result = await withdrawFromApproval(draftDocument.id)
+                        if (result.success) {
+                          toast.success('Document withdrawn from approval')
+                          window.location.reload()
+                        } else {
+                          toast.error(result.error || 'Failed to withdraw document')
+                        }
+                      }
+                    }}
+                  >
+                    Withdraw from Approval
+                  </Button>
+                </>
+              )}
+              
+              {/* If Draft - show Release/Submit and Delete buttons */}
+              {draftDocument.status === 'Draft' && (
+                <>
               {/* Release / Submit for Approval */}
               {draftDocument.is_production ? (
                 // Production documents always need approval
@@ -234,6 +262,8 @@ export default function DocumentActionsPanel({
 
               {/* Delete Draft */}
               <DeleteDocumentButton documentId={draftDocument.id} />
+                </>
+              )}
             </>
           )}
 
