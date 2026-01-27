@@ -1,7 +1,7 @@
 // app/actions/promotion.ts
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError } from '@/lib/logger'
@@ -63,7 +63,8 @@ export async function promoteToProduction(prototypeDocumentId: string) {
         is_production,
         project_code,
         document_type_id,
-        created_by
+        created_by,
+        tenant_id
       `)
       .eq('id', prototypeDocumentId)
       .single()
@@ -143,8 +144,11 @@ export async function promoteToProduction(prototypeDocumentId: string) {
       }
     }
 
+    // Use service role client to bypass RLS (we've already verified permissions)
+    const supabaseAdmin = createServiceRoleClient()
+
     // Create new Production document at v1
-    const { data: productionDoc, error: insertError } = await supabase
+    const { data: productionDoc, error: insertError } = await supabaseAdmin
       .from('documents')
       .insert({
         document_type_id: prototypeDoc.document_type_id,
@@ -155,7 +159,8 @@ export async function promoteToProduction(prototypeDocumentId: string) {
         status: 'Draft', // Starts as Draft, requires approval
         is_production: true,
         project_code: prototypeDoc.project_code,
-        created_by: userId
+        created_by: userId,
+        tenant_id: prototypeDoc.tenant_id
       })
       .select()
       .single()
@@ -172,13 +177,14 @@ export async function promoteToProduction(prototypeDocumentId: string) {
     }
 
     // Create audit log for new Production document
-    const { error: auditNewError } = await supabase
+    const { error: auditNewError } = await supabaseAdmin
       .from('audit_log')
       .insert({
         document_id: productionDoc.id,
         action: 'promoted_to_production',
         performed_by: userId,
         performed_by_email: userEmail || '',
+        tenant_id: prototypeDoc.tenant_id,
         details: {
           source_prototype_id: prototypeDocumentId,
           source_version: prototypeDoc.version,
@@ -198,13 +204,14 @@ export async function promoteToProduction(prototypeDocumentId: string) {
     }
 
     // Create audit log for source Prototype (reference)
-    const { error: auditSourceError } = await supabase
+    const { error: auditSourceError } = await supabaseAdmin
       .from('audit_log')
       .insert({
         document_id: prototypeDocumentId,
         action: 'document_promoted',
         performed_by: userId,
         performed_by_email: userEmail || '',
+        tenant_id: prototypeDoc.tenant_id,
         details: {
           promoted_to_id: productionDoc.id,
           production_version: 'v1',
