@@ -123,6 +123,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
   // Get selected document versions if document_number provided
   let selectedDocumentData = null
   let auditLogs = []
+  let availableUsers = []
 
   if (searchParams.selected) {
     // Import the helper function dynamically
@@ -138,6 +139,16 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
         auditLogs = auditResult.data
       }
     }
+
+    // Fetch available users for approver management (exclude current user)
+    const { data: users } = await supabase
+      .from('users')
+      .select('id, email, full_name')
+      .neq('id', user.id)
+      .eq('tenant_id', user.user_metadata?.tenant_id || 'app')
+      .order('email')
+    
+    availableUsers = users || []
   }
 
   return (
@@ -171,6 +182,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
               <DocumentActionsPanel
                 documentData={selectedDocumentData}
                 auditLogs={auditLogs}
+                availableUsers={availableUsers}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}

@@ -43,27 +43,17 @@ export default async function EditDocumentPage({ params }: PageProps) {
     redirect(`/documents/${params.id}`)
   }
 
-  // Get all users for approver selection (exclude current user)
-  const { data: allUsers } = await supabase
-    .from('users')
-    .select('id, email, full_name')
-    .neq('id', user.id)
-    .order('email')
-
   return (
     <div className="container mx-auto py-8 max-w-4xl">
       <Card>
         <CardHeader>
           <CardTitle>Edit Document</CardTitle>
           <CardDescription>
-            Modify document details, manage approvers, and file attachments
+            Modify document details and file attachments
           </CardDescription>
         </CardHeader>
         <CardContent>
-          <EditDocumentForm 
-            document={document} 
-            availableUsers={allUsers || []}
-          />
+          <EditDocumentForm document={document} />
         </CardContent>
       </Card>
     </div>
