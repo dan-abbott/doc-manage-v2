@@ -154,7 +154,7 @@ export default function CollapsibleSearchPanel({
   }
 
   return (
-    <div className="w-80 bg-white border-r flex flex-col overflow-hidden">
+    <div className="w-96 lg:w-[40%] xl:w-[35%] 2xl:w-[30%] max-w-2xl bg-white border-r flex flex-col overflow-hidden">
       {/* Header with collapse button */}
       <div className="p-4 border-b flex items-center justify-between">
         <div>

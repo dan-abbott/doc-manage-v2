@@ -70,12 +70,10 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
                 <p className="text-sm text-gray-900">{version.document_type?.name || 'Unknown'}</p>
               </div>
               
-              {version.project_code && (
-                <div>
-                  <p className="text-xs font-medium text-gray-500 mb-0.5">Project Code</p>
-                  <p className="text-sm font-mono text-gray-900">{version.project_code}</p>
-                </div>
-              )}
+              <div>
+                <p className="text-xs font-medium text-gray-500 mb-0.5">Project Code</p>
+                <p className="text-sm font-mono text-gray-900">{version.project_code || <span className="text-gray-400 italic">None</span>}</p>
+              </div>
               
               {approvers.length > 0 && (
                 <div>
