@@ -22,6 +22,7 @@ const AdminActions = dynamic(() => import('./components/AdminActions'), { ssr: f
 
 interface DocumentActionsPanelProps {
   documentData: DocumentVersionsData
+  auditLogs: any[] // Add audit logs as prop
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
@@ -88,6 +89,7 @@ function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }
 
 export default function DocumentActionsPanel({
   documentData,
+  auditLogs,
   isAdmin,
   currentUserId,
   currentUserEmail
@@ -268,7 +270,7 @@ export default function DocumentActionsPanel({
 
       {/* Audit Trail */}
       <CollapsibleSection title="Audit Trail" defaultOpen={false} sectionKey="audit">
-        <AuditTrail documentId={primaryDocument.id} />
+        <AuditTrail auditLogs={auditLogs} />
       </CollapsibleSection>
 
       {/* Admin Actions */}

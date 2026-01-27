@@ -1,18 +1,11 @@
-import { getDocumentAuditLog } from '@/app/actions/audit'
 import AuditTrailClient from './AuditTrailClient'
+import type { AuditLogEntry } from '@/app/actions/audit'
 
 interface AuditTrailProps {
-  documentId: string
+  auditLogs: AuditLogEntry[]
 }
 
-export default async function AuditTrail({ documentId }: AuditTrailProps) {
-  console.log('[AuditTrail] Server component rendering for documentId:', documentId)
-  const result = await getDocumentAuditLog(documentId)
-  console.log('[AuditTrail] Audit log fetched, success:', result.success, 'entries:', result.data?.length)
-
-  if (!result.success || !result.data) {
-    return null
-  }
-
-  return <AuditTrailClient auditLogs={result.data} />
+export default function AuditTrail({ auditLogs }: AuditTrailProps) {
+  console.log('[AuditTrail] Rendering with', auditLogs.length, 'entries')
+  return <AuditTrailClient auditLogs={auditLogs} />
 }

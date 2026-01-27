@@ -122,11 +122,22 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
 
   // Get selected document versions if document_number provided
   let selectedDocumentData = null
+  let auditLogs = []
 
   if (searchParams.selected) {
     // Import the helper function dynamically
     const { fetchDocumentVersions } = await import('@/lib/document-helpers')
     selectedDocumentData = await fetchDocumentVersions(searchParams.selected, user.id)
+    
+    // Fetch audit logs for the primary document
+    if (selectedDocumentData?.latestReleased || selectedDocumentData?.wipVersions?.[0]) {
+      const { getDocumentAuditLog } = await import('@/app/actions/audit')
+      const primaryDoc = selectedDocumentData.latestReleased || selectedDocumentData.wipVersions[0]
+      const auditResult = await getDocumentAuditLog(primaryDoc.id)
+      if (auditResult.success && auditResult.data) {
+        auditLogs = auditResult.data
+      }
+    }
   }
 
   return (
@@ -159,6 +170,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
             <div className="w-1/2 overflow-y-auto">
               <DocumentActionsPanel
                 documentData={selectedDocumentData}
+                auditLogs={auditLogs}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}
