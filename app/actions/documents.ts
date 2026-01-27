@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logger } from '@/lib/logger'
 import { logError, logServerAction, logFileOperation, measureTime } from '@/lib/utils/logging-helpers'
@@ -935,8 +935,9 @@ export async function releaseDocument(documentId: string) {
       }
     }
 
-    // Update document to Released
-    const { error: updateError } = await supabase
+    // Update document to Released - use service role client as RLS might block status changes
+    const supabaseAdmin = createServiceRoleClient()
+    const { error: updateError } = await supabaseAdmin
       .from('documents')
       .update({
         status: 'Released',
@@ -976,13 +977,13 @@ export async function releaseDocument(documentId: string) {
           predecessorVersion: predecessor.version,
         })
 
-        await supabase
+        await supabaseAdmin
           .from('documents')
           .update({ status: 'Obsolete' })
           .eq('id', predecessor.id)
 
         // Log obsolescence
-        await supabase
+        await supabaseAdmin
           .from('audit_log')
           .insert({
             document_id: predecessor.id,
@@ -999,7 +1000,7 @@ export async function releaseDocument(documentId: string) {
     }
 
     // Create audit log entry
-    await supabase
+    await supabaseAdmin
       .from('audit_log')
       .insert({
         document_id: documentId,
