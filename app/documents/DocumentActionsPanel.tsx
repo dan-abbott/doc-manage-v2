@@ -215,11 +215,11 @@ export default function DocumentActionsPanel({
               {/* Release / Submit for Approval */}
               {draftDocument.is_production ? (
                 // Production documents always need approval
-                draftDocument.approvers?.length > 0 ? (
+                (draftDocument.approvers?.length ?? 0) > 0 ? (
                   <SubmitForApprovalButton 
                     documentId={draftDocument.id}
                     documentNumber={draftDocument.document_number}
-                    approverCount={draftDocument.approvers.length}
+                    approverCount={draftDocument.approvers?.length ?? 0}
                   />
                 ) : (
                   <Button
@@ -232,11 +232,11 @@ export default function DocumentActionsPanel({
                 )
               ) : (
                 // Prototype documents - Release or Submit
-                draftDocument.approvers?.length > 0 ? (
+                (draftDocument.approvers?.length ?? 0) > 0 ? (
                   <SubmitForApprovalButton 
                     documentId={draftDocument.id}
                     documentNumber={draftDocument.document_number}
-                    approverCount={draftDocument.approvers.length}
+                    approverCount={draftDocument.approvers?.length ?? 0}
                   />
                 ) : (
                   <ReleaseDocumentButton 
