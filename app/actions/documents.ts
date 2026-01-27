@@ -989,6 +989,7 @@ export async function releaseDocument(documentId: string) {
             action: 'document_obsoleted',
             performed_by: user.id,
             performed_by_email: user.email,
+            tenant_id: predecessor.tenant_id,
             details: {
               document_number: `${predecessor.document_number}${predecessor.version}`,
               obsoleted_by_version: document.version,
@@ -1005,6 +1006,7 @@ export async function releaseDocument(documentId: string) {
         action: 'released',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: document.tenant_id,
         details: { 
           document_number: `${document.document_number}${document.version}` 
         },

@@ -268,9 +268,18 @@ export async function removeApprover(documentId: string, approverId: string) {
       .from('approvers')
       .select('user_email')
       .eq('id', approverId)
-      .single()
+      .maybeSingle()
 
-    // Remove approver
+    if (!approver) {
+      logger.warn('Approver not found for removal', {
+        userId,
+        documentId,
+        approverId,
+      })
+      return { success: false, error: 'Approver not found' }
+    }
+
+    // Remove approver - use regular client (RLS should allow creator to delete)
     const { error: deleteError } = await supabase
       .from('approvers')
       .delete()
@@ -286,29 +295,44 @@ export async function removeApprover(documentId: string, approverId: string) {
       return { success: false, error: 'Failed to remove approver' }
     }
 
+    // Verify deletion succeeded
+    const { data: stillExists } = await supabase
+      .from('approvers')
+      .select('id')
+      .eq('id', approverId)
+      .maybeSingle()
+
+    if (stillExists) {
+      logger.error('Approver still exists after delete attempt', {
+        userId,
+        documentId,
+        approverId,
+      })
+      return { success: false, error: 'Failed to remove approver - still exists' }
+    }
+
     logger.info('Approver removed successfully', {
       userId,
       documentId,
       approverId,
-      approverEmail: approver?.user_email,
+      approverEmail: approver.user_email,
     })
 
     // Create audit log
-    if (approver) {
-      await supabase
-        .from('audit_log')
-        .insert({
-          document_id: documentId,
-          action: 'approver_removed',
-          performed_by: user.id,
-          performed_by_email: user.email,
-          details: { 
-            approver_email: approver.user_email 
-          }
-        })
-    }
+    await supabase
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        action: 'approver_removed',
+        performed_by: user.id,
+        performed_by_email: user.email,
+        details: { 
+          approver_email: approver.user_email 
+        }
+      })
 
     revalidatePath(`/documents/${documentId}`)
+    revalidatePath('/documents')
     
     const duration = Date.now() - startTime
     logServerAction('removeApprover', {
