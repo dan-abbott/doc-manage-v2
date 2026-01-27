@@ -21,12 +21,14 @@ interface SubmitForApprovalButtonProps {
   documentId: string
   documentNumber: string
   approverCount: number
+  fileCount?: number
 }
 
 export default function SubmitForApprovalButton({ 
   documentId, 
   documentNumber,
-  approverCount 
+  approverCount,
+  fileCount = 0
 }: SubmitForApprovalButtonProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
@@ -75,6 +77,11 @@ export default function SubmitForApprovalButton({
                 This document will be reviewed by <span className="font-medium">{approverCount}</span> approver{approverCount > 1 ? 's' : ''}. 
                 You will not be able to edit it until approval is complete.
               </p>
+              {fileCount === 0 && (
+                <p className="text-amber-600 font-medium mt-2">
+                  ⚠️ Note: This document has no files attached.
+                </p>
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

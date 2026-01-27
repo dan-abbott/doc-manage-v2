@@ -61,7 +61,6 @@ export default function ApprovalsListClient({ approvals }: { approvals: any[] })
 
   const handleApprovalClick = (approval: any) => {
     if (approval.status === 'Pending' && approval.document?.status === 'In Approval') {
-      console.log('Opening approval modal with document:', approval.document)
       setSelectedApproval(approval)
       setModalOpen(true)
     }

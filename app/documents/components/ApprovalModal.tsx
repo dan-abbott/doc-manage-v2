@@ -105,11 +105,6 @@ export default function ApprovalModal({
     onOpenChange(false)
   }
 
-  // Debug: Log document data
-  console.log('ApprovalModal document:', document)
-  console.log('Document files:', document.document_files)
-  console.log('Document description:', document.description)
-
   return (
     <AlertDialog open={open} onOpenChange={handleClose}>
       <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
@@ -142,12 +137,15 @@ export default function ApprovalModal({
 
           {/* Document Details */}
           <div className="space-y-3">
-            {document.description && (
-              <div>
-                <Label className="text-sm font-medium">Description</Label>
+            {/* Description */}
+            <div>
+              <Label className="text-sm font-medium">Description</Label>
+              {document.description ? (
                 <p className="text-sm text-gray-700 mt-1">{document.description}</p>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-gray-500 italic mt-1">No description provided</p>
+              )}
+            </div>
 
             {document.project_code && (
               <div>
@@ -157,9 +155,11 @@ export default function ApprovalModal({
             )}
 
             {/* Attached Files */}
-            {document.document_files && document.document_files.length > 0 && (
-              <div>
-                <Label className="text-sm font-medium">Attached Files ({document.document_files.length})</Label>
+            <div>
+              <Label className="text-sm font-medium">
+                Attached Files ({document.document_files?.length || 0})
+              </Label>
+              {document.document_files && document.document_files.length > 0 ? (
                 <div className="mt-2 space-y-1">
                   {document.document_files.map((file) => (
                     <div key={file.id} className="text-sm text-gray-700 flex items-center gap-2">
@@ -171,8 +171,10 @@ export default function ApprovalModal({
                     </div>
                   ))}
                 </div>
-              </div>
-            )}
+              ) : (
+                <p className="text-sm text-gray-500 italic mt-2">No files attached</p>
+              )}
+            </div>
           </div>
 
           {/* Approve/Reject Forms */}
@@ -230,6 +232,14 @@ export default function ApprovalModal({
 
           {!showRejectForm ? (
             <>
+              <Button
+                variant="outline"
+                onClick={handleClose}
+                disabled={isSubmitting}
+                className="w-full sm:w-auto"
+              >
+                Cancel
+              </Button>
               <Button
                 variant="outline"
                 onClick={() => setShowRejectForm(true)}

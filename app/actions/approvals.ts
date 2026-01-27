@@ -633,6 +633,7 @@ export async function approveDocument(documentId: string, comments?: string) {
         action: 'approved',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: document.tenant_id,
         details: { 
           document_number: `${document.document_number}${document.version}`,
           comments: cleanComments
@@ -909,6 +910,7 @@ export async function rejectDocument(documentId: string, rejectionReason: string
         action: 'rejected',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: document.tenant_id,
         details: { 
           document_number: `${document.document_number}${document.version}`,
           rejection_reason: cleanReason

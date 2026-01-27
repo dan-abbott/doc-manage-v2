@@ -201,6 +201,7 @@ export default function DocumentActionsPanel({
                     documentId={draftDocument.id}
                     documentNumber={draftDocument.document_number}
                     approverCount={draftDocument.approvers?.length ?? 0}
+                    fileCount={draftDocument.document_files?.length ?? 0}
                   />
                 ) : (
                   <Button
@@ -219,11 +220,14 @@ export default function DocumentActionsPanel({
                     documentId={draftDocument.id}
                     documentNumber={draftDocument.document_number}
                     approverCount={draftDocument.approvers?.length ?? 0}
+                    fileCount={draftDocument.document_files?.length ?? 0}
                   />
                 ) : (
                   <ReleaseDocumentButton 
                     documentId={draftDocument.id} 
                     isProduction={draftDocument.is_production}
+                    documentNumber={`${draftDocument.document_number}${draftDocument.version}`}
+                    fileCount={draftDocument.document_files?.length ?? 0}
                   />
                 )
               )}
