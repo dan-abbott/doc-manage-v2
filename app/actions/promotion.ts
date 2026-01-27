@@ -150,79 +150,71 @@ export async function promoteToProduction(
 
     // Handle existing draft based on mode
     if (mode === 'discard' || mode === 'convert') {
-      // Find existing draft
+      // Find existing prototype draft
       const { data: existingDraft } = await supabase
         .from('documents')
-        .select('id')
+        .select('id, version, tenant_id')
         .eq('document_number', prototypeDoc.document_number)
         .eq('status', 'Draft')
         .eq('is_production', false)
         .maybeSingle()
 
-      if (!existingDraft && mode === 'convert' && draftId) {
-        // Use provided draftId for convert mode
-        const { data: specificDraft } = await supabase
+      if (mode === 'convert' && existingDraft) {
+        // Convert this draft to production
+        const supabaseAdmin = createServiceRoleClient()
+        const { error: updateError } = await supabaseAdmin
           .from('documents')
-          .select('id')
-          .eq('id', draftId)
-          .single()
-        
-        if (specificDraft) {
-          // Convert this draft to production
-          const supabaseAdmin = createServiceRoleClient()
-          const { error: updateError } = await supabaseAdmin
-            .from('documents')
-            .update({ 
-              is_production: true,
-              version: 'v1'
-            })
-            .eq('id', draftId)
+          .update({ 
+            is_production: true,
+            version: 'v1'
+          })
+          .eq('id', existingDraft.id)
 
-          if (updateError) {
-            logger.error('Failed to convert draft to production', {
-              userId,
-              draftId,
-              error: updateError
-            })
-            throw updateError
-          }
-
-          logger.info('Converted draft to production', {
+        if (updateError) {
+          logger.error('Failed to convert draft to production', {
             userId,
-            draftId,
-            documentNumber: prototypeDoc.document_number
+            draftId: existingDraft.id,
+            error: updateError
+          })
+          throw updateError
+        }
+
+        logger.info('Converted draft to production', {
+          userId,
+          draftId: existingDraft.id,
+          documentNumber: prototypeDoc.document_number
+        })
+
+        // Create audit log
+        await supabaseAdmin
+          .from('audit_log')
+          .insert({
+            document_id: existingDraft.id,
+            action: 'converted_to_production',
+            performed_by: userId,
+            performed_by_email: userEmail || '',
+            tenant_id: existingDraft.tenant_id,
+            details: {
+              source_prototype_id: prototypeDocumentId,
+              document_number: prototypeDoc.document_number,
+              previous_version: existingDraft.version,
+              conversion_date: new Date().toISOString()
+            }
           })
 
-          // Create audit log
-          await supabaseAdmin
-            .from('audit_log')
-            .insert({
-              document_id: draftId,
-              action: 'converted_to_production',
-              performed_by: userId,
-              performed_by_email: userEmail || '',
-              tenant_id: prototypeDoc.tenant_id,
-              details: {
-                source_prototype_id: prototypeDocumentId,
-                document_number: prototypeDoc.document_number,
-                conversion_date: new Date().toISOString()
-              }
-            })
+        revalidatePath('/documents')
+        revalidatePath(`/documents/${prototypeDocumentId}`)
+        revalidatePath(`/documents/${existingDraft.id}`)
 
-          revalidatePath('/documents')
-          revalidatePath(`/documents/${prototypeDocumentId}`)
-          revalidatePath(`/documents/${draftId}`)
-
-          return {
-            success: true,
-            documentNumber: prototypeDoc.document_number,
-            documentId: draftId,
-            data: specificDraft
-          }
+        return {
+          success: true,
+          documentNumber: prototypeDoc.document_number,
+          documentId: existingDraft.id,
+          data: { id: existingDraft.id }
         }
       }
 
-      if (existingDraft && mode === 'discard') {
+      if (mode === 'discard' && existingDraft) {
         // Delete the existing draft
         const { error: deleteError } = await supabase
           .from('documents')
@@ -238,6 +230,13 @@ export async function promoteToProduction(
           // Continue anyway - we'll create a new one
         } else {
           logger.info('Deleted existing draft before promotion', {
+            userId,
+            draftId: existingDraft.id,
+            documentNumber: prototypeDoc.document_number
+          })
+        }
+      }
+    }
             userId,
             draftId: existingDraft.id,
             documentNumber: prototypeDoc.document_number

@@ -129,21 +129,27 @@ export default function PromoteToProductionButton({
               <p className="font-medium text-foreground mt-3">Choose an option:</p>
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
-            <AlertDialogCancel disabled={isPromoting}>Cancel</AlertDialogCancel>
-            <Button
-              variant="outline"
-              onClick={handleDiscardAndPromote}
-              disabled={isPromoting}
-            >
-              {isPromoting ? 'Processing...' : 'Discard Draft & Create New'}
-            </Button>
-            <Button
-              onClick={handleConvertDraft}
-              disabled={isPromoting}
-            >
-              {isPromoting ? 'Processing...' : 'Convert to Production Draft'}
-            </Button>
+          <AlertDialogFooter className="sm:flex-col sm:space-y-2 gap-2">
+            <div className="flex flex-col sm:flex-row gap-2 w-full">
+              <Button
+                variant="outline"
+                onClick={handleDiscardAndPromote}
+                disabled={isPromoting}
+                className="flex-1"
+              >
+                {isPromoting ? 'Processing...' : 'Discard Draft & Create New'}
+              </Button>
+              <Button
+                onClick={handleConvertDraft}
+                disabled={isPromoting}
+                className="flex-1"
+              >
+                {isPromoting ? 'Processing...' : 'Convert to Production Draft'}
+              </Button>
+            </div>
+            <AlertDialogCancel disabled={isPromoting} className="w-full sm:w-auto">
+              Cancel
+            </AlertDialogCancel>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
