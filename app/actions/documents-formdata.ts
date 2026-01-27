@@ -90,7 +90,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
         // We've already verified ownership above, so this is safe
         const supabaseAdmin = createServiceRoleClient()
         
-        // Create file record
+        // Create file record with tenant_id
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
@@ -101,6 +101,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
             file_size: file.size,
             mime_type: file.type,
             uploaded_by: user.id,
+            tenant_id: document.tenant_id, // Include tenant_id from document
           })
           .select()
 
