@@ -152,6 +152,40 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
             )}
           </div>
 
+          {/* Rejection Notice (for Draft versions with rejected approvers) */}
+          {version.status === 'Draft' && approvers.some((a: any) => a.status === 'Rejected') && (
+            <div className="pt-4 border-t">
+              {approvers
+                .filter((a: any) => a.status === 'Rejected')
+                .map((rejectedApprover: any) => (
+                  <div key={rejectedApprover.id} className="p-4 bg-red-50 border border-red-200 rounded-lg mb-4">
+                    <div className="flex items-start gap-2">
+                      <div className="flex-1">
+                        <p className="font-medium text-red-900 mb-1">Document Rejected</p>
+                        <p className="text-sm text-red-800 mb-2">
+                          Rejected by: {rejectedApprover.user_email}
+                        </p>
+                        {rejectedApprover.comments && (
+                          <div className="mt-2 p-3 bg-white border border-red-200 rounded">
+                            <p className="text-sm font-medium text-gray-700 mb-1">Rejection Reason:</p>
+                            <p className="text-sm text-gray-900">{rejectedApprover.comments}</p>
+                          </div>
+                        )}
+                        {rejectedApprover.action_date && (
+                          <p className="text-xs text-red-700 mt-2" suppressHydrationWarning>
+                            Rejected on {formatDate(rejectedApprover.action_date)}
+                          </p>
+                        )}
+                        <p className="text-sm text-red-700 mt-2">
+                          Please review the feedback, make necessary changes, and resubmit for approval.
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+
           {/* Approver Management (for Draft versions) */}
           {version.status === 'Draft' && (isCreator || isAdmin) && (
             <div className="pt-4 border-t">
