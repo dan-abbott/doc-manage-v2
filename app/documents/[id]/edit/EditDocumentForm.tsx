@@ -137,6 +137,15 @@ export default function EditDocumentForm({ document, availableUsers }: EditDocum
     try {
       setIsSubmitting(true)
 
+      // Convert files array to plain data that can be serialized
+      const fileData = files.map(f => ({
+        name: f.name,
+        size: f.size,
+        type: f.type
+      }))
+      
+      console.log('Submitting with files:', fileData)
+
       const result = await updateDocument(document.id, {
         title,
         description,
@@ -145,7 +154,8 @@ export default function EditDocumentForm({ document, availableUsers }: EditDocum
 
       if (result.success) {
         toast.success('Document updated successfully')
-        router.push(`/documents/${document.id}`)
+        router.push(`/documents?selected=${document.document_number}&version=${document.version}`)
+        router.refresh()
       } else {
         toast.error(result.error || 'Failed to update document')
       }
