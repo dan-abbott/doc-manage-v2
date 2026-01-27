@@ -9,6 +9,7 @@ import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 const ApproverManagement = dynamic(() => import('./components/ApproverManagement'), { ssr: false })
 
@@ -193,6 +194,8 @@ export default function DocumentDetailPanel({
   currentUserId,
   currentUserEmail
 }: DocumentDetailPanelProps) {
+  const router = useRouter()
+  const searchParams = useSearchParams()
   const { latestReleased, wipVersions, documentNumber, title } = documentData
   
   // Determine default tab based on selected version
@@ -203,6 +206,14 @@ export default function DocumentDetailPanel({
   // Check if current user is creator of any version
   const isCreator = latestReleased?.created_by === currentUserId || 
     wipVersions.some(v => v.created_by === currentUserId)
+
+  // Update URL when tab changes
+  const handleTabChange = (tab: 'released' | 'wip') => {
+    setActiveTab(tab)
+    const params = new URLSearchParams(searchParams.toString())
+    params.set('tab', tab)
+    router.replace(`?${params.toString()}`, { scroll: false })
+  }
 
   return (
     <div className="p-6">
@@ -225,7 +236,7 @@ export default function DocumentDetailPanel({
       <div className="border-b mb-6">
         <div className="flex gap-4">
           <button
-            onClick={() => setActiveTab('released')}
+            onClick={() => handleTabChange('released')}
             className={cn(
               "pb-2 px-1 border-b-2 font-medium text-sm transition-colors",
               activeTab === 'released' 
@@ -236,7 +247,7 @@ export default function DocumentDetailPanel({
             Released Version
           </button>
           <button
-            onClick={() => setActiveTab('wip')}
+            onClick={() => handleTabChange('wip')}
             className={cn(
               "pb-2 px-1 border-b-2 font-medium text-sm transition-colors",
               activeTab === 'wip' 

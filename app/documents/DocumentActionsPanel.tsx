@@ -14,6 +14,7 @@ import SubmitForApprovalButton from './components/SubmitForApprovalButton'
 import DeleteDocumentButton from './components/DeleteDocumentButton'
 import CreateNewVersionButton from './components/CreateNewVersionButton'
 import PromoteToProductionButton from './components/PromoteToProductionButton'
+import { useSearchParams } from 'next/navigation'
 
 // Dynamically import components
 const ApprovalWorkflow = dynamic(() => import('./components/ApprovalWorkflow'), { ssr: false })
@@ -94,6 +95,9 @@ export default function DocumentActionsPanel({
   currentUserId,
   currentUserEmail
 }: DocumentActionsPanelProps) {
+  const searchParams = useSearchParams()
+  const activeTab = (searchParams.get('tab') as 'released' | 'wip') || 'released'
+  
   const [mounted, setMounted] = useState(false)
 
   useEffect(() => {
@@ -116,6 +120,10 @@ export default function DocumentActionsPanel({
   // Check if there's a draft version (WIP)
   const hasDraft = wipVersions.length > 0
   const draftDocument = wipVersions[0]
+  
+  // Determine which buttons to show based on active tab
+  const showingReleasedTab = activeTab === 'released'
+  const showingWIPTab = activeTab === 'wip'
   
   // Determine button visibility
   const canEdit = (isCreator || isAdmin) && primaryDocument.status === 'Draft'
@@ -158,8 +166,30 @@ export default function DocumentActionsPanel({
       {/* Primary Actions */}
       <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary">
         <div className="grid grid-cols-2 gap-2">
-          {/* SCENARIO 1: Draft exists - show WIP actions */}
-          {hasDraft && draftDocument && (isCreator || isAdmin) && (
+          {/* RELEASED TAB: Show Released version actions */}
+          {showingReleasedTab && latestReleased && (isCreator || isAdmin) && (
+            <>
+              {/* New Version Button */}
+              <CreateNewVersionButton
+                documentId={latestReleased.id}
+                documentNumber={latestReleased.document_number}
+                version={latestReleased.version}
+                isProduction={latestReleased.is_production}
+              />
+              
+              {/* Promote to Production - Only for Prototype */}
+              {!latestReleased.is_production && (
+                <PromoteToProductionButton
+                  documentId={latestReleased.id}
+                  documentNumber={latestReleased.document_number}
+                  version={latestReleased.version}
+                />
+              )}
+            </>
+          )}
+
+          {/* WIP TAB: Show draft actions if draft exists */}
+          {showingWIPTab && hasDraft && draftDocument && (isCreator || isAdmin) && (
             <>
               {/* Release / Submit for Approval */}
               {draftDocument.is_production ? (
@@ -201,34 +231,22 @@ export default function DocumentActionsPanel({
             </>
           )}
 
-          {/* SCENARIO 2: No draft, Released version exists - show Released tab actions */}
-          {!hasDraft && latestReleased && (isCreator || isAdmin) && (
-            <>
-              {/* New Version Button */}
-              <CreateNewVersionButton
-                documentId={latestReleased.id}
-                documentNumber={latestReleased.document_number}
-                version={latestReleased.version}
-                isProduction={latestReleased.is_production}
-              />
-              
-              {/* Promote to Production - Only for Prototype */}
-              {canPromoteToProduction && (
-                <PromoteToProductionButton
-                  documentId={latestReleased.id}
-                  documentNumber={latestReleased.document_number}
-                  version={latestReleased.version}
-                />
-              )}
-            </>
+          {/* WIP TAB: Show New Version if no draft */}
+          {showingWIPTab && !hasDraft && latestReleased && (isCreator || isAdmin) && (
+            <CreateNewVersionButton
+              documentId={latestReleased.id}
+              documentNumber={latestReleased.document_number}
+              version={latestReleased.version}
+              isProduction={latestReleased.is_production}
+            />
           )}
 
           {/* No actions available */}
-          {!hasDraft && !latestReleased && (
+          {(showingReleasedTab && !latestReleased) || (showingWIPTab && !hasDraft && !latestReleased) ? (
             <p className="text-sm text-gray-500 text-center py-4 col-span-2">
               No actions available
             </p>
-          )}
+          ) : null}
         </div>
       </CollapsibleSection>
 
