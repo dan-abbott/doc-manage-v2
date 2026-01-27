@@ -61,6 +61,7 @@ export default function ApprovalsListClient({ approvals }: { approvals: any[] })
 
   const handleApprovalClick = (approval: any) => {
     if (approval.status === 'Pending' && approval.document?.status === 'In Approval') {
+      console.log('Opening approval modal with document:', approval.document)
       setSelectedApproval(approval)
       setModalOpen(true)
     }
@@ -117,7 +118,7 @@ export default function ApprovalsListClient({ approvals }: { approvals: any[] })
                           {approval.document.project_code && (
                             <span>Project: {approval.document.project_code}</span>
                           )}
-                          <span>Submitted: {formatDate(approval.created_at)}</span>
+                          <span suppressHydrationWarning>Submitted: {formatDate(approval.created_at)}</span>
                         </div>
                       </div>
 
@@ -178,7 +179,7 @@ export default function ApprovalsListClient({ approvals }: { approvals: any[] })
                         
                         <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-600 mt-2">
                           {approval.action_date && (
-                            <span>
+                            <span suppressHydrationWarning>
                               {approval.status === 'Approved' ? 'Approved' : 'Rejected'}: {formatDate(approval.action_date)}
                             </span>
                           )}

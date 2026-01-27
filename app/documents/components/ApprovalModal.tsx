@@ -105,6 +105,11 @@ export default function ApprovalModal({
     onOpenChange(false)
   }
 
+  // Debug: Log document data
+  console.log('ApprovalModal document:', document)
+  console.log('Document files:', document.document_files)
+  console.log('Document description:', document.description)
+
   return (
     <AlertDialog open={open} onOpenChange={handleClose}>
       <AlertDialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
