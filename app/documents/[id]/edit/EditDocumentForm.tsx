@@ -8,7 +8,8 @@ import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FileUpload } from '@/components/documents/FileUpload'
 import { toast } from 'sonner'
-import { updateDocument, deleteFile } from '@/app/actions/documents'
+import { updateDocumentWithFiles } from '@/app/actions/documents-formdata'
+import { deleteFile } from '@/app/actions/documents'
 import { addApprover, removeApprover } from '@/app/actions/approvals'
 import { Trash2, FileText, X, UserPlus } from 'lucide-react'
 
@@ -137,29 +138,30 @@ export default function EditDocumentForm({ document, availableUsers }: EditDocum
     try {
       setIsSubmitting(true)
 
-      // Convert files array to plain data that can be serialized
-      const fileData = files.map(f => ({
-        name: f.name,
-        size: f.size,
-        type: f.type
-      }))
+      // Create FormData for proper file handling
+      const formData = new FormData()
+      formData.append('documentId', document.id)
+      formData.append('title', title)
+      formData.append('description', description)
+      if (projectCode) {
+        formData.append('projectCode', projectCode.toUpperCase())
+      }
       
-      console.log('Submitting with files:', fileData)
+      // Append all files
+      files.forEach(file => {
+        formData.append('files', file)
+      })
 
-      const result = await updateDocument(document.id, {
-        title,
-        description,
-        project_code: projectCode ? projectCode.toUpperCase() : null,
-      }, files)
+      const result = await updateDocumentWithFiles(formData)
 
       if (result.success) {
         toast.success('Document updated successfully')
-        router.push(`/documents?selected=${document.document_number}&version=${document.version}`)
+        router.push(`/documents?selected=${result.documentNumber}&version=${result.version}`)
         router.refresh()
       } else {
         toast.error(result.error || 'Failed to update document')
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error('Update error:', error)
       toast.error('An unexpected error occurred')
     } finally {
