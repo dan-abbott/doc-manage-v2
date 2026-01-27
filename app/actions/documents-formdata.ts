@@ -57,15 +57,19 @@ export async function updateDocumentWithFiles(formData: FormData) {
     const files = formData.getAll('files') as File[]
     
     if (files.length > 0) {
+      console.log(`Uploading ${files.length} files for document ${documentId}`)
+      
       for (const file of files) {
         if (file.size === 0) continue // Skip empty files
+
+        console.log(`Processing file: ${file.name}, size: ${file.size}`)
 
         // Generate unique file name
         const fileExt = file.name.split('.').pop()
         const fileName = `${documentId}/${Date.now()}-${file.name}`
 
         // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
+        const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
           .upload(fileName, file, {
             contentType: file.type,
@@ -74,19 +78,37 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         if (uploadError) {
           console.error('File upload error:', uploadError)
-          continue
+          return { 
+            success: false, 
+            error: `Failed to upload file ${file.name}: ${uploadError.message}` 
+          }
         }
 
+        console.log('File uploaded to storage:', fileName)
+
         // Create file record
-        await supabase.from('document_files').insert({
-          document_id: documentId,
-          file_name: `${document.document_number}${document.version}_${file.name}`,
-          original_file_name: file.name,
-          file_path: fileName,
-          file_size: file.size,
-          mime_type: file.type,
-          uploaded_by: user.id,
-        })
+        const { data: fileRecord, error: fileError } = await supabase
+          .from('document_files')
+          .insert({
+            document_id: documentId,
+            file_name: `${document.document_number}${document.version}_${file.name}`,
+            original_file_name: file.name,
+            file_path: fileName,
+            file_size: file.size,
+            mime_type: file.type,
+            uploaded_by: user.id,
+          })
+          .select()
+
+        if (fileError) {
+          console.error('File record creation error:', fileError)
+          return { 
+            success: false, 
+            error: `Failed to save file metadata for ${file.name}: ${fileError.message}` 
+          }
+        }
+
+        console.log('File record created:', fileRecord)
       }
     }
 
