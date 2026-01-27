@@ -48,7 +48,7 @@ export default function DeleteDocumentButton({ documentId }: DeleteDocumentButto
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive" className="w-full">
+        <Button variant="destructive">
           <Trash2 className="mr-2 h-4 w-4" />
           Delete Draft
         </Button>

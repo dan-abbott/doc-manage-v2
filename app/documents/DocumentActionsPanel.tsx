@@ -157,56 +157,12 @@ export default function DocumentActionsPanel({
     <div className="p-6 space-y-4">
       {/* Primary Actions */}
       <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary">
-        <div className="space-y-3">
-          {/* RELEASED TAB ACTIONS */}
-          {latestReleased && !hasDraft && (
-            <>
-              {/* New Version Button - Always show for Released */}
-              <CreateNewVersionButton
-                documentId={latestReleased.id}
-                documentNumber={latestReleased.document_number}
-                version={latestReleased.version}
-                isProduction={latestReleased.is_production}
-              />
-              
-              {/* Promote to Production - Only for Prototype */}
-              {canPromoteToProduction && (
-                <PromoteToProductionButton
-                  documentId={latestReleased.id}
-                  documentNumber={latestReleased.document_number}
-                  version={latestReleased.version}
-                />
-              )}
-            </>
-          )}
-
-          {/* RELEASED TAB - Draft Exists (show disabled) */}
-          {latestReleased && hasDraft && (isCreator || isAdmin) && (
-            <>
-              <Button
-                disabled
-                className="w-full opacity-50 cursor-not-allowed"
-                title="A draft version already exists. Complete or delete it before creating a new version."
-              >
-                New Version
-              </Button>
-              
-              {/* Promote to Production - Only for Prototype */}
-              {canPromoteToProduction && (
-                <PromoteToProductionButton
-                  documentId={latestReleased.id}
-                  documentNumber={latestReleased.document_number}
-                  version={latestReleased.version}
-                />
-              )}
-            </>
-          )}
-
-          {/* WIP TAB ACTIONS - Draft exists */}
+        <div className="grid grid-cols-2 gap-2">
+          {/* SCENARIO 1: Draft exists - show WIP actions */}
           {hasDraft && draftDocument && (isCreator || isAdmin) && (
             <>
               {/* Edit Draft */}
-              <Button asChild className="w-full">
+              <Button asChild className="col-span-2">
                 <Link href={`/documents/${draftDocument.id}/edit`}>
                   Edit Draft
                 </Link>
@@ -224,7 +180,7 @@ export default function DocumentActionsPanel({
                 ) : (
                   <Button
                     disabled
-                    className="w-full opacity-50 cursor-not-allowed"
+                    className="opacity-50 cursor-not-allowed"
                     title="Production documents require at least one approver. Assign approvers in the Work In Progress tab."
                   >
                     Send for Approval
@@ -251,19 +207,31 @@ export default function DocumentActionsPanel({
             </>
           )}
 
-          {/* WIP TAB - No Draft, but can create version */}
-          {!hasDraft && latestReleased && latestReleased.status === 'Released' && (isCreator || isAdmin) && (
-            <CreateNewVersionButton
-              documentId={latestReleased.id}
-              documentNumber={latestReleased.document_number}
-              version={latestReleased.version}
-              isProduction={latestReleased.is_production}
-            />
+          {/* SCENARIO 2: No draft, Released version exists - show Released tab actions */}
+          {!hasDraft && latestReleased && (isCreator || isAdmin) && (
+            <>
+              {/* New Version Button */}
+              <CreateNewVersionButton
+                documentId={latestReleased.id}
+                documentNumber={latestReleased.document_number}
+                version={latestReleased.version}
+                isProduction={latestReleased.is_production}
+              />
+              
+              {/* Promote to Production - Only for Prototype */}
+              {canPromoteToProduction && (
+                <PromoteToProductionButton
+                  documentId={latestReleased.id}
+                  documentNumber={latestReleased.document_number}
+                  version={latestReleased.version}
+                />
+              )}
+            </>
           )}
 
           {/* No actions available */}
-          {!canEdit && !canRelease && !canSubmitForApproval && !canCreateNewVersion && !canPromoteToProduction && !canDelete && !hasDraft && (
-            <p className="text-sm text-gray-500 text-center py-4">
+          {!hasDraft && !latestReleased && (
+            <p className="text-sm text-gray-500 text-center py-4 col-span-2">
               No actions available
             </p>
           )}
