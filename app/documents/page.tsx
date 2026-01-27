@@ -145,7 +145,6 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
       .from('users')
       .select('id, email, full_name')
       .neq('id', user.id)
-      .eq('tenant_id', user.user_metadata?.tenant_id || 'app')
       .order('email')
     
     availableUsers = users || []
