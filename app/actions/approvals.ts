@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { logger } from '@/lib/logger'
 import { logError, logServerAction, logApproval } from '@/lib/utils/logging-helpers'
@@ -70,7 +70,7 @@ export async function addApprover(documentId: string, userId: string, userEmail:
     // Check document ownership and status
     const { data: document, error: docError } = await supabase
       .from('documents')
-      .select('id, created_by, status')
+      .select('id, created_by, status, tenant_id')
       .eq('id', documentId)
       .single()
 
@@ -118,14 +118,18 @@ export async function addApprover(documentId: string, userId: string, userEmail:
       return { success: false, error: 'This user is already an approver' }
     }
 
+    // Use service role client to bypass RLS (we've already verified permissions above)
+    const supabaseAdmin = createServiceRoleClient()
+
     // Add approver
-    const { error: insertError } = await supabase
+    const { error: insertError } = await supabaseAdmin
       .from('approvers')
       .insert({
         document_id: documentId,
         user_id: userId,
         user_email: cleanEmail,
-        status: 'Pending'
+        status: 'Pending',
+        tenant_id: document.tenant_id
       })
 
     if (insertError) {
@@ -146,7 +150,7 @@ export async function addApprover(documentId: string, userId: string, userEmail:
     })
 
     // Create audit log
-    await supabase
+    await supabaseAdmin
       .from('audit_log')
       .insert({
         document_id: documentId,
@@ -155,7 +159,8 @@ export async function addApprover(documentId: string, userId: string, userEmail:
         performed_by_email: user.email,
         details: { 
           approver_email: cleanEmail 
-        }
+        },
+        tenant_id: document.tenant_id
       })
 
     revalidatePath(`/documents/${documentId}`)
