@@ -1,6 +1,6 @@
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 
 export async function updateDocumentWithFiles(formData: FormData) {
@@ -86,8 +86,12 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         console.log('File uploaded to storage:', fileName)
 
+        // Use service role client to bypass RLS for file insert
+        // We've already verified ownership above, so this is safe
+        const supabaseAdmin = createServiceRoleClient()
+        
         // Create file record
-        const { data: fileRecord, error: fileError } = await supabase
+        const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
             document_id: documentId,
