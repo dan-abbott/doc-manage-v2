@@ -161,13 +161,6 @@ export default function DocumentActionsPanel({
           {/* SCENARIO 1: Draft exists - show WIP actions */}
           {hasDraft && draftDocument && (isCreator || isAdmin) && (
             <>
-              {/* Edit Draft */}
-              <Button asChild className="col-span-2">
-                <Link href={`/documents/${draftDocument.id}/edit`}>
-                  Edit Draft
-                </Link>
-              </Button>
-
               {/* Release / Submit for Approval */}
               {draftDocument.is_production ? (
                 // Production documents always need approval
@@ -180,6 +173,7 @@ export default function DocumentActionsPanel({
                 ) : (
                   <Button
                     disabled
+                    variant="outline"
                     className="opacity-50 cursor-not-allowed"
                     title="Production documents require at least one approver. Assign approvers in the Work In Progress tab."
                   >

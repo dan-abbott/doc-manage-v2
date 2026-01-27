@@ -55,7 +55,7 @@ export default function PromoteToProductionButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="secondary" disabled={isPromoting}>
+        <Button variant="outline" disabled={isPromoting}>
           <ArrowUp className="mr-2 h-4 w-4" />
           Promote to Production
         </Button>

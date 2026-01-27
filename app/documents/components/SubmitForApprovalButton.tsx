@@ -56,7 +56,8 @@ export default function SubmitForApprovalButton({
       <Button
         onClick={() => setShowConfirm(true)}
         disabled={isSubmitting}
-        className="bg-blue-600 hover:bg-blue-700"
+        variant="outline"
+        className="border-blue-200 text-blue-700 hover:bg-blue-50"
       >
         <Send className="h-4 w-4 mr-2" />
         {isSubmitting ? 'Submitting...' : 'Send for Approval'}

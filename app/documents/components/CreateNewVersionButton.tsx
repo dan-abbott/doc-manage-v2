@@ -57,7 +57,7 @@ export default function CreateNewVersionButton({
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button disabled={isCreating}>
+        <Button disabled={isCreating} variant="outline">
           <Plus className="mr-2 h-4 w-4" />
           New Version
         </Button>

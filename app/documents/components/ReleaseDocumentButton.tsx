@@ -48,6 +48,8 @@ export default function ReleaseDocumentButton({
     <Button 
       onClick={handleRelease}
       disabled={isReleasing || isProduction}
+      variant="outline"
+      className="border-green-200 text-green-700 hover:bg-green-50"
     >
       <CheckCircle className="mr-2 h-4 w-4" />
       {isReleasing ? 'Releasing...' : 'Release'}
