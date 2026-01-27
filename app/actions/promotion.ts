@@ -237,13 +237,6 @@ export async function promoteToProduction(
         }
       }
     }
-            userId,
-            draftId: existingDraft.id,
-            documentNumber: prototypeDoc.document_number
-          })
-        }
-      }
-    }
 
     // Use service role client to bypass RLS (we've already verified permissions)
     const supabaseAdmin = createServiceRoleClient()
