@@ -123,7 +123,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
   // Get selected document versions if document_number provided
   let selectedDocumentData = null
   let auditLogs = []
-  let availableUsers = []
+  let availableUsers: any[] = []
 
   if (searchParams.selected) {
     // Import the helper function dynamically
