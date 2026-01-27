@@ -113,25 +113,34 @@ export default function DocumentActionsPanel({
   const approvers = primaryDocument.approvers || []
   const hasApprovers = approvers.length > 0
   
+  // Check if there's a draft version (WIP)
+  const hasDraft = wipVersions.length > 0
+  const draftDocument = wipVersions[0]
+  
   // Determine button visibility
   const canEdit = (isCreator || isAdmin) && primaryDocument.status === 'Draft'
   const canDelete = (isCreator || isAdmin) && primaryDocument.status === 'Draft'
   
+  // Release/Submit buttons - only show if there's a draft
   const canRelease = 
     (isCreator || isAdmin) && 
-    primaryDocument.status === 'Draft' && 
-    !primaryDocument.is_production &&
+    hasDraft &&
+    draftDocument.status === 'Draft' && 
+    !draftDocument.is_production &&
     !hasApprovers
 
   const canSubmitForApproval = 
     (isCreator || isAdmin) && 
-    primaryDocument.status === 'Draft' && 
+    hasDraft &&
+    draftDocument.status === 'Draft' && 
     hasApprovers
 
+  // Create New Version - only if no draft exists
   const canCreateNewVersion = 
     (isCreator || isAdmin) && 
     latestReleased && 
-    latestReleased.status === 'Released'
+    latestReleased.status === 'Released' &&
+    !hasDraft
 
   const canPromoteToProduction = 
     (isCreator || isAdmin) && 
@@ -159,16 +168,16 @@ export default function DocumentActionsPanel({
 
           {canRelease && (
             <ReleaseDocumentButton 
-              documentId={primaryDocument.id} 
-              isProduction={primaryDocument.is_production}
+              documentId={draftDocument.id} 
+              isProduction={draftDocument.is_production}
             />
           )}
 
           {canSubmitForApproval && (
             <SubmitForApprovalButton 
-              documentId={primaryDocument.id}
-              documentNumber={primaryDocument.document_number}
-              approverCount={approvers.length}
+              documentId={draftDocument.id}
+              documentNumber={draftDocument.document_number}
+              approverCount={draftDocument.approvers?.length || 0}
             />
           )}
 
@@ -179,6 +188,17 @@ export default function DocumentActionsPanel({
               version={latestReleased.version}
               isProduction={latestReleased.is_production}
             />
+          )}
+
+          {/* Show disabled button if draft exists */}
+          {!canCreateNewVersion && latestReleased && latestReleased.status === 'Released' && hasDraft && (isCreator || isAdmin) && (
+            <Button
+              disabled
+              className="w-full"
+              title="A draft version already exists. Complete or delete it before creating a new version."
+            >
+              Create New Version (Draft Exists)
+            </Button>
           )}
 
           {canPromoteToProduction && (
