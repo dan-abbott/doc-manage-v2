@@ -255,7 +255,7 @@ export default function DocumentActionsPanel({
       {/* Version History */}
       <CollapsibleSection title="Version History" defaultOpen={true} sectionKey="version-history">
         <div className="space-y-2">
-          {[...allVersions].reverse().map((version) => (
+          {allVersions.map((version) => (
             <div
               key={version.id}
               className={cn(

@@ -85,7 +85,7 @@ export async function fetchDocumentVersions(
     return null
   }
 
-  // Sort versions properly (vA, vB, vC or v1, v2, v3)
+  // Sort versions properly - prototype first (vA, vB, vC), then production (v1, v2, v3)
   const sortedVersions = [...versions].sort((a, b) => {
     const aVersion = a.version.substring(1) // Remove 'v'
     const bVersion = b.version.substring(1)
@@ -94,6 +94,11 @@ export async function fetchDocumentVersions(
     const aIsNumeric = /^\d+$/.test(aVersion)
     const bIsNumeric = /^\d+$/.test(bVersion)
     
+    // If one is prototype and one is production, prototype comes first
+    if (!aIsNumeric && bIsNumeric) return -1
+    if (aIsNumeric && !bIsNumeric) return 1
+    
+    // Both are same type, sort within type
     if (aIsNumeric && bIsNumeric) {
       return parseInt(aVersion) - parseInt(bVersion)
     } else {

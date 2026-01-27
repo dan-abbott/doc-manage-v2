@@ -263,12 +263,23 @@ export async function removeApprover(documentId: string, approverId: string) {
       return { success: false, error: 'Can only remove approvers from Draft documents' }
     }
 
-    // Get approver details before deleting (for audit log)
-    const { data: approver } = await supabase
+    // Get approver details before deleting (for audit log and verification)
+    const { data: approver, error: approverError } = await supabase
       .from('approvers')
-      .select('user_email')
+      .select('user_email, document_id, tenant_id')
       .eq('id', approverId)
+      .eq('document_id', documentId)
       .maybeSingle()
+
+    if (approverError) {
+      logger.error('Error fetching approver for removal', {
+        userId,
+        documentId,
+        approverId,
+        error: approverError,
+      })
+      return { success: false, error: 'Failed to fetch approver' }
+    }
 
     if (!approver) {
       logger.warn('Approver not found for removal', {
