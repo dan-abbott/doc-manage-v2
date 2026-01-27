@@ -48,10 +48,10 @@ export default function ReleaseDocumentButton({
     <Button 
       onClick={handleRelease}
       disabled={isReleasing || isProduction}
-      className="w-full sm:w-auto"
+      className="w-full"
     >
       <CheckCircle className="mr-2 h-4 w-4" />
-      {isReleasing ? 'Releasing...' : 'Release Document'}
+      {isReleasing ? 'Releasing...' : 'Release'}
     </Button>
   )
 }

@@ -48,16 +48,16 @@ export default function DeleteDocumentButton({ documentId }: DeleteDocumentButto
   return (
     <AlertDialog>
       <AlertDialogTrigger asChild>
-        <Button variant="destructive">
+        <Button variant="destructive" className="w-full">
           <Trash2 className="mr-2 h-4 w-4" />
-          Delete
+          Delete Draft
         </Button>
       </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
-          <AlertDialogTitle>Are you sure?</AlertDialogTitle>
+          <AlertDialogTitle>Delete Draft?</AlertDialogTitle>
           <AlertDialogDescription>
-            This action cannot be undone. This will permanently delete the document
+            This action cannot be undone. This will permanently delete the draft document
             and all its attached files.
           </AlertDialogDescription>
         </AlertDialogHeader>
@@ -68,7 +68,7 @@ export default function DeleteDocumentButton({ documentId }: DeleteDocumentButto
             disabled={isDeleting}
             className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
           >
-            {isDeleting ? 'Deleting...' : 'Delete Document'}
+            {isDeleting ? 'Deleting...' : 'Delete Draft'}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

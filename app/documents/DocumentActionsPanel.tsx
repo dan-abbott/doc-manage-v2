@@ -157,31 +157,102 @@ export default function DocumentActionsPanel({
     <div className="p-6 space-y-4">
       {/* Primary Actions */}
       <CollapsibleSection title="Primary Actions" defaultOpen={true} sectionKey="primary">
-        <div className="space-y-2">
-          {canEdit && (
-            <Button asChild className="w-full">
-              <Link href={`/documents/${primaryDocument.id}/edit`}>
-                Edit Document
-              </Link>
-            </Button>
+        <div className="space-y-3">
+          {/* RELEASED TAB ACTIONS */}
+          {latestReleased && !hasDraft && (
+            <>
+              {/* New Version Button - Always show for Released */}
+              <CreateNewVersionButton
+                documentId={latestReleased.id}
+                documentNumber={latestReleased.document_number}
+                version={latestReleased.version}
+                isProduction={latestReleased.is_production}
+              />
+              
+              {/* Promote to Production - Only for Prototype */}
+              {canPromoteToProduction && (
+                <PromoteToProductionButton
+                  documentId={latestReleased.id}
+                  documentNumber={latestReleased.document_number}
+                  version={latestReleased.version}
+                />
+              )}
+            </>
           )}
 
-          {canRelease && (
-            <ReleaseDocumentButton 
-              documentId={draftDocument.id} 
-              isProduction={draftDocument.is_production}
-            />
+          {/* RELEASED TAB - Draft Exists (show disabled) */}
+          {latestReleased && hasDraft && (isCreator || isAdmin) && (
+            <>
+              <Button
+                disabled
+                className="w-full opacity-50 cursor-not-allowed"
+                title="A draft version already exists. Complete or delete it before creating a new version."
+              >
+                New Version
+              </Button>
+              
+              {/* Promote to Production - Only for Prototype */}
+              {canPromoteToProduction && (
+                <PromoteToProductionButton
+                  documentId={latestReleased.id}
+                  documentNumber={latestReleased.document_number}
+                  version={latestReleased.version}
+                />
+              )}
+            </>
           )}
 
-          {canSubmitForApproval && (
-            <SubmitForApprovalButton 
-              documentId={draftDocument.id}
-              documentNumber={draftDocument.document_number}
-              approverCount={draftDocument.approvers?.length || 0}
-            />
+          {/* WIP TAB ACTIONS - Draft exists */}
+          {hasDraft && draftDocument && (isCreator || isAdmin) && (
+            <>
+              {/* Edit Draft */}
+              <Button asChild className="w-full">
+                <Link href={`/documents/${draftDocument.id}/edit`}>
+                  Edit Draft
+                </Link>
+              </Button>
+
+              {/* Release / Submit for Approval */}
+              {draftDocument.is_production ? (
+                // Production documents always need approval
+                draftDocument.approvers?.length > 0 ? (
+                  <SubmitForApprovalButton 
+                    documentId={draftDocument.id}
+                    documentNumber={draftDocument.document_number}
+                    approverCount={draftDocument.approvers.length}
+                  />
+                ) : (
+                  <Button
+                    disabled
+                    className="w-full opacity-50 cursor-not-allowed"
+                    title="Production documents require at least one approver. Assign approvers in the Work In Progress tab."
+                  >
+                    Send for Approval
+                  </Button>
+                )
+              ) : (
+                // Prototype documents - Release or Submit
+                draftDocument.approvers?.length > 0 ? (
+                  <SubmitForApprovalButton 
+                    documentId={draftDocument.id}
+                    documentNumber={draftDocument.document_number}
+                    approverCount={draftDocument.approvers.length}
+                  />
+                ) : (
+                  <ReleaseDocumentButton 
+                    documentId={draftDocument.id} 
+                    isProduction={draftDocument.is_production}
+                  />
+                )
+              )}
+
+              {/* Delete Draft */}
+              <DeleteDocumentButton documentId={draftDocument.id} />
+            </>
           )}
 
-          {canCreateNewVersion && (
+          {/* WIP TAB - No Draft, but can create version */}
+          {!hasDraft && latestReleased && latestReleased.status === 'Released' && (isCreator || isAdmin) && (
             <CreateNewVersionButton
               documentId={latestReleased.id}
               documentNumber={latestReleased.document_number}
@@ -190,32 +261,10 @@ export default function DocumentActionsPanel({
             />
           )}
 
-          {/* Show disabled button if draft exists */}
-          {!canCreateNewVersion && latestReleased && latestReleased.status === 'Released' && hasDraft && (isCreator || isAdmin) && (
-            <Button
-              disabled
-              className="w-full"
-              title="A draft version already exists. Complete or delete it before creating a new version."
-            >
-              Create New Version (Draft Exists)
-            </Button>
-          )}
-
-          {canPromoteToProduction && (
-            <PromoteToProductionButton
-              documentId={latestReleased.id}
-              documentNumber={latestReleased.document_number}
-              version={latestReleased.version}
-            />
-          )}
-
-          {canDelete && (
-            <DeleteDocumentButton documentId={primaryDocument.id} />
-          )}
-
-          {!canEdit && !canRelease && !canSubmitForApproval && !canCreateNewVersion && !canPromoteToProduction && !canDelete && (
+          {/* No actions available */}
+          {!canEdit && !canRelease && !canSubmitForApproval && !canCreateNewVersion && !canPromoteToProduction && !canDelete && !hasDraft && (
             <p className="text-sm text-gray-500 text-center py-4">
-              No actions available for this document
+              No actions available
             </p>
           )}
         </div>
