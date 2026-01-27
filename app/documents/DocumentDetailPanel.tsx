@@ -8,10 +8,14 @@ import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
+import dynamic from 'next/dynamic'
+
+const ApproverManagement = dynamic(() => import('./components/ApproverManagement'), { ssr: false })
 
 interface DocumentDetailPanelProps {
   documentData: DocumentVersionsData
   selectedVersion?: string
+  availableUsers: any[]
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
@@ -32,7 +36,7 @@ function formatDate(dateString: string) {
   })
 }
 
-function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, isCollapsible = false }: any) {
+function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, availableUsers, isCollapsible = false }: any) {
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
   const files = version.document_files || []
   const approvers = version.approvers || []
@@ -147,6 +151,18 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
             )}
           </div>
 
+          {/* Approver Management (for Draft versions) */}
+          {version.status === 'Draft' && (isCreator || isAdmin) && (
+            <div className="pt-4 border-t">
+              <ApproverManagement
+                documentId={version.id}
+                approvers={approvers}
+                availableUsers={availableUsers || []}
+                disabled={false}
+              />
+            </div>
+          )}
+
           {/* Actions (for Draft versions) */}
           {version.status === 'Draft' && (isCreator || isAdmin) && (
             <div className="pt-4 border-t flex gap-2">
@@ -172,6 +188,7 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
 export default function DocumentDetailPanel({
   documentData,
   selectedVersion,
+  availableUsers,
   isAdmin,
   currentUserId,
   currentUserEmail
@@ -242,6 +259,7 @@ export default function DocumentDetailPanel({
               isAdmin={isAdmin}
               currentUserId={currentUserId}
               currentUserEmail={currentUserEmail}
+              availableUsers={availableUsers}
               isCollapsible={false}
             />
           ) : (
@@ -265,6 +283,7 @@ export default function DocumentDetailPanel({
                 isAdmin={isAdmin}
                 currentUserId={currentUserId}
                 currentUserEmail={currentUserEmail}
+                availableUsers={availableUsers}
                 isCollapsible={true}
               />
             ))

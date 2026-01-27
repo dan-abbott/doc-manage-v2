@@ -17,14 +17,12 @@ import PromoteToProductionButton from './components/PromoteToProductionButton'
 
 // Dynamically import components
 const ApprovalWorkflow = dynamic(() => import('./components/ApprovalWorkflow'), { ssr: false })
-const ApproverManagement = dynamic(() => import('./components/ApproverManagement'), { ssr: false })
 const AuditTrail = dynamic(() => import('./components/AuditTrail'), { ssr: false })
 const AdminActions = dynamic(() => import('./components/AdminActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
   documentData: DocumentVersionsData
   auditLogs: any[]
-  availableUsers: any[]
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
@@ -92,7 +90,6 @@ function CollapsibleSection({ title, children, defaultOpen = false, sectionKey }
 export default function DocumentActionsPanel({
   documentData,
   auditLogs,
-  availableUsers,
   isAdmin,
   currentUserId,
   currentUserEmail
@@ -256,18 +253,6 @@ export default function DocumentActionsPanel({
           ))}
         </div>
       </CollapsibleSection>
-
-      {/* Approver Management (for Draft documents only) */}
-      {primaryDocument.status === 'Draft' && (isCreator || isAdmin) && (
-        <CollapsibleSection title="Assign Approvers" defaultOpen={true} sectionKey="approvers">
-          <ApproverManagement
-            documentId={primaryDocument.id}
-            approvers={approvers}
-            availableUsers={availableUsers}
-            disabled={false}
-          />
-        </CollapsibleSection>
-      )}
 
       {/* Approval Workflow (if has approvers) */}
       {hasApprovers && primaryDocument.status === 'In Approval' && (

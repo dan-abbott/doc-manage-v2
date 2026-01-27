@@ -171,6 +171,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
               <DocumentDetailPanel
                 documentData={selectedDocumentData}
                 selectedVersion={searchParams.version}
+                availableUsers={availableUsers}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}
@@ -182,7 +183,6 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
               <DocumentActionsPanel
                 documentData={selectedDocumentData}
                 auditLogs={auditLogs}
-                availableUsers={availableUsers}
                 isAdmin={isAdmin}
                 currentUserId={user.id}
                 currentUserEmail={user.email || ''}
