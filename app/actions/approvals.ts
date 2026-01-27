@@ -441,8 +441,9 @@ export async function submitForApproval(documentId: string) {
       }
     }
 
-    // Update document status
-    const { error: updateError } = await supabase
+    // Update document status - use service role client as RLS blocks status changes
+    const supabaseAdmin = createServiceRoleClient()
+    const { error: updateError } = await supabaseAdmin
       .from('documents')
       .update({ status: 'In Approval' })
       .eq('id', documentId)
@@ -472,13 +473,14 @@ export async function submitForApproval(documentId: string) {
     })
 
     // Create audit log
-    await supabase
+    await supabaseAdmin
       .from('audit_log')
       .insert({
         document_id: documentId,
         action: 'submitted_for_approval',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: document.tenant_id,
         details: { 
           document_number: `${document.document_number}${document.version}`,
           approver_count: approverCount
@@ -648,8 +650,9 @@ export async function approveDocument(documentId: string, comments?: string) {
         documentNumber: `${document.document_number}${document.version}`,
       })
 
-      // All approved - release the document
-      await supabase
+      // All approved - release the document - use service role client
+      const supabaseAdmin = createServiceRoleClient()
+      await supabaseAdmin
         .from('documents')
         .update({
           status: 'Released',
@@ -677,19 +680,20 @@ export async function approveDocument(documentId: string, comments?: string) {
             predecessorVersion: predecessor.version,
           })
 
-          await supabase
+          await supabaseAdmin
             .from('documents')
             .update({ status: 'Obsolete' })
             .eq('id', predecessor.id)
 
           // Log obsolescence
-          await supabase
+          await supabaseAdmin
             .from('audit_log')
             .insert({
               document_id: predecessor.id,
               action: 'document_obsoleted',
               performed_by: user.id,
               performed_by_email: user.email,
+              tenant_id: predecessor.tenant_id,
               details: {
                 document_number: `${predecessor.document_number}${predecessor.version}`,
                 obsoleted_by_version: document.version,
@@ -706,13 +710,14 @@ export async function approveDocument(documentId: string, comments?: string) {
       })
 
       // Create release audit log
-      await supabase
+      await supabaseAdmin
         .from('audit_log')
         .insert({
           document_id: documentId,
           action: 'released',
           performed_by: user.id,
           performed_by_email: user.email,
+          tenant_id: document.tenant_id,
           details: { 
             document_number: `${document.document_number}${document.version}`,
             release_method: 'approved'
@@ -854,8 +859,9 @@ export async function rejectDocument(documentId: string, rejectionReason: string
       return { success: false, error: 'Failed to reject document' }
     }
 
-    // Return document to Draft status
-    const { error: updateDocError } = await supabase
+    // Return document to Draft status - use service role client
+    const supabaseAdmin = createServiceRoleClient()
+    const { error: updateDocError } = await supabaseAdmin
       .from('documents')
       .update({ status: 'Draft' })
       .eq('id', documentId)
