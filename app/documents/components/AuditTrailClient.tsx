@@ -28,6 +28,8 @@ const actionConfig: Record<string, { label: string; icon: any; color: string }> 
   'approver_added': { label: 'Approver Added', icon: UserPlus, color: 'text-blue-600' },
   'approver_removed': { label: 'Approver Removed', icon: UserMinus, color: 'text-orange-600' },
   'admin_status_change': { label: 'Status Changed (Admin)', icon: ShieldAlert, color: 'text-red-600' },
+  'admin_delete': { label: 'Deleted (Admin)', icon: Trash, color: 'text-red-600' },
+  'admin_rename': { label: 'Renamed (Admin)', icon: Edit, color: 'text-red-600' },
 }
 
 function formatDate(dateString: string) {
@@ -75,15 +77,41 @@ function AuditLogEntry({ entry, isLast }: { entry: AuditLogEntry; isLast: boolea
 
         {/* Additional details - only show important ones */}
         {entry.details && (
-          <div className="mt-0.5 text-xs text-gray-600">
+          <div className="mt-0.5 text-xs text-gray-600 space-y-1">
+            {/* Version info */}
+            {entry.details.document_number && (
+              <p className="text-gray-500">
+                <span className="font-medium">{entry.details.document_number}</span>
+              </p>
+            )}
+            
+            {/* Admin status change */}
+            {entry.details.old_status && entry.details.new_status && (
+              <p className="text-orange-700 font-medium">
+                {entry.details.old_status} → {entry.details.new_status}
+              </p>
+            )}
+            
+            {/* Admin rename */}
+            {entry.details.old_number && entry.details.new_number && (
+              <p className="text-orange-700 font-medium">
+                {entry.details.old_number} → {entry.details.new_number}
+              </p>
+            )}
+            
+            {/* Comments */}
             {entry.details.comments && (
               <p className="italic text-gray-500 line-clamp-2">&quot;{entry.details.comments}&quot;</p>
             )}
+            
+            {/* Rejection reason */}
             {entry.details.rejection_reason && (
-              <div className="mt-1 p-1.5 bg-red-50 border border-red-200 rounded text-xs">
+              <div className="mt-1 p-1.5 bg-red-50 border border-red-200 rounded">
                 <p className="text-red-700 line-clamp-2">{entry.details.rejection_reason}</p>
               </div>
             )}
+            
+            {/* File name */}
             {entry.details.file_name && (
               <p className="text-gray-500 truncate">{entry.details.file_name}</p>
             )}

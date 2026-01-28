@@ -41,6 +41,7 @@ export default function AdminActions({
   const [newStatus, setNewStatus] = useState(currentStatus)
   const [newVersion, setNewVersion] = useState(currentVersion)
   const [newIsProduction, setNewIsProduction] = useState(isProduction)
+  const [newDocNumber, setNewDocNumber] = useState(documentNumber)
 
   const handleForceStatusChange = async () => {
     if (newStatus === currentStatus) {
@@ -81,6 +82,26 @@ export default function AdminActions({
     setShowConfirm(true)
   }
 
+  const handleForceDocNumberChange = async () => {
+    if (newDocNumber === documentNumber) {
+      toast.error('Document number unchanged')
+      return
+    }
+
+    // Validate format
+    const numberPattern = /^[A-Z]+-\d{5}$/
+    if (!numberPattern.test(newDocNumber)) {
+      toast.error('Invalid format. Use PREFIX-##### (e.g., FORM-00001)')
+      return
+    }
+
+    setPendingAction({
+      type: 'docnumber',
+      value: newDocNumber,
+    })
+    setShowConfirm(true)
+  }
+
   const executeAdminAction = async () => {
     setIsLoading(true)
     setShowConfirm(false)
@@ -117,6 +138,16 @@ export default function AdminActions({
           body: JSON.stringify({
             documentId,
             isProduction: pendingAction.value,
+          }),
+        })
+      } else if (pendingAction.type === 'docnumber') {
+        endpoint = '/api/admin/force-docnumber-change'
+        response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            documentId,
+            newDocNumber: pendingAction.value,
           }),
         })
       }
@@ -215,6 +246,36 @@ export default function AdminActions({
             </p>
             <p className="text-xs text-amber-600">
               ⚠️ Warning: Changing version may cause numbering conflicts
+            </p>
+          </div>
+
+          {/* Force Document Number Change */}
+          <div className="space-y-2">
+            <Label htmlFor="admin-doc-number" className="text-sm font-medium">
+              Force Document Number Change
+            </Label>
+            <div className="flex gap-2">
+              <Input
+                id="admin-doc-number"
+                value={newDocNumber}
+                onChange={(e) => setNewDocNumber(e.target.value.toUpperCase())}
+                placeholder="FORM-00001"
+                className="flex-1"
+              />
+              <Button
+                onClick={handleForceDocNumberChange}
+                disabled={isLoading || newDocNumber === documentNumber}
+                variant="destructive"
+                size="sm"
+              >
+                Change
+              </Button>
+            </div>
+            <p className="text-xs text-gray-500">
+              Current: <span className="font-medium">{documentNumber}</span>
+            </p>
+            <p className="text-xs text-amber-600">
+              ⚠️ Warning: Use format PREFIX-##### (e.g., FORM-00001)
             </p>
           </div>
 

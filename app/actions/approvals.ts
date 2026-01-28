@@ -487,6 +487,8 @@ export async function submitForApproval(documentId: string) {
       .from('audit_log')
       .insert({
         document_id: documentId,
+        document_number: document.document_number,
+        version: document.version,
         action: 'submitted_for_approval',
         performed_by: user.id,
         performed_by_email: user.email,
