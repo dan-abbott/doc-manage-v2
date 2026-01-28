@@ -42,6 +42,7 @@ export default async function AdminLayout({
           <nav className="flex space-x-4 border-b border-gray-200">
             <AdminNavLink href="/admin/users" label="User Management" />
             <AdminNavLink href="/admin/settings" label="Company Settings" />
+            <AdminNavLink href="/admin/document-types" label="Document Types" />
           </nav>
         </div>
 

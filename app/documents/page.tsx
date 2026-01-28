@@ -92,9 +92,13 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     query = query.eq('document_type_id', searchParams.type)
   }
 
-  // Status filter
+  // Status filter - multi-select or default to exclude Obsolete
   if (searchParams.status) {
-    query = query.eq('status', searchParams.status)
+    const statuses = searchParams.status.split(',')
+    query = query.in('status', statuses)
+  } else {
+    // Default: exclude Obsolete documents
+    query = query.in('status', ['Draft', 'In Approval', 'Released'])
   }
 
   // Project filter

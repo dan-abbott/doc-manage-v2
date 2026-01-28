@@ -82,7 +82,14 @@ export default function CollapsibleSearchPanel({
   
   const [search, setSearch] = useState(currentFilters.search || '')
   const [type, setType] = useState(currentFilters.type || '')
-  const [status, setStatus] = useState(currentFilters.status || '')
+  // Status is now an array - default to exclude Obsolete
+  const [status, setStatus] = useState<string[]>(() => {
+    if (currentFilters.status) {
+      return currentFilters.status.split(',')
+    }
+    // Default: show Draft, In Approval, and Released (exclude Obsolete)
+    return ['Draft', 'In Approval', 'Released']
+  })
   const [project, setProject] = useState(currentFilters.project || '')
   const [myDocs, setMyDocs] = useState(currentFilters.myDocs === 'true')
 
@@ -91,7 +98,7 @@ export default function CollapsibleSearchPanel({
     
     if (search) params.set('search', search)
     if (type) params.set('type', type)
-    if (status) params.set('status', status)
+    if (status.length > 0 && status.length < 4) params.set('status', status.join(','))
     if (project) params.set('project', project)
     if (myDocs) params.set('myDocs', 'true')
     
@@ -105,7 +112,7 @@ export default function CollapsibleSearchPanel({
   const clearFilters = () => {
     setSearch('')
     setType('')
-    setStatus('')
+    setStatus(['Draft', 'In Approval', 'Released']) // Reset to default
     setProject('')
     setMyDocs(false)
     
@@ -117,7 +124,18 @@ export default function CollapsibleSearchPanel({
     router.replace(`/documents?${params.toString()}`)
   }
 
-  const hasActiveFilters = search || type || status || project || myDocs
+  const hasActiveFilters = search || type || (status.length > 0 && status.length < 4) || project || myDocs
+
+  // Handle status checkbox toggle
+  const toggleStatus = (statusValue: string) => {
+    setStatus(prev => {
+      if (prev.includes(statusValue)) {
+        return prev.filter(s => s !== statusValue)
+      } else {
+        return [...prev, statusValue]
+      }
+    })
+  }
 
   // Handle document selection - use replace to avoid history spam
   const handleDocumentSelect = (documentNumber: string, version: string) => {
@@ -126,7 +144,7 @@ export default function CollapsibleSearchPanel({
     // Preserve all current filters
     if (search) params.set('search', search)
     if (type) params.set('type', type)
-    if (status) params.set('status', status)
+    if (status.length > 0 && status.length < 4) params.set('status', status.join(','))
     if (project) params.set('project', project)
     if (myDocs) params.set('myDocs', 'true')
     if (currentFilters.viewAll) params.set('viewAll', currentFilters.viewAll)
@@ -214,20 +232,23 @@ export default function CollapsibleSearchPanel({
           </div>
 
           <div>
-            <Label htmlFor="status" className="text-xs mb-1">Status</Label>
-            <select
-              id="status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-            >
-              <option value="">All statuses</option>
+            <Label className="text-xs mb-1 block">Status</Label>
+            <div className="space-y-1">
               {STATUS_OPTIONS.map((option) => (
-                <option key={option.value} value={option.value}>
-                  {option.label}
-                </option>
+                <div key={option.value} className="flex items-center">
+                  <input
+                    type="checkbox"
+                    id={`status-${option.value}`}
+                    checked={status.includes(option.value)}
+                    onChange={() => toggleStatus(option.value)}
+                    className="h-3 w-3 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+                  />
+                  <label htmlFor={`status-${option.value}`} className="ml-1.5 text-xs text-gray-700 cursor-pointer">
+                    {option.label}
+                  </label>
+                </div>
               ))}
-            </select>
+            </div>
           </div>
         </div>
 

@@ -2,6 +2,7 @@
 
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { formatDocumentFilename } from '@/lib/file-naming'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -22,12 +23,23 @@ export async function updateDocumentWithFiles(formData: FormData) {
     // Get document to check ownership and status
     const { data: document, error: getError } = await supabase
       .from('documents')
-      .select('*')
+      .select('*, users!documents_created_by_fkey(tenant_id)')
       .eq('id', documentId)
       .single()
 
     if (getError || !document) {
       return { success: false, error: 'Document not found' }
+    }
+
+    // Get tenant's auto_rename setting
+    const tenantId = (document.users as any)?.tenant_id || document.tenant_id
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('auto_rename_files')
+      .eq('id', tenantId)
+      .single()
+    
+    const autoRename = tenant?.auto_rename_files ?? true // Default to true
     }
 
     if (document.created_by !== user.id) {
@@ -90,12 +102,20 @@ export async function updateDocumentWithFiles(formData: FormData) {
         // We've already verified ownership above, so this is safe
         const supabaseAdmin = createServiceRoleClient()
         
+        // Format filename with smart renaming (scrubs old prefix, applies current)
+        const formattedFileName = formatDocumentFilename(
+          document.document_number,
+          document.version,
+          file.name,
+          autoRename
+        )
+        
         // Create file record with tenant_id
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
             document_id: documentId,
-            file_name: `${document.document_number}${document.version}_${file.name}`,
+            file_name: formattedFileName,
             original_file_name: file.name,
             file_path: fileName,
             file_size: file.size,
