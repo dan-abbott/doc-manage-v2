@@ -1,4 +1,10 @@
-import * as Sentry from '@sentry/nextjs'
+// Safely import Sentry - gracefully handle if not installed
+let Sentry: any = null
+try {
+  Sentry = require('@sentry/nextjs')
+} catch (e) {
+  console.warn('Sentry not available - error capture disabled')
+}
 
 /**
  * Capture and log errors from Server Actions
@@ -14,17 +20,19 @@ export async function captureServerActionError<T>(
     // Log to console for immediate visibility
     console.error(`[Server Action Error] ${actionName}:`, error)
     
-    // Send to Sentry with context
-    Sentry.captureException(error, {
-      tags: {
-        action: actionName,
-        type: 'server_action',
-      },
-      extra: {
-        actionName,
-        timestamp: new Date().toISOString(),
-      },
-    })
+    // Send to Sentry with context (if available)
+    if (Sentry) {
+      Sentry.captureException(error, {
+        tags: {
+          action: actionName,
+          type: 'server_action',
+        },
+        extra: {
+          actionName,
+          timestamp: new Date().toISOString(),
+        },
+      })
+    }
     
     // Re-throw so caller can handle
     throw error
@@ -42,6 +50,8 @@ export function captureRLSError(
     userId?: string
   }
 ) {
+  if (!Sentry) return
+  
   Sentry.captureException(error, {
     tags: {
       type: 'rls_violation',
@@ -63,6 +73,8 @@ export function captureAuthError(
     email?: string
   }
 ) {
+  if (!Sentry) return
+  
   Sentry.captureException(error, {
     tags: {
       type: 'auth_error',
@@ -82,6 +94,8 @@ export function setUserContext(user: {
   tenantId?: string
   isAdmin?: boolean
 }) {
+  if (!Sentry) return
+  
   Sentry.setUser({
     id: user.id,
     email: user.email,
@@ -94,6 +108,8 @@ export function setUserContext(user: {
  * Clear user context (on logout)
  */
 export function clearUserContext() {
+  if (!Sentry) return
+  
   Sentry.setUser(null)
 }
 
@@ -101,6 +117,8 @@ export function clearUserContext() {
  * Add breadcrumb for tracking user actions
  */
 export function addBreadcrumb(message: string, data?: Record<string, any>) {
+  if (!Sentry) return
+  
   Sentry.addBreadcrumb({
     message,
     data,
