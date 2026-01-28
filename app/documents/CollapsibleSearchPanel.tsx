@@ -318,7 +318,7 @@ export default function CollapsibleSearchPanel({
                 // Preserve filters
                 if (search) params.set('search', search)
                 if (type) params.set('type', type)
-                if (status) params.set('status', status)
+                if (status.length > 0 && status.length < 4) params.set('status', status.join(','))
                 if (project) params.set('project', project)
                 if (myDocs) params.set('myDocs', 'true')
                 if (currentFilters.selected) params.set('selected', currentFilters.selected)
