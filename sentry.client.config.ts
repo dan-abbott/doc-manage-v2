@@ -53,3 +53,6 @@ try {
   // Sentry not installed, skip initialization
   console.warn('Sentry not installed - error monitoring disabled');
 }
+
+// Export empty object to make this a valid module
+export {}

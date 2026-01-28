@@ -16,3 +16,6 @@ try {
   // Sentry not installed, skip initialization
   console.warn('Sentry not installed - error monitoring disabled');
 }
+
+// Export to make this a proper module
+export {};
