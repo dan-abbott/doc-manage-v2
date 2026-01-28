@@ -186,7 +186,7 @@ export async function changeDocumentOwner(documentId: string, newOwnerEmail: str
     revalidatePath('/documents')
     revalidatePath(`/documents/${documentId}`)
 
-    return { success: true }
+    return { success: true, newOwnerEmail: newOwner.email }
   } catch (error) {
     console.error('Admin change owner error:', error)
     return {
