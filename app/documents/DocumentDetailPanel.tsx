@@ -186,34 +186,6 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
             </div>
           )}
 
-          {/* Approval Status (for In Approval documents) */}
-          {version.status === 'In Approval' && approvers.length > 0 && (
-            <div className="pt-4 border-t">
-              <div className="p-4 bg-yellow-50 border border-yellow-200 rounded-lg mb-4">
-                <h4 className="text-sm font-medium mb-3 text-yellow-900">Approval Progress</h4>
-                <div className="space-y-2">
-                  {approvers.map((approver: any) => (
-                    <div key={approver.id} className="flex items-center justify-between p-2 bg-white rounded border">
-                      <div className="flex items-center gap-2">
-                        <span className="text-sm text-gray-700">{approver.user_email}</span>
-                      </div>
-                      <Badge className={
-                        approver.status === 'Approved' ? 'bg-green-600' :
-                        approver.status === 'Rejected' ? 'bg-red-600' :
-                        'bg-yellow-600'
-                      }>
-                        {approver.status}
-                      </Badge>
-                    </div>
-                  ))}
-                </div>
-                <p className="text-xs text-yellow-800 mt-3">
-                  {approvers.filter((a: any) => a.status === 'Approved').length} of {approvers.length} approvers have approved
-                </p>
-              </div>
-            </div>
-          )}
-
           {/* Approver Management (for Draft versions) */}
           {version.status === 'Draft' && (isCreator || isAdmin) && (
             <div className="pt-4 border-t">

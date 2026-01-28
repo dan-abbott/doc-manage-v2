@@ -674,42 +674,88 @@ export async function approveDocument(documentId: string, comments?: string) {
 
       // Handle obsolescence: make immediate predecessor obsolete
       const { getImmediatePredecessor } = await import('./versions')
-      const predecessorResult = await getImmediatePredecessor(
-        document.document_number,
-        document.version
-      )
-
-      if (predecessorResult.success && predecessorResult.data) {
-        const predecessor = predecessorResult.data
+      
+      // Special case: Production v1 should obsolete the last Released prototype
+      if (document.is_production && document.version === 'v1') {
+        // Find last released prototype version
+        const { data: lastPrototype } = await supabaseAdmin
+          .from('documents')
+          .select('id, version, status, tenant_id')
+          .eq('document_number', document.document_number)
+          .eq('is_production', false)
+          .eq('status', 'Released')
+          .order('version', { ascending: false })
+          .limit(1)
+          .maybeSingle()
         
-        // Only obsolete if predecessor is Released
-        if (predecessor.status === 'Released') {
-          logger.info('Obsoleting predecessor version', {
+        if (lastPrototype) {
+          logger.info('Obsoleting last prototype version for production v1', {
             userId,
             documentId,
-            predecessorId: predecessor.id,
-            predecessorVersion: predecessor.version,
+            prototypeId: lastPrototype.id,
+            prototypeVersion: lastPrototype.version,
           })
-
+          
           await supabaseAdmin
             .from('documents')
             .update({ status: 'Obsolete' })
-            .eq('id', predecessor.id)
-
+            .eq('id', lastPrototype.id)
+          
           // Log obsolescence
           await supabaseAdmin
             .from('audit_log')
             .insert({
-              document_id: predecessor.id,
+              document_id: lastPrototype.id,
               action: 'document_obsoleted',
               performed_by: user.id,
               performed_by_email: user.email,
-              tenant_id: predecessor.tenant_id,
+              tenant_id: lastPrototype.tenant_id,
               details: {
-                document_number: `${predecessor.document_number}${predecessor.version}`,
+                document_number: `${lastPrototype.version}`,
                 obsoleted_by_version: document.version,
+                reason: 'superseded_by_production'
               },
             })
+        }
+      } else {
+        // Normal case: find immediate predecessor
+        const predecessorResult = await getImmediatePredecessor(
+          document.document_number,
+          document.version
+        )
+
+        if (predecessorResult.success && predecessorResult.data) {
+          const predecessor = predecessorResult.data
+          
+          // Only obsolete if predecessor is Released
+          if (predecessor.status === 'Released') {
+            logger.info('Obsoleting predecessor version', {
+              userId,
+              documentId,
+              predecessorId: predecessor.id,
+              predecessorVersion: predecessor.version,
+            })
+
+            await supabaseAdmin
+              .from('documents')
+              .update({ status: 'Obsolete' })
+              .eq('id', predecessor.id)
+
+            // Log obsolescence
+            await supabaseAdmin
+              .from('audit_log')
+              .insert({
+                document_id: predecessor.id,
+                action: 'document_obsoleted',
+                performed_by: user.id,
+                performed_by_email: user.email,
+                tenant_id: predecessor.tenant_id,
+                details: {
+                  document_number: `${predecessor.document_number}${predecessor.version}`,
+                  obsoleted_by_version: document.version,
+                },
+              })
+          }
         }
       }
 

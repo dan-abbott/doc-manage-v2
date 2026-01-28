@@ -76,6 +76,27 @@ export default function VersionHistory({ documentNumber, currentVersionId }: Ver
         releaser: Array.isArray(item.releaser) ? item.releaser[0] : item.releaser
       }))
 
+      // Sort versions: prototype (vA, vB...) first, then production (v1, v2...), newest first within each type
+      transformedData.sort((a, b) => {
+        const aIsNumeric = /^v\d+$/.test(a.version)
+        const bIsNumeric = /^v\d+$/.test(b.version)
+        
+        // Prototype versions come before production
+        if (!aIsNumeric && bIsNumeric) return -1
+        if (aIsNumeric && !bIsNumeric) return 1
+        
+        // Within same type, sort descending (newest first)
+        if (!aIsNumeric && !bIsNumeric) {
+          // Both prototype: vC > vB > vA
+          return b.version.localeCompare(a.version)
+        } else {
+          // Both production: v3 > v2 > v1
+          const aNum = parseInt(a.version.substring(1))
+          const bNum = parseInt(b.version.substring(1))
+          return bNum - aNum
+        }
+      })
+
       setVersions(transformedData)
       setLoading(false)
     }
