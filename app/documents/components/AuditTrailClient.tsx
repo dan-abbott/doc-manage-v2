@@ -4,7 +4,7 @@ import React, { useState } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
-import { Clock, User, FileText, CheckCircle, XCircle, Edit, Trash, Upload, Download, UserPlus, UserMinus, Send, ChevronDown, ChevronUp } from 'lucide-react'
+import { Clock, User, FileText, CheckCircle, XCircle, Edit, Trash, Upload, Download, UserPlus, UserMinus, Send, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react'
 import type { AuditLogEntry } from '@/app/actions/audit'
 
 interface AuditTrailProps {
@@ -27,6 +27,7 @@ const actionConfig: Record<string, { label: string; icon: any; color: string }> 
   'document_obsoleted': { label: 'Obsoleted', icon: FileText, color: 'text-gray-600' },
   'approver_added': { label: 'Approver Added', icon: UserPlus, color: 'text-blue-600' },
   'approver_removed': { label: 'Approver Removed', icon: UserMinus, color: 'text-orange-600' },
+  'admin_status_change': { label: 'Status Changed (Admin)', icon: ShieldAlert, color: 'text-red-600' },
 }
 
 function formatDate(dateString: string) {

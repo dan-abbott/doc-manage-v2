@@ -1,12 +1,6 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
-import { logger } from '@/lib/logger'
-import { logError, logServerAction } from '@/lib/utils/logging-helpers'
-
-// ==========================================
-// Types
-// ==========================================
 
 export interface AuditLogEntry {
   id: string
@@ -14,64 +8,70 @@ export interface AuditLogEntry {
   action: string
   performed_by: string
   performed_by_email: string
-  details: any
   created_at: string
+  details: any
 }
 
-// ==========================================
-// Action: Get Audit Logs for Document
-// ==========================================
-
+/**
+ * Get audit log for a specific document
+ * Returns all audit entries for all versions of the document (by document_number)
+ */
 export async function getDocumentAuditLog(documentId: string) {
-  const startTime = Date.now()
-  let userId: string | undefined
-  
   try {
     const supabase = await createClient()
-
+    
     // Get current user
     const { data: { user }, error: authError } = await supabase.auth.getUser()
     if (authError || !user) {
-      logger.warn('Audit log access attempted without authentication', { documentId })
       return { success: false, error: 'Not authenticated', data: [] }
     }
 
-    userId = user.id
-    logger.debug('Fetching audit log', { userId, documentId, action: 'getDocumentAuditLog' })
+    // First, get the document to find its document_number
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select('document_number')
+      .eq('id', documentId)
+      .single()
 
-    // Get audit log entries for this document
-    const { data: auditLogs, error } = await supabase
-      .from('audit_log')
-      .select('*')
-      .eq('document_id', documentId)
-      .order('created_at', { ascending: false })
-
-    if (error) {
-      logError(error, {
-        action: 'getDocumentAuditLog',
-        userId,
-        documentId,
-        duration: Date.now() - startTime
-      })
-      return { success: false, error: 'Failed to fetch audit log', data: [] }
+    if (docError || !document) {
+      return { success: false, error: 'Document not found', data: [] }
     }
 
-    logServerAction('getDocumentAuditLog', {
-      userId,
-      documentId,
-      success: true,
-      duration: Date.now() - startTime,
-      entryCount: auditLogs?.length || 0
-    })
+    // Get all documents with this document_number (all versions)
+    const { data: allVersions, error: versionsError } = await supabase
+      .from('documents')
+      .select('id')
+      .eq('document_number', document.document_number)
 
-    return { success: true, data: auditLogs || [] }
-  } catch (error: any) {
-    logError(error, {
-      action: 'getDocumentAuditLog',
-      userId,
-      documentId,
-      duration: Date.now() - startTime
-    })
-    return { success: false, error: error.message || 'Failed to fetch audit log', data: [] }
+    if (versionsError) {
+      return { success: false, error: 'Failed to fetch versions', data: [] }
+    }
+
+    const documentIds = allVersions?.map(v => v.id) || []
+
+    if (documentIds.length === 0) {
+      return { success: true, data: [] }
+    }
+
+    // Fetch audit logs for all versions of this document
+    const { data: logs, error: logsError } = await supabase
+      .from('audit_log')
+      .select('*')
+      .in('document_id', documentIds)
+      .order('created_at', { ascending: false })
+
+    if (logsError) {
+      console.error('Error fetching audit logs:', logsError)
+      return { success: false, error: 'Failed to fetch audit logs', data: [] }
+    }
+
+    return { success: true, data: logs || [] }
+  } catch (error) {
+    console.error('Error in getDocumentAuditLog:', error)
+    return { 
+      success: false, 
+      error: error instanceof Error ? error.message : 'Failed to fetch audit logs',
+      data: [] 
+    }
   }
 }
