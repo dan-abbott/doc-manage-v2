@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect } from 'react'
+import * as Sentry from '@sentry/nextjs'
 import { Button } from '@/components/ui/button'
 import { AlertCircle } from 'lucide-react'
 
@@ -12,11 +13,11 @@ export default function GlobalError({
   reset: () => void
 }) {
   useEffect(() => {
-    // Log the error to Sentry (if available)
-    if (typeof window !== 'undefined' && (window as any).Sentry) {
-      (window as any).Sentry.captureException(error)
+    // Log the error to Sentry (if DSN configured)
+    if (process.env.NEXT_PUBLIC_SENTRY_DSN) {
+      Sentry.captureException(error)
     } else {
-      // Fallback to console if Sentry not available
+      // Fallback to console if Sentry not configured
       console.error('Global error:', error)
     }
   }, [error])

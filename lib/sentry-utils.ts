@@ -1,9 +1,10 @@
-// Safely import Sentry - gracefully handle if not installed
-let Sentry: any = null
-try {
-  Sentry = require('@sentry/nextjs')
-} catch (e) {
-  console.warn('Sentry not available - error capture disabled')
+import * as Sentry from '@sentry/nextjs'
+
+/**
+ * Check if Sentry is enabled (DSN configured)
+ */
+function isSentryEnabled() {
+  return !!process.env.NEXT_PUBLIC_SENTRY_DSN
 }
 
 /**
@@ -20,8 +21,8 @@ export async function captureServerActionError<T>(
     // Log to console for immediate visibility
     console.error(`[Server Action Error] ${actionName}:`, error)
     
-    // Send to Sentry with context (if available)
-    if (Sentry) {
+    // Send to Sentry with context (if enabled)
+    if (isSentryEnabled()) {
       Sentry.captureException(error, {
         tags: {
           action: actionName,
@@ -50,7 +51,7 @@ export function captureRLSError(
     userId?: string
   }
 ) {
-  if (!Sentry) return
+  if (!isSentryEnabled()) return
   
   Sentry.captureException(error, {
     tags: {
@@ -73,7 +74,7 @@ export function captureAuthError(
     email?: string
   }
 ) {
-  if (!Sentry) return
+  if (!isSentryEnabled()) return
   
   Sentry.captureException(error, {
     tags: {
@@ -94,7 +95,7 @@ export function setUserContext(user: {
   tenantId?: string
   isAdmin?: boolean
 }) {
-  if (!Sentry) return
+  if (!isSentryEnabled()) return
   
   Sentry.setUser({
     id: user.id,
@@ -108,7 +109,7 @@ export function setUserContext(user: {
  * Clear user context (on logout)
  */
 export function clearUserContext() {
-  if (!Sentry) return
+  if (!isSentryEnabled()) return
   
   Sentry.setUser(null)
 }
@@ -117,7 +118,7 @@ export function clearUserContext() {
  * Add breadcrumb for tracking user actions
  */
 export function addBreadcrumb(message: string, data?: Record<string, any>) {
-  if (!Sentry) return
+  if (!isSentryEnabled()) return
   
   Sentry.addBreadcrumb({
     message,

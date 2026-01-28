@@ -1,58 +1,52 @@
-// Check if Sentry is installed before importing
-try {
-  const Sentry = require("@sentry/nextjs");
+import * as Sentry from "@sentry/nextjs";
 
-  Sentry.init({
-    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+Sentry.init({
+  dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-    // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring.
-    // We recommend adjusting this value in production
-    tracesSampleRate: 1.0,
+  // Set tracesSampleRate to 1.0 to capture 100% of transactions for performance monitoring.
+  // We recommend adjusting this value in production
+  tracesSampleRate: 1.0,
 
-    // Setting this option to true will print useful information to the console while you're setting up Sentry.
-    debug: false,
+  // Setting this option to true will print useful information to the console while you're setting up Sentry.
+  debug: false,
 
-    // Capture replay sessions for error investigation
-    replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions with errors
-    replaysSessionSampleRate: 0.1, // Capture 10% of normal sessions
+  // Only enable if DSN is configured
+  enabled: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-    // Integrate with Session Replay
-    integrations: [
-      Sentry.replayIntegration({
-        maskAllText: true, // Mask all text for privacy
-        blockAllMedia: true, // Block all media for privacy
-      }),
-    ],
+  // Capture replay sessions for error investigation
+  replaysOnErrorSampleRate: 1.0, // Capture 100% of sessions with errors
+  replaysSessionSampleRate: 0.1, // Capture 10% of normal sessions
 
-    // Filter out noise
-    ignoreErrors: [
-      // Browser extensions
-      'top.GLOBALS',
-      // Random plugins/extensions
-      'originalCreateNotification',
-      'canvas.contentDocument',
-      'MyApp_RemoveAllHighlights',
-      // Network errors
-      'NetworkError',
-      'Network request failed',
-      // Supabase session errors (common, not critical)
-      'session_not_found',
-    ],
+  // Integrate with Session Replay
+  integrations: [
+    Sentry.replayIntegration({
+      maskAllText: true, // Mask all text for privacy
+      blockAllMedia: true, // Block all media for privacy
+    }),
+  ],
 
-    // Add custom tags
-    beforeSend(event: any, hint: any) {
-      // Don't send events in development
-      if (process.env.NODE_ENV === 'development') {
-        console.error('Sentry event (dev):', event);
-        return null;
-      }
-      return event;
-    },
-  });
-} catch (e) {
-  // Sentry not installed, skip initialization
-  console.warn('Sentry not installed - error monitoring disabled');
-}
+  // Filter out noise
+  ignoreErrors: [
+    // Browser extensions
+    'top.GLOBALS',
+    // Random plugins/extensions
+    'originalCreateNotification',
+    'canvas.contentDocument',
+    'MyApp_RemoveAllHighlights',
+    // Network errors
+    'NetworkError',
+    'Network request failed',
+    // Supabase session errors (common, not critical)
+    'session_not_found',
+  ],
 
-// Export empty object to make this a valid module
-export {}
+  // Add custom tags
+  beforeSend(event: any, hint: any) {
+    // Don't send events in development
+    if (process.env.NODE_ENV === 'development') {
+      console.error('Sentry event (dev):', event);
+      return null;
+    }
+    return event;
+  },
+});
