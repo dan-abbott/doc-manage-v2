@@ -3,6 +3,7 @@
 import { Badge } from '@/components/ui/badge'
 import { formatDistanceToNow } from 'date-fns'
 import { cn } from '@/lib/utils'
+import BookmarkButton from './components/BookmarkButton'
 
 interface Document {
   id: string
@@ -55,9 +56,15 @@ export default function DocumentsTable({ documents, onDocumentSelect, selectedDo
               <span className="font-medium text-sm truncate">
                 {doc.document_number}{doc.version}
               </span>
-              <Badge className={cn("text-xs px-1.5 py-0", STATUS_COLORS[doc.status] || 'bg-gray-500')}>
-                {doc.status}
-              </Badge>
+              <div className="flex items-center gap-2">
+                <BookmarkButton 
+                  documentNumber={doc.document_number} 
+                  size="sm"
+                />
+                <Badge className={cn("text-xs px-1.5 py-0", STATUS_COLORS[doc.status] || 'bg-gray-500')}>
+                  {doc.status}
+                </Badge>
+              </div>
             </div>
             <p className="text-sm text-gray-900 truncate">
               {doc.title}

@@ -10,6 +10,7 @@ import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
+import BookmarkButton from './components/BookmarkButton'
 
 const ApproverManagement = dynamic(() => import('./components/ApproverManagement'), { ssr: false })
 
@@ -305,17 +306,30 @@ export default function DocumentDetailPanel({
     <div className="p-6">
       {/* Document Header (no version) */}
       <div className="mb-6">
-        <h1 className="text-2xl font-bold mb-1">
-          {documentNumber}
-        </h1>
-        <p className="text-lg text-gray-600 mb-2">{title}</p>
-        
-        {/* Latest version indicator */}
-        {latestReleased && (
-          <p className="text-sm text-gray-500">
-            Latest: <span className="font-medium text-green-600">Released {latestReleased.version}</span>
-          </p>
-        )}
+        <div className="flex items-start justify-between gap-4">
+          <div className="flex-1">
+            <h1 className="text-2xl font-bold mb-1">
+              {documentNumber}
+            </h1>
+            <p className="text-lg text-gray-600 mb-2">{title}</p>
+            
+            {/* Latest version indicator */}
+            {latestReleased && (
+              <p className="text-sm text-gray-500">
+                Latest: <span className="font-medium text-green-600">Released {latestReleased.version}</span>
+              </p>
+            )}
+          </div>
+          
+          {/* Bookmark Button */}
+          <div className="flex-shrink-0 pt-1">
+            <BookmarkButton 
+              documentNumber={documentNumber} 
+              size="lg"
+              showLabel
+            />
+          </div>
+        </div>
       </div>
 
       {/* Tabs */}
