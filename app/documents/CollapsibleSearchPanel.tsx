@@ -156,9 +156,9 @@ export default function CollapsibleSearchPanel({
   return (
     <div className="w-96 lg:w-[40%] xl:w-[35%] 2xl:w-[30%] max-w-2xl bg-white border-r flex flex-col overflow-hidden">
       {/* Header with collapse button */}
-      <div className="p-4 border-b flex items-center justify-between">
+      <div className="p-3 border-b flex items-center justify-between">
         <div>
-          <h2 className="text-lg font-semibold">Search & Filter</h2>
+          <h2 className="text-base font-semibold">Search & Filter</h2>
           <p className="text-xs text-gray-500">{totalCount} document{totalCount === 1 ? '' : 's'}</p>
         </div>
         <button
@@ -175,7 +175,7 @@ export default function CollapsibleSearchPanel({
       </div>
 
       {/* Filters */}
-      <div className="flex-shrink-0 p-4 space-y-4 border-b">
+      <div className="flex-shrink-0 p-3 space-y-3 border-b">
         {/* My Documents Checkbox */}
         <div className="flex items-center space-x-2">
           <input
@@ -190,39 +190,30 @@ export default function CollapsibleSearchPanel({
           </Label>
         </div>
 
-        {/* Active Filter Indicator */}
-        {myDocs && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-2">
-            <p className="text-xs text-purple-800">
-              Showing documents you created or revised
-            </p>
-          </div>
-        )}
-
         {/* Search */}
         <div>
-          <Label htmlFor="search" className="text-sm">Search</Label>
-          <div className="relative mt-1">
-            <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Label htmlFor="search" className="text-xs mb-1">Search</Label>
+          <div className="relative">
+            <Search className="absolute left-2.5 top-1/2 transform -translate-y-1/2 h-3.5 w-3.5 text-muted-foreground" />
             <Input
               id="search"
               placeholder="Number or title..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-              className="pl-9 h-9"
+              className="pl-8 h-8 text-sm"
             />
           </div>
         </div>
 
         {/* Document Type */}
         <div>
-          <Label htmlFor="type" className="text-sm">Document Type</Label>
+          <Label htmlFor="type" className="text-xs mb-1">Document Type</Label>
           <select
             id="type"
             value={type}
             onChange={(e) => setType(e.target.value)}
-            className="mt-1 flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             <option value="">All types</option>
             {documentTypes.map((dt) => (
@@ -235,12 +226,12 @@ export default function CollapsibleSearchPanel({
 
         {/* Status */}
         <div>
-          <Label htmlFor="status" className="text-sm">Status</Label>
+          <Label htmlFor="status" className="text-xs mb-1">Status</Label>
           <select
             id="status"
             value={status}
             onChange={(e) => setStatus(e.target.value)}
-            className="mt-1 flex h-9 w-full rounded-md border border-gray-300 bg-white px-3 py-2 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
           >
             <option value="">All statuses</option>
             {STATUS_OPTIONS.map((option) => (
@@ -253,7 +244,7 @@ export default function CollapsibleSearchPanel({
 
         {/* Project Code */}
         <div>
-          <Label htmlFor="project" className="text-sm">Project Code</Label>
+          <Label htmlFor="project" className="text-xs mb-1">Project Code</Label>
           <Input
             id="project"
             placeholder="P-12345"
@@ -261,19 +252,19 @@ export default function CollapsibleSearchPanel({
             onChange={(e) => setProject(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
             maxLength={7}
-            className="mt-1 h-9"
+            className="h-8 text-sm"
           />
         </div>
 
         {/* Action Buttons */}
-        <div className="flex flex-col gap-2 pt-2">
-          <Button onClick={applyFilters} className="w-full h-9" size="sm">
-            <Search className="mr-2 h-4 w-4" />
+        <div className="flex flex-col gap-1.5 pt-1">
+          <Button onClick={applyFilters} className="w-full h-8 text-xs" size="sm">
+            <Search className="mr-1.5 h-3.5 w-3.5" />
             Apply Filters
           </Button>
           {hasActiveFilters && (
-            <Button variant="outline" onClick={clearFilters} className="w-full h-9" size="sm">
-              <X className="mr-2 h-4 w-4" />
+            <Button variant="outline" onClick={clearFilters} className="w-full h-8 text-xs" size="sm">
+              <X className="mr-1.5 h-3.5 w-3.5" />
               Clear Filters
             </Button>
           )}
@@ -281,8 +272,8 @@ export default function CollapsibleSearchPanel({
 
         {/* Admin View All Toggle */}
         {isAdmin && (
-          <div className="pt-4 border-t mt-4 p-3 border-2 border-red-300 rounded-lg bg-red-50">
-            <div className="flex items-center justify-between mb-2">
+          <div className="pt-2 border-t mt-2 p-2 border border-red-300 rounded bg-red-50">
+            <div className="flex items-center justify-between mb-1.5">
               <div>
                 <p className="text-xs font-medium text-red-900">Admin View</p>
                 <p className="text-xs text-red-700">See all user drafts</p>
@@ -291,7 +282,7 @@ export default function CollapsibleSearchPanel({
             <Button
               variant={currentFilters.viewAll === 'true' ? 'default' : 'outline'}
               size="sm"
-              className="w-full h-9"
+              className="w-full h-7 text-xs"
               onClick={() => {
                 const params = new URLSearchParams()
                 
