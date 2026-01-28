@@ -196,6 +196,10 @@ export async function changeDocumentOwner(documentId: string, newOwnerEmail: str
   }
 }
 
+/**
+ * Admin: Rename document number
+ */
+export async function adminRenameDocument(documentId: string, newNumber: string) {
   try {
     const supabase = await createClient()
     
