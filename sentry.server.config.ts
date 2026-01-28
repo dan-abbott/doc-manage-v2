@@ -20,7 +20,7 @@ try {
     ],
 
     // Add context to all events
-    beforeSend(event, hint) {
+    beforeSend(event: any, hint: any) {
       // Don't send events in development
       if (process.env.NODE_ENV === 'development') {
         console.error('Sentry event (dev):', event);
