@@ -1,5 +1,3 @@
-const { withSentryConfig } = require("@sentry/nextjs");
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: false,  // Add this temporarily
@@ -23,6 +21,18 @@ const nextConfig = {
   },
 }
 
+// Try to import Sentry, but don't fail if it's not installed
+let withSentryConfig
+try {
+  const sentryImport = require("@sentry/nextjs")
+  withSentryConfig = sentryImport.withSentryConfig
+} catch (e) {
+  console.warn('⚠️  Sentry not installed. Run: npm install')
+  // If Sentry is not installed, just export the config as-is
+  module.exports = nextConfig
+  return
+}
+
 // Sentry configuration options
 const sentryWebpackPluginOptions = {
   // For all available options, see:
@@ -32,7 +42,7 @@ const sentryWebpackPluginOptions = {
   silent: true,
   org: process.env.SENTRY_ORG,
   project: process.env.SENTRY_PROJECT,
-};
+}
 
 const sentryOptions = {
   // For all available options, see:
@@ -55,6 +65,6 @@ const sentryOptions = {
 
   // Enables automatic instrumentation of Vercel Cron Monitors.
   automaticVercelMonitors: true,
-};
+}
 
-module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions, sentryOptions);
+module.exports = withSentryConfig(nextConfig, sentryWebpackPluginOptions, sentryOptions)
