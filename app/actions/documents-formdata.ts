@@ -40,7 +40,6 @@ export async function updateDocumentWithFiles(formData: FormData) {
       .single()
     
     const autoRename = tenant?.auto_rename_files ?? true // Default to true
-    }
 
     if (document.created_by !== user.id) {
       return { success: false, error: 'Not authorized' }
