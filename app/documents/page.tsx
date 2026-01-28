@@ -54,6 +54,16 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     .eq('is_active', true)
     .order('name')
 
+  // Get unique project codes for filter dropdown
+  const { data: projectCodes } = await supabase
+    .from('documents')
+    .select('project_code')
+    .not('project_code', 'is', null)
+    .order('project_code')
+  
+  // Extract unique project codes
+  const uniqueProjectCodes = [...new Set(projectCodes?.map(d => d.project_code).filter(Boolean))] as string[]
+
   // Build query
   const page = parseInt(searchParams.page || '1')
   const pageSize = 50
@@ -155,6 +165,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
       {/* Collapsible Search/Filter Panel */}
       <CollapsibleSearchPanel
         documentTypes={documentTypes || []}
+        projectCodes={uniqueProjectCodes}
         documents={documents || []}
         totalCount={count || 0}
         currentFilters={searchParams}

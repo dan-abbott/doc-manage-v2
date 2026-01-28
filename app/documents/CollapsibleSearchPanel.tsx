@@ -11,6 +11,7 @@ import DocumentsTable from './DocumentsTable'
 
 interface CollapsibleSearchPanelProps {
   documentTypes: Array<{ id: string; name: string }>
+  projectCodes: string[]
   documents: any[]
   totalCount: number
   currentFilters: {
@@ -34,7 +35,8 @@ const STATUS_OPTIONS = [
 ]
 
 export default function CollapsibleSearchPanel({ 
-  documentTypes, 
+  documentTypes,
+  projectCodes,
   documents,
   totalCount,
   currentFilters,
@@ -176,20 +178,6 @@ export default function CollapsibleSearchPanel({
 
       {/* Filters */}
       <div className="flex-shrink-0 p-3 space-y-3 border-b">
-        {/* My Documents Checkbox */}
-        <div className="flex items-center space-x-2">
-          <input
-            type="checkbox"
-            id="myDocs"
-            checked={myDocs}
-            onChange={(e) => setMyDocs(e.target.checked)}
-            className="h-4 w-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
-          />
-          <Label htmlFor="myDocs" className="text-sm font-medium cursor-pointer">
-            Only show my documents
-          </Label>
-        </div>
-
         {/* Search */}
         <div>
           <Label htmlFor="search" className="text-xs mb-1">Search</Label>
@@ -206,54 +194,74 @@ export default function CollapsibleSearchPanel({
           </div>
         </div>
 
-        {/* Document Type */}
-        <div>
-          <Label htmlFor="type" className="text-xs mb-1">Document Type</Label>
-          <select
-            id="type"
-            value={type}
-            onChange={(e) => setType(e.target.value)}
-            className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          >
-            <option value="">All types</option>
-            {documentTypes.map((dt) => (
-              <option key={dt.id} value={dt.id}>
-                {dt.name}
-              </option>
-            ))}
-          </select>
+        {/* Document Type and Status - Side by Side */}
+        <div className="grid grid-cols-2 gap-2">
+          <div>
+            <Label htmlFor="type" className="text-xs mb-1">Type</Label>
+            <select
+              id="type"
+              value={type}
+              onChange={(e) => setType(e.target.value)}
+              className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              <option value="">All types</option>
+              {documentTypes.map((dt) => (
+                <option key={dt.id} value={dt.id}>
+                  {dt.name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <Label htmlFor="status" className="text-xs mb-1">Status</Label>
+            <select
+              id="status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              <option value="">All statuses</option>
+              {STATUS_OPTIONS.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
 
-        {/* Status */}
-        <div>
-          <Label htmlFor="status" className="text-xs mb-1">Status</Label>
-          <select
-            id="status"
-            value={status}
-            onChange={(e) => setStatus(e.target.value)}
-            className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
-          >
-            <option value="">All statuses</option>
-            {STATUS_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+        {/* Project Code and My Documents - Side by Side */}
+        <div className="grid grid-cols-2 gap-2 items-end">
+          <div>
+            <Label htmlFor="project" className="text-xs mb-1">Project</Label>
+            <select
+              id="project"
+              value={project}
+              onChange={(e) => setProject(e.target.value)}
+              className="flex h-8 w-full rounded-md border border-gray-300 bg-white px-2 py-1 text-sm ring-offset-white focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500 focus-visible:ring-offset-2"
+            >
+              <option value="">All projects</option>
+              {projectCodes.map((code) => (
+                <option key={code} value={code}>
+                  {code}
+                </option>
+              ))}
+            </select>
+          </div>
 
-        {/* Project Code */}
-        <div>
-          <Label htmlFor="project" className="text-xs mb-1">Project Code</Label>
-          <Input
-            id="project"
-            placeholder="P-12345"
-            value={project}
-            onChange={(e) => setProject(e.target.value.toUpperCase())}
-            onKeyDown={(e) => e.key === 'Enter' && applyFilters()}
-            maxLength={7}
-            className="h-8 text-sm"
-          />
+          <div className="flex items-center pb-0.5">
+            <input
+              type="checkbox"
+              id="myDocs"
+              checked={myDocs}
+              onChange={(e) => setMyDocs(e.target.checked)}
+              className="h-3.5 w-3.5 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+            />
+            <Label htmlFor="myDocs" className="text-xs ml-1.5 cursor-pointer">
+              My docs
+            </Label>
+          </div>
         </div>
 
         {/* Action Buttons */}
