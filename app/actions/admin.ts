@@ -101,9 +101,101 @@ export async function adminDeleteDocument(documentId: string) {
 }
 
 /**
- * Admin: Rename document number
+ * Admin: Change document owner
  */
-export async function adminRenameDocument(documentId: string, newNumber: string) {
+export async function changeDocumentOwner(documentId: string, newOwnerEmail: string) {
+  try {
+    const supabase = await createClient()
+    
+    // Check authentication
+    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    if (authError || !user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    // Check if user is admin
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_admin) {
+      return { success: false, error: 'Not authorized - admin only' }
+    }
+
+    // Get new owner by email
+    const { data: newOwner, error: ownerError } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', newOwnerEmail.toLowerCase())
+      .single()
+
+    if (ownerError || !newOwner) {
+      return { success: false, error: 'User not found with that email address' }
+    }
+
+    // Get current document info
+    const { data: document, error: docError } = await supabase
+      .from('documents')
+      .select('id, document_number, version, created_by, tenant_id, users!documents_created_by_fkey(email)')
+      .eq('id', documentId)
+      .single()
+
+    if (docError || !document) {
+      return { success: false, error: 'Document not found' }
+    }
+
+    // Don't change if already the owner
+    if (document.created_by === newOwner.id) {
+      return { success: false, error: 'User is already the owner' }
+    }
+
+    // Use service role client to bypass RLS
+    const supabaseAdmin = createServiceRoleClient()
+
+    // Update document owner
+    const { error: updateError } = await supabaseAdmin
+      .from('documents')
+      .update({ created_by: newOwner.id })
+      .eq('id', documentId)
+
+    if (updateError) {
+      console.error('Failed to change document owner:', updateError)
+      return { success: false, error: 'Failed to change owner' }
+    }
+
+    // Create audit log
+    await supabaseAdmin
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        document_number: document.document_number,
+        version: document.version,
+        action: 'admin_change_owner',
+        performed_by: user.id,
+        performed_by_email: user.email,
+        tenant_id: document.tenant_id,
+        details: {
+          document_number: `${document.document_number}${document.version}`,
+          old_owner: (document.users as any)?.email || 'unknown',
+          new_owner: newOwner.email,
+        },
+      })
+
+    revalidatePath('/documents')
+    revalidatePath(`/documents/${documentId}`)
+
+    return { success: true }
+  } catch (error) {
+    console.error('Admin change owner error:', error)
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to change owner',
+    }
+  }
+}
+
   try {
     const supabase = await createClient()
     

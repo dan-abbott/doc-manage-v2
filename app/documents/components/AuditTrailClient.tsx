@@ -30,6 +30,7 @@ const actionConfig: Record<string, { label: string; icon: any; color: string }> 
   'admin_status_change': { label: 'Status Changed (Admin)', icon: ShieldAlert, color: 'text-red-600' },
   'admin_delete': { label: 'Deleted (Admin)', icon: Trash, color: 'text-red-600' },
   'admin_rename': { label: 'Renamed (Admin)', icon: Edit, color: 'text-red-600' },
+  'admin_change_owner': { label: 'Owner Changed (Admin)', icon: UserPlus, color: 'text-red-600' },
 }
 
 function formatDate(dateString: string) {
@@ -96,6 +97,13 @@ function AuditLogEntry({ entry, isLast }: { entry: AuditLogEntry; isLast: boolea
             {entry.details.old_number && entry.details.new_number && (
               <p className="text-orange-700 font-medium">
                 {entry.details.old_number} → {entry.details.new_number}
+              </p>
+            )}
+            
+            {/* Admin owner change */}
+            {entry.details.old_owner && entry.details.new_owner && (
+              <p className="text-orange-700 font-medium">
+                {entry.details.old_owner} → {entry.details.new_owner}
               </p>
             )}
             
