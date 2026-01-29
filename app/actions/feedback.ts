@@ -1,7 +1,8 @@
 'use server'
 
-import { resend, FEEDBACK_EMAIL, FROM_EMAIL } from '@/lib/resend'
-import { createClient } from '@/lib/supabase/server'
+// TEMPORARY: Commented out until resend package is installed
+// import { resend, FEEDBACK_EMAIL, FROM_EMAIL } from '@/lib/resend'
+import { createClient } from '@/lib/supabase/client'
 import { logger } from '@/lib/logger'
 
 export type FeedbackType = 'bug' | 'feature' | 'general'
@@ -161,32 +162,37 @@ export async function submitFeedback(data: FeedbackData) {
       </html>
     `
 
-    // Send email via Resend
-    const emailResult = await resend.emails.send({
-      from: FROM_EMAIL,
-      to: FEEDBACK_EMAIL,
-      subject: `${typeLabel} - ${userData?.full_name || 'User'}`,
-      html: emailHtml,
-      replyTo: userData?.email || user.email,
-    })
-
-    if (emailResult.error) {
-      logger.error('Failed to send feedback email', { 
-        error: emailResult.error,
-        userId: user.id 
-      })
-      
-      return { 
-        success: false, 
-        error: 'Failed to send feedback. Please try again.' 
-      }
-    }
-
-    logger.info('Feedback submitted', {
+    // TEMPORARY: Log feedback instead of sending email until resend is installed
+    logger.info('Feedback submitted (not emailed - resend not installed)', {
       userId: user.id,
+      userEmail: userData?.email || user.email,
+      userName: userData?.full_name || 'Unknown User',
       type: data.type,
-      emailId: emailResult.data?.id,
+      description: data.description,
+      url: data.url,
+      userAgent: data.userAgent,
     })
+    
+    // TODO: Uncomment when resend package is properly installed
+    // const emailResult = await resend.emails.send({
+    //   from: FROM_EMAIL,
+    //   to: FEEDBACK_EMAIL,
+    //   subject: `${typeLabel} - ${userData?.full_name || 'User'}`,
+    //   html: emailHtml,
+    //   replyTo: userData?.email || user.email,
+    // })
+    //
+    // if (emailResult.error) {
+    //   logger.error('Failed to send feedback email', { 
+    //     error: emailResult.error,
+    //     userId: user.id 
+    //   })
+    //   
+    //   return { 
+    //     success: false, 
+    //     error: 'Failed to send feedback. Please try again.' 
+    //   }
+    // }
 
     return { 
       success: true,
