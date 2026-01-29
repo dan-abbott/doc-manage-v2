@@ -3,6 +3,7 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
+import { scanFile } from '@/lib/virustotal'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -75,6 +76,45 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         console.log(`Processing file: ${file.name}, size: ${file.size}`)
 
+        // ==========================================
+        // VIRUS SCAN WITH VIRUSTOTAL
+        // ==========================================
+        console.log('[VirusTotal] Converting file to buffer...')
+        const fileBuffer = await file.arrayBuffer()
+        
+        console.log('[VirusTotal] Starting virus scan for:', file.name, {
+          size: file.size,
+          type: file.type,
+          hasApiKey: !!process.env.VIRUSTOTAL_API_KEY,
+          apiKeyLength: process.env.VIRUSTOTAL_API_KEY?.length || 0,
+        })
+        
+        const scanResult = await scanFile(fileBuffer, file.name)
+        
+        console.log('[VirusTotal] Scan result:', scanResult)
+        
+        if ('error' in scanResult) {
+          console.error('[VirusTotal] Scan error:', scanResult.error, scanResult.details)
+          // Continue with upload if VirusTotal is not configured or fails
+        } else {
+          console.log('[VirusTotal] Scan complete:', {
+            safe: scanResult.safe,
+            malicious: scanResult.malicious,
+            suspicious: scanResult.suspicious,
+            permalink: scanResult.permalink
+          })
+          
+          if (!scanResult.safe) {
+            console.error('[VirusTotal] ⚠️  MALWARE DETECTED - blocking upload')
+            return {
+              success: false,
+              error: `File "${file.name}" blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. This file may contain malware.`
+            }
+          }
+          
+          console.log('[VirusTotal] ✅ File is clean, proceeding with upload')
+        }
+
         // Generate unique file name
         const fileExt = file.name.split('.').pop()
         const fileName = `${documentId}/${Date.now()}-${file.name}`
@@ -82,7 +122,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
         // Upload to Supabase Storage
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(fileName, file, {
+          .upload(fileName, fileBuffer, {
             contentType: file.type,
             upsert: false,
           })
