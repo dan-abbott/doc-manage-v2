@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { scanFile } from '@/lib/virustotal'
 
 export async function POST(request: NextRequest) {
   try {
@@ -55,13 +56,41 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    // Get file buffer
+    const fileBuffer = await file.arrayBuffer()
+
+    // Virus scan with VirusTotal
+    console.log('[v0] Starting virus scan for admin upload:', file.name)
+    
+    const scanResult = await scanFile(fileBuffer, file.name)
+    
+    if ('error' in scanResult) {
+      console.error('[v0] Virus scan error:', scanResult.error)
+      // Log the error but allow upload to continue if VirusTotal is not configured
+    } else {
+      console.log('[v0] Virus scan result:', {
+        safe: scanResult.safe,
+        malicious: scanResult.malicious,
+        suspicious: scanResult.suspicious
+      })
+      
+      if (!scanResult.safe) {
+        return NextResponse.json(
+          { 
+            success: false, 
+            error: `File blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found.` 
+          },
+          { status: 400 }
+        )
+      }
+    }
+
     // Generate file path
     const fileExt = file.name.split('.').pop()
     const fileName = `${document.document_number}${document.version}_${Date.now()}.${fileExt}`
     const filePath = `${documentId}/${fileName}`
 
     // Upload to Supabase Storage
-    const fileBuffer = await file.arrayBuffer()
     const { error: uploadError } = await supabase
       .storage
       .from('documents')
