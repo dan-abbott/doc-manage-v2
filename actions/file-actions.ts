@@ -102,7 +102,10 @@ async function logAudit(
 // ==========================================
 
 export async function uploadFile(formData: FormData) {
+  console.log('🚨 [TEST] uploadFile function called!')
+
   try {
+       
     const supabase = await createClient()
 
     // Get current user
