@@ -11,7 +11,7 @@ import { ScanStatusBadge } from '@/components/ScanStatusBadge'
 import { toast } from 'sonner'
 import { updateDocumentWithFiles } from '@/app/actions/documents-formdata'
 import { deleteFile } from '@/app/actions/documents'
-import { Trash2, FileText, Shield, Download } from 'lucide-react'
+import { Trash2, FileText, Shield } from 'lucide-react'
 
 interface EditDocumentFormProps {
   document: any
@@ -53,11 +53,14 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
     try {
       setIsSubmitting(true)
       
-      // Show info about async scanning
+      // Show scanning notice if files present
       if (files.length > 0) {
-        toast.info('Files will be scanned for viruses in the background', {
-          duration: 4000,
-        })
+        toast.info(
+          files.length === 1 
+            ? 'Scanning file for viruses... This may take 30-60 seconds.'
+            : `Scanning ${files.length} files for viruses... This may take ${files.length * 30}-${files.length * 60} seconds.`,
+          { duration: 5000 }
+        )
       }
 
       // Create FormData for proper file handling
@@ -77,13 +80,11 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       const result = await updateDocumentWithFiles(formData)
 
       if (result.success) {
-        if (result.filesUploaded && result.filesUploaded > 0) {
-          toast.success(
-            `Document updated! ${result.filesUploaded} file(s) uploaded and queued for scanning.`
-          )
-        } else {
-          toast.success('Document updated successfully')
-        }
+        toast.success(
+          files.length > 0
+            ? `Document updated! ${result.filesUploaded} file(s) scanned and uploaded successfully.`
+            : 'Document updated successfully'
+        )
         
         router.push(`/documents?selected=${result.documentNumber}&version=${result.version}`)
         router.refresh()
@@ -182,7 +183,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium">{file.file_name}</p>
-                        <ScanStatusBadge status={scanStatus} />
+                        <ScanStatusBadge status={scanStatus} showText={false} />
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {(file.file_size / 1024 / 1024).toFixed(2)} MB
@@ -217,9 +218,19 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
         
         {/* Virus scanning notice */}
         {files.length > 0 && (
-          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
-            <Shield className="h-4 w-4" />
-            <span>Files will be scanned for viruses after upload</span>
+          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
+            <div className="flex items-start gap-2">
+              <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
+              <div className="text-sm text-blue-900">
+                <p className="font-medium mb-1">Virus Scanning Required</p>
+                <p>
+                  {files.length === 1 
+                    ? 'This file will be scanned for viruses before upload (~30-60 seconds).'
+                    : `All ${files.length} files will be scanned for viruses before upload (~${files.length * 30}-${files.length * 60} seconds).`
+                  }
+                </p>
+              </div>
+            </div>
           </div>
         )}
       </div>
@@ -227,7 +238,15 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       {/* Actions */}
       <div className="flex gap-3">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : 'Save Changes'}
+          {isSubmitting && files.length > 0 && (
+            <Shield className="h-4 w-4 mr-2 animate-pulse" />
+          )}
+          {isSubmitting 
+            ? files.length > 0 
+              ? 'Scanning & Saving...' 
+              : 'Saving...'
+            : 'Save Changes'
+          }
         </Button>
         <Button
           type="button"
