@@ -48,12 +48,13 @@ export async function scanFile(
   }
 
   try {
-    // Convert ArrayBuffer to Buffer if needed
+    // Convert to Uint8Array for Blob creation
     const fileBuffer = Buffer.isBuffer(file) ? file : Buffer.from(file)
+    const uint8Array = new Uint8Array(fileBuffer)
 
     // Create form data for file upload
     const formData = new FormData()
-    const blob = new Blob([fileBuffer])
+    const blob = new Blob([uint8Array])
     formData.append('file', blob, fileName)
 
     console.log(`[VirusTotal] Uploading file for scan: ${fileName} (${fileBuffer.length} bytes)`)
