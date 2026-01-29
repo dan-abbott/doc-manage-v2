@@ -153,9 +153,9 @@ export default function Navigation({ user, isAdmin }: Props) {
             })}
           </div>
 
-          {/* Right side - User menu */}
-          <FeedbackButton />
+          {/* Right side - Feedback & User menu */}
           <div className="flex-shrink-0 flex items-center gap-2">
+            <FeedbackButton />
             <span className="text-sm text-slate-700 font-medium hidden md:inline truncate max-w-[150px]">
               {user.fullName || user.email}
             </span>

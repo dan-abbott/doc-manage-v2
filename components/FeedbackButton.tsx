@@ -1,12 +1,16 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { FeedbackModal } from './FeedbackModal'
 
 export function FeedbackButton() {
   const [isModalOpen, setIsModalOpen] = useState(false)
+
+  useEffect(() => {
+    console.log('[v0] FeedbackButton mounted successfully')
+  }, [])
 
   return (
     <>

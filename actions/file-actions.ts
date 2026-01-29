@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { scanFile } from '@/lib/virustotal'
 
 // ==========================================
 // Types
@@ -185,6 +186,31 @@ export async function uploadFile(formData: FormData) {
       }
     }
 
+    // Virus scan with VirusTotal
+    const fileBuffer = await file.arrayBuffer()
+    console.log('[v0] Starting virus scan for file:', file.name)
+    
+    const scanResult = await scanFile(fileBuffer, file.name)
+    
+    if ('error' in scanResult) {
+      console.error('[v0] Virus scan error:', scanResult.error)
+      // Log the error but allow upload to continue if VirusTotal is not configured
+      // In production, you may want to block uploads if scanning fails
+    } else {
+      console.log('[v0] Virus scan result:', {
+        safe: scanResult.safe,
+        malicious: scanResult.malicious,
+        suspicious: scanResult.suspicious
+      })
+      
+      if (!scanResult.safe) {
+        return {
+          success: false,
+          error: `File blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. This file may contain malware.`,
+        }
+      }
+    }
+
     // Smart file renaming
     const originalFileName = file.name
     const { fileName: displayName, wasRenamed } = smartRenameFile(
@@ -206,10 +232,10 @@ export async function uploadFile(formData: FormData) {
     // Generate file path: documents/{document-id}/{filename}
     const filePath = `${documentId}/${displayName}`
 
-    // Upload to storage
+    // Upload to storage (reuse buffer from virus scan)
     const { error: uploadError } = await supabase.storage
       .from('documents')
-      .upload(filePath, file, {
+      .upload(filePath, fileBuffer, {
         cacheControl: '3600',
         upsert: false // Don't overwrite existing files
       })
