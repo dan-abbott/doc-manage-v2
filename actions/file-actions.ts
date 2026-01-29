@@ -119,6 +119,13 @@ export async function uploadFile(formData: FormData) {
       return { success: false, error: 'Document ID and file are required' }
     }
 
+    console.log('[Upload] Starting file upload:', {
+      documentId,
+      fileName: file.name,
+      fileSize: file.size,
+      fileType: file.type
+    })
+
     // Get document to verify ownership and get document number
     const { data: document, error: docError } = await supabase
       .from('documents')
@@ -186,21 +193,43 @@ export async function uploadFile(formData: FormData) {
       }
     }
 
-    // Virus scan with VirusTotal
+    // ==========================================
+    // VIRUS SCAN - ENHANCED DEBUG LOGGING
+    // ==========================================
+    
+    console.log('[VirusTotal] Pre-scan check:', {
+      fileName: file.name,
+      fileSize: file.size,
+      hasApiKey: !!process.env.VIRUSTOTAL_API_KEY,
+      apiKeyLength: process.env.VIRUSTOTAL_API_KEY?.length || 0,
+      apiKeyPrefix: process.env.VIRUSTOTAL_API_KEY?.substring(0, 8) + '...',
+    })
+
     const fileBuffer = await file.arrayBuffer()
-    console.log('[v0] Starting virus scan for file:', file.name)
+    console.log('[VirusTotal] File buffer created, size:', fileBuffer.byteLength)
+    console.log('[VirusTotal] Starting virus scan for file:', file.name)
     
     const scanResult = await scanFile(fileBuffer, file.name)
     
+    console.log('[VirusTotal] Scan result received:', {
+      hasError: 'error' in scanResult,
+      result: scanResult
+    })
+    
     if ('error' in scanResult) {
-      console.error('[v0] Virus scan error:', scanResult.error)
+      console.error('[VirusTotal] Virus scan error:', scanResult.error)
+      console.error('[VirusTotal] Error details:', scanResult.details)
       // Log the error but allow upload to continue if VirusTotal is not configured
       // In production, you may want to block uploads if scanning fails
     } else {
-      console.log('[v0] Virus scan result:', {
+      console.log('[VirusTotal] Virus scan result:', {
         safe: scanResult.safe,
         malicious: scanResult.malicious,
-        suspicious: scanResult.suspicious
+        suspicious: scanResult.suspicious,
+        undetected: scanResult.undetected,
+        harmless: scanResult.harmless,
+        scanId: scanResult.scanId,
+        permalink: scanResult.permalink
       })
       
       if (!scanResult.safe) {
@@ -209,6 +238,8 @@ export async function uploadFile(formData: FormData) {
           error: `File blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. This file may contain malware.`,
         }
       }
+      
+      console.log('[VirusTotal] ✅ File passed virus scan - safe to upload')
     }
 
     // Smart file renaming
@@ -468,6 +499,8 @@ export async function uploadMultipleFiles(formData: FormData) {
       return { success: false, error: 'Document ID is required' }
     }
 
+    console.log('[Upload Multiple] Starting upload for document:', documentId)
+
     // Get all files from FormData
     const files: File[] = []
     for (const [key, value] of formData.entries()) {
@@ -475,6 +508,8 @@ export async function uploadMultipleFiles(formData: FormData) {
         files.push(value)
       }
     }
+
+    console.log('[Upload Multiple] Found files:', files.length, files.map(f => f.name))
 
     if (files.length === 0) {
       return { success: false, error: 'No files provided' }
@@ -505,11 +540,15 @@ export async function uploadMultipleFiles(formData: FormData) {
     const errors = []
 
     for (const file of files) {
+      console.log('[Upload Multiple] Processing file:', file.name)
+      
       const fileFormData = new FormData()
       fileFormData.append('documentId', documentId)
       fileFormData.append('file', file)
 
       const result = await uploadFile(fileFormData)
+      
+      console.log('[Upload Multiple] File result:', file.name, result.success ? '✅' : '❌', result)
       
       if (result.success) {
         results.push(result.file)
@@ -519,6 +558,12 @@ export async function uploadMultipleFiles(formData: FormData) {
     }
 
     revalidatePath(`/documents/${documentId}`)
+
+    console.log('[Upload Multiple] Complete:', {
+      total: files.length,
+      uploaded: results.length,
+      failed: errors.length
+    })
 
     return {
       success: true,
