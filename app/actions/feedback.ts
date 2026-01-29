@@ -1,9 +1,13 @@
 'use server'
 
-// TEMPORARY: Commented out until resend package is installed
-// import { resend, FEEDBACK_EMAIL, FROM_EMAIL } from '@/lib/resend'
+import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+
+// Initialize Resend directly here
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FEEDBACK_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
+const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev'
 
 export type FeedbackType = 'bug' | 'feature' | 'general'
 
@@ -42,6 +46,21 @@ export async function submitFeedback(data: FeedbackData) {
     }
 
     const typeLabel = typeLabels[data.type] || data.type
+
+    // Log the feedback submission attempt
+    logger.info('Attempting to send feedback email', {
+      userId: user.id,
+      userEmail: userData?.email || user.email,
+      userName: userData?.full_name,
+      type: data.type,
+      description: data.description,
+      url: data.url,
+      userAgent: data.userAgent,
+      fromEmail: FROM_EMAIL,
+      toEmail: FEEDBACK_EMAIL,
+      hasApiKey: !!process.env.RESEND_API_KEY,
+      apiKeyLength: process.env.RESEND_API_KEY?.length || 0,
+    })
 
     // Build email HTML
     const emailHtml = `
@@ -162,45 +181,65 @@ export async function submitFeedback(data: FeedbackData) {
       </html>
     `
 
-    // TEMPORARY: Log feedback instead of sending email until resend is installed
-    logger.info('Feedback submitted (not emailed - resend not installed)', {
-      userId: user.id,
-      userEmail: userData?.email || user.email,
-      userName: userData?.full_name || 'Unknown User',
-      type: data.type,
-      description: data.description,
-      url: data.url,
-      userAgent: data.userAgent,
-    })
-    
-    // TODO: Uncomment when resend package is properly installed
-    // const emailResult = await resend.emails.send({
-    //   from: FROM_EMAIL,
-    //   to: FEEDBACK_EMAIL,
-    //   subject: `${typeLabel} - ${userData?.full_name || 'User'}`,
-    //   html: emailHtml,
-    //   replyTo: userData?.email || user.email,
-    // })
-    //
-    // if (emailResult.error) {
-    //   logger.error('Failed to send feedback email', { 
-    //     error: emailResult.error,
-    //     userId: user.id 
-    //   })
-    //   
-    //   return { 
-    //     success: false, 
-    //     error: 'Failed to send feedback. Please try again.' 
-    //   }
-    // }
+    // Send email via Resend
+    try {
+      const emailResult = await resend.emails.send({
+        from: FROM_EMAIL,
+        to: FEEDBACK_EMAIL,
+        subject: `${typeLabel} - ${userData?.full_name || 'User'}`,
+        html: emailHtml,
+        replyTo: userData?.email || user.email,
+      })
 
-    return { 
-      success: true,
-      message: 'Thank you for your feedback! We\'ll review it soon.'
+      logger.info('Resend API response', { 
+        success: !emailResult.error,
+        error: emailResult.error,
+        data: emailResult.data,
+        emailId: emailResult.data?.id,
+      })
+
+      if (emailResult.error) {
+        logger.error('Failed to send feedback email', { 
+          error: emailResult.error,
+          errorMessage: JSON.stringify(emailResult.error),
+          userId: user.id 
+        })
+        
+        return { 
+          success: false, 
+          error: 'Failed to send feedback. Please try again.' 
+        }
+      }
+
+      logger.info('Feedback email sent successfully', {
+        userId: user.id,
+        type: data.type,
+        emailId: emailResult.data?.id,
+      })
+
+      return { 
+        success: true,
+        message: 'Thank you for your feedback! We\'ll review it soon.'
+      }
+
+    } catch (emailError) {
+      logger.error('Exception sending email', { 
+        error: emailError,
+        errorMessage: emailError instanceof Error ? emailError.message : String(emailError),
+        userId: user.id 
+      })
+      
+      return { 
+        success: false, 
+        error: 'Failed to send feedback email. Please try again.' 
+      }
     }
 
   } catch (error) {
-    logger.error('Error submitting feedback', { error })
+    logger.error('Error submitting feedback', { 
+      error,
+      errorMessage: error instanceof Error ? error.message : String(error),
+    })
     
     return { 
       success: false, 
