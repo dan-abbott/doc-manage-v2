@@ -2,7 +2,7 @@
 
 // TEMPORARY: Commented out until resend package is installed
 // import { resend, FEEDBACK_EMAIL, FROM_EMAIL } from '@/lib/resend'
-import { createClient } from '@/lib/supabase/client'
+import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 
 export type FeedbackType = 'bug' | 'feature' | 'general'
