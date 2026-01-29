@@ -87,8 +87,8 @@ export async function scanFile(
 
     console.log(`[VirusTotal] File uploaded, analysis ID: ${analysisId}`)
 
-    // Poll for results (VirusTotal scans can take a few seconds)
-    const maxAttempts = 20 // 20 attempts * 2 seconds = 40 seconds max wait
+    // Poll for results - INCREASED TO 60 SECONDS
+    const maxAttempts = 30 // 30 attempts * 2 seconds = 60 seconds max wait
     let attempts = 0
     
     while (attempts < maxAttempts) {
@@ -152,7 +152,7 @@ export async function scanFile(
     }
 
     // Timeout - scan took too long
-    console.error('[VirusTotal] Scan timeout after 40 seconds')
+    console.error('[VirusTotal] Scan timeout after 60 seconds')
     return { 
       error: 'Scan timeout - file is still being analyzed',
       details: 'The scan is taking longer than expected. Please try again later.'

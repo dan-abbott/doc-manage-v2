@@ -65,57 +65,83 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Failed to update document' }
     }
 
-    // Handle file uploads - SYNCHRONOUS SCANNING
+    // Handle file uploads - PARALLEL SCANNING
     const files = formData.getAll('files') as File[]
-    const uploadedFiles: any[] = []
     
     if (files.length > 0) {
       console.log(`Uploading ${files.length} files for document ${documentId}`)
       
-      for (let i = 0; i < files.length; i++) {
-        const file = files[i]
-        if (file.size === 0) continue
-
-        console.log(`[${i + 1}/${files.length}] Processing file: ${file.name}, size: ${file.size}`)
-
-        // Convert to buffer
-        const fileBuffer = await file.arrayBuffer()
-
-        // ==========================================
-        // VIRUS SCAN FIRST (BEFORE UPLOAD)
-        // ==========================================
-        console.log(`[${i + 1}/${files.length}] Starting virus scan: ${file.name}`)
-        
-        const scanResult = await scanFile(fileBuffer, file.name)
-        
+      // Convert all files to buffers first
+      const fileBuffers = await Promise.all(
+        files.map(async (file, i) => {
+          if (file.size === 0) return null
+          console.log(`[${i + 1}/${files.length}] Preparing file: ${file.name}`)
+          return {
+            index: i,
+            file,
+            buffer: await file.arrayBuffer(),
+          }
+        })
+      )
+      
+      const validFiles = fileBuffers.filter(f => f !== null)
+      
+      // ==========================================
+      // PARALLEL VIRUS SCANNING
+      // ==========================================
+      console.log(`Starting parallel virus scans for ${validFiles.length} files`)
+      
+      const scanPromises = validFiles.map(async ({ index, file, buffer }) => {
+        console.log(`[${index + 1}/${files.length}] Starting scan: ${file.name}`)
+        const result = await scanFile(buffer, file.name)
+        console.log(`[${index + 1}/${files.length}] Scan complete: ${file.name}`)
+        return { index, file, buffer, scanResult: result }
+      })
+      
+      // Wait for all scans to complete
+      const scanResults = await Promise.all(scanPromises)
+      
+      console.log('All virus scans complete')
+      
+      // Check for malware
+      for (const { index, file, scanResult } of scanResults) {
         if ('error' in scanResult) {
-          console.error(`[${i + 1}/${files.length}] Scan error:`, scanResult.error)
+          console.error(`[${index + 1}/${files.length}] Scan error for ${file.name}:`, scanResult.error)
           // Continue with upload but mark as error
         } else {
-          console.log(`[${i + 1}/${files.length}] Scan complete:`, {
+          console.log(`[${index + 1}/${files.length}] Scan result for ${file.name}:`, {
             safe: scanResult.safe,
             malicious: scanResult.malicious,
             suspicious: scanResult.suspicious,
           })
           
           if (!scanResult.safe) {
-            console.error(`[${i + 1}/${files.length}] ⚠️ MALWARE DETECTED - blocking upload`)
+            console.error(`[${index + 1}/${files.length}] ⚠️ MALWARE DETECTED in ${file.name}`)
             return {
               success: false,
               error: `File "${file.name}" blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. Upload aborted.`
             }
           }
-          
-          console.log(`[${i + 1}/${files.length}] ✅ File is clean, proceeding with upload`)
         }
-
+      }
+      
+      console.log('✅ All files passed virus scan, proceeding with upload')
+      
+      // ==========================================
+      // UPLOAD FILES TO STORAGE
+      // ==========================================
+      const uploadedFiles: any[] = []
+      
+      for (const { index, file, buffer, scanResult } of scanResults) {
+        console.log(`[${index + 1}/${files.length}] Uploading ${file.name} to storage`)
+        
         // Generate unique file name
         const fileName = `${documentId}/${Date.now()}-${file.name}`
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(fileName, fileBuffer, {
+          .upload(fileName, buffer, {
             contentType: file.type,
             upsert: false,
           })
@@ -128,7 +154,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           }
         }
 
-        console.log(`[${i + 1}/${files.length}] File uploaded to storage:`, fileName)
+        console.log(`[${index + 1}/${files.length}] File uploaded to storage`)
 
         // Use service role client for DB insert
         const supabaseAdmin = createServiceRoleClient()
@@ -181,7 +207,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           }
         }
 
-        console.log(`[${i + 1}/${files.length}] ✅ File record created`)
+        console.log(`[${index + 1}/${files.length}] ✅ Complete`)
         uploadedFiles.push(fileRecord)
       }
     }
@@ -192,7 +218,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
       success: true,
       documentNumber: document.document_number,
       version: document.version,
-      filesUploaded: uploadedFiles.length,
+      filesUploaded: files.length,
     }
   } catch (error: any) {
     console.error('Server action error:', error)
