@@ -10,7 +10,7 @@ import { FileUpload } from '@/components/documents/FileUpload'
 import { toast } from 'sonner'
 import { updateDocumentWithFiles } from '@/app/actions/documents-formdata'
 import { deleteFile } from '@/app/actions/documents'
-import { Trash2, FileText } from 'lucide-react'
+import { Trash2, FileText, Shield } from 'lucide-react'
 
 interface EditDocumentFormProps {
   document: any
@@ -19,6 +19,7 @@ interface EditDocumentFormProps {
 export default function EditDocumentForm({ document }: EditDocumentFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'scanning' | 'uploading'>('idle')
   const [title, setTitle] = useState(document.title)
   const [description, setDescription] = useState(document.description || '')
   const [projectCode, setProjectCode] = useState(document.project_code || '')
@@ -51,6 +52,16 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
 
     try {
       setIsSubmitting(true)
+      
+      // Set status based on whether files are being uploaded
+      if (files.length > 0) {
+        setUploadStatus('scanning')
+        
+        // Show toast about virus scanning
+        toast.info('Scanning files for viruses...', {
+          duration: 5000,
+        })
+      }
 
       // Create FormData for proper file handling
       const formData = new FormData()
@@ -80,7 +91,17 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       toast.error('An unexpected error occurred')
     } finally {
       setIsSubmitting(false)
+      setUploadStatus('idle')
     }
+  }
+
+  // Determine button text based on state
+  const getButtonText = () => {
+    if (!isSubmitting) return 'Save Changes'
+    if (files.length > 0 && uploadStatus === 'scanning') {
+      return 'Virus Scanning...'
+    }
+    return 'Saving...'
   }
 
   return (
@@ -112,9 +133,9 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
           id="title"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
-          required
-          maxLength={200}
           placeholder="Enter document title"
+          required
+          disabled={isSubmitting}
         />
       </div>
 
@@ -125,41 +146,41 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
           id="description"
           value={description}
           onChange={(e) => setDescription(e.target.value)}
-          maxLength={1000}
           placeholder="Enter document description (optional)"
           rows={4}
+          disabled={isSubmitting}
         />
       </div>
 
       {/* Project Code */}
       <div>
-        <Label htmlFor="project_code">Project Code</Label>
+        <Label htmlFor="projectCode">Project Code</Label>
         <Input
-          id="project_code"
+          id="projectCode"
           value={projectCode}
-          onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
-          placeholder="P-12345 (optional)"
-          maxLength={7}
+          onChange={(e) => setProjectCode(e.target.value)}
+          placeholder="P-##### (e.g., P-12345)"
+          disabled={isSubmitting}
         />
         <p className="text-sm text-muted-foreground mt-1">
           Format: P-##### (e.g., P-12345)
         </p>
       </div>
 
-      {/* Existing Files */}
+      {/* Current Files */}
       {existingFiles.length > 0 && (
         <div>
           <Label>Current Files</Label>
-          <div className="mt-2 space-y-2">
+          <div className="space-y-2 mt-2">
             {existingFiles.map((file: any) => (
               <div
                 key={file.id}
-                className="flex items-center justify-between p-3 border rounded-lg"
+                className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
               >
                 <div className="flex items-center gap-3">
                   <FileText className="h-5 w-5 text-muted-foreground" />
                   <div>
-                    <p className="font-medium text-sm">{file.file_name}</p>
+                    <p className="text-sm font-medium">{file.file_name}</p>
                     <p className="text-xs text-muted-foreground">
                       {(file.file_size / 1024 / 1024).toFixed(2)} MB
                     </p>
@@ -170,6 +191,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
                   variant="ghost"
                   size="sm"
                   onClick={() => handleDeleteFile(file.id)}
+                  disabled={isSubmitting}
                 >
                   <Trash2 className="h-4 w-4 text-destructive" />
                 </Button>
@@ -183,12 +205,23 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       <div>
         <Label>Add New Files</Label>
         <FileUpload files={files} onFilesChange={setFiles} />
+        
+        {/* Virus scanning notice */}
+        {files.length > 0 && (
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted-foreground">
+            <Shield className="h-4 w-4" />
+            <span>Files will be scanned for viruses before upload</span>
+          </div>
+        )}
       </div>
 
       {/* Actions */}
       <div className="flex gap-3">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? 'Saving...' : 'Save Changes'}
+          {isSubmitting && files.length > 0 && (
+            <Shield className="h-4 w-4 mr-2 animate-pulse" />
+          )}
+          {getButtonText()}
         </Button>
         <Button
           type="button"
