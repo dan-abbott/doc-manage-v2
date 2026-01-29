@@ -3,7 +3,6 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
-import { scanFile } from '@/lib/virustotal'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -65,61 +64,25 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Failed to update document' }
     }
 
-    // Handle file uploads
+    // Handle file uploads - ASYNC SCANNING
     const files = formData.getAll('files') as File[]
+    const uploadedFileIds: string[] = []
     
     if (files.length > 0) {
-      console.log(`Uploading ${files.length} files for document ${documentId}`)
+      console.log(`Uploading ${files.length} files for document ${documentId} (async virus scanning)`)
       
       for (const file of files) {
         if (file.size === 0) continue // Skip empty files
 
         console.log(`Processing file: ${file.name}, size: ${file.size}`)
 
-        // ==========================================
-        // VIRUS SCAN WITH VIRUSTOTAL
-        // ==========================================
-        console.log('[VirusTotal] Converting file to buffer...')
+        // Convert to buffer for upload
         const fileBuffer = await file.arrayBuffer()
-        
-        console.log('[VirusTotal] Starting virus scan for:', file.name, {
-          size: file.size,
-          type: file.type,
-          hasApiKey: !!process.env.VIRUSTOTAL_API_KEY,
-          apiKeyLength: process.env.VIRUSTOTAL_API_KEY?.length || 0,
-        })
-        
-        const scanResult = await scanFile(fileBuffer, file.name)
-        
-        console.log('[VirusTotal] Scan result:', scanResult)
-        
-        if ('error' in scanResult) {
-          console.error('[VirusTotal] Scan error:', scanResult.error, scanResult.details)
-          // Continue with upload if VirusTotal is not configured or fails
-        } else {
-          console.log('[VirusTotal] Scan complete:', {
-            safe: scanResult.safe,
-            malicious: scanResult.malicious,
-            suspicious: scanResult.suspicious,
-            permalink: scanResult.permalink
-          })
-          
-          if (!scanResult.safe) {
-            console.error('[VirusTotal] ⚠️  MALWARE DETECTED - blocking upload')
-            return {
-              success: false,
-              error: `File "${file.name}" blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. This file may contain malware.`
-            }
-          }
-          
-          console.log('[VirusTotal] ✅ File is clean, proceeding with upload')
-        }
 
         // Generate unique file name
-        const fileExt = file.name.split('.').pop()
         const fileName = `${documentId}/${Date.now()}-${file.name}`
 
-        // Upload to Supabase Storage
+        // Upload to Supabase Storage immediately (no scanning yet)
         const { data: uploadData, error: uploadError } = await supabase.storage
           .from('documents')
           .upload(fileName, fileBuffer, {
@@ -138,10 +101,9 @@ export async function updateDocumentWithFiles(formData: FormData) {
         console.log('File uploaded to storage:', fileName)
 
         // Use service role client to bypass RLS for file insert
-        // We've already verified ownership above, so this is safe
         const supabaseAdmin = createServiceRoleClient()
         
-        // Format filename with smart renaming (scrubs old prefix, applies current)
+        // Format filename with smart renaming
         const formattedFileName = formatDocumentFilename(
           document.document_number,
           document.version,
@@ -149,7 +111,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           autoRename
         )
         
-        // Create file record with tenant_id
+        // Create file record with scan_status = 'pending'
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
@@ -160,19 +122,41 @@ export async function updateDocumentWithFiles(formData: FormData) {
             file_size: file.size,
             mime_type: file.type,
             uploaded_by: user.id,
-            tenant_id: document.tenant_id, // Include tenant_id from document
+            tenant_id: document.tenant_id,
+            scan_status: 'pending', // Mark as pending scan
           })
           .select()
+          .single()
 
         if (fileError) {
           console.error('File record creation error:', fileError)
+          
+          // Clean up uploaded file
+          await supabase.storage.from('documents').remove([fileName])
+          
           return { 
             success: false, 
             error: `Failed to save file metadata for ${file.name}: ${fileError.message}` 
           }
         }
 
-        console.log('File record created:', fileRecord)
+        console.log('File record created with scan_status=pending:', fileRecord.id)
+        uploadedFileIds.push(fileRecord.id)
+      }
+
+      // Trigger async virus scans (non-blocking)
+      if (uploadedFileIds.length > 0) {
+        console.log('Triggering async virus scans for', uploadedFileIds.length, 'files')
+        
+        // Fire and forget - don't await
+        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.baselinedocs.com'}/api/scan-files`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ fileIds: uploadedFileIds }),
+        }).catch(err => {
+          console.error('Failed to trigger scan:', err)
+          // Non-fatal - scans will be picked up by cron job
+        })
       }
     }
 
@@ -182,6 +166,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
       success: true,
       documentNumber: document.document_number,
       version: document.version,
+      filesUploaded: uploadedFileIds.length,
     }
   } catch (error: any) {
     console.error('Server action error:', error)
