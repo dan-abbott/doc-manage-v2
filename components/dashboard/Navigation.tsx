@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
+import { FeedbackButton } from '@/components/FeedbackButton'
 
 type Props = {
   user: {
@@ -153,6 +154,7 @@ export default function Navigation({ user, isAdmin }: Props) {
           </div>
 
           {/* Right side - User menu */}
+          <FeedbackButton />
           <div className="flex-shrink-0 flex items-center gap-2">
             <span className="text-sm text-slate-700 font-medium hidden md:inline truncate max-w-[150px]">
               {user.fullName || user.email}
