@@ -1,10 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import { ScanStatusBadge } from '@/components/ScanStatusBadge'
+import { useScanStatusPolling } from '@/hooks/useScanStatusPolling'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
@@ -42,6 +44,18 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
   const files = version.document_files || []
   const approvers = version.approvers || []
+
+  // Extract file IDs for scanning status
+  const fileIds = useMemo(() => files.map((f: any) => f.id), [files])
+  
+  // Check if any files are pending/scanning
+  const hasPendingScans = useMemo(() => 
+    files.some((f: any) => f.scan_status === 'pending' || f.scan_status === 'scanning'),
+    [files]
+  )
+
+  // Auto-refresh when scans complete
+  useScanStatusPolling(fileIds, hasPendingScans)
 
   const cardContent = (
     <>
@@ -117,36 +131,57 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
             <h4 className="text-sm font-medium mb-3">Attached Files</h4>
             {files && files.length > 0 ? (
               <div className="space-y-2">
-                {files.map((file: any) => (
-                  <div
-                    key={file.id}
-                    className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200"
-                  >
-                    <div className="flex items-center gap-3 flex-1 min-w-0">
-                      <FileText className="h-5 w-5 text-gray-400 flex-shrink-0" />
-                      <div className="flex-1 min-w-0">
-                        <p className="text-sm font-medium truncate">{file.original_file_name}</p>
-                        <p className="text-xs text-gray-500">
-                          {(file.file_size / 1024 / 1024).toFixed(2)} MB
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      size="sm"
-                      variant="outline"
-                      asChild
+                {files.map((file: any) => {
+                  const scanStatus = file.scan_status || 'safe'
+                  const isBlocked = scanStatus === 'blocked'
+                  
+                  return (
+                    <div
+                      key={file.id}
+                      className={cn(
+                        "flex items-center justify-between p-3 rounded-lg border",
+                        isBlocked ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+                      )}
                     >
-                      <a
-                        href={`/api/documents/${version.id}/files/${file.id}/download`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                      >
-                        <Download className="h-4 w-4 mr-2" />
-                        Download
-                      </a>
-                    </Button>
-                  </div>
-                ))}
+                      <div className="flex items-center gap-3 flex-1 min-w-0">
+                        <FileText className={cn(
+                          "h-5 w-5 flex-shrink-0",
+                          isBlocked ? "text-red-400" : "text-gray-400"
+                        )} />
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center gap-2">
+                            <p className="text-sm font-medium truncate">{file.original_file_name}</p>
+                            <ScanStatusBadge status={scanStatus} showText={false} />
+                          </div>
+                          <p className="text-xs text-gray-500">
+                            {(file.file_size / 1024 / 1024).toFixed(2)} MB
+                          </p>
+                          {isBlocked && file.scan_result && (
+                            <p className="text-xs text-red-600 mt-1">
+                              Blocked: {file.scan_result.malicious || 0} threats detected
+                            </p>
+                          )}
+                        </div>
+                      </div>
+                      {!isBlocked && (
+                        <Button
+                          size="sm"
+                          variant="outline"
+                          asChild
+                        >
+                          <a
+                            href={`/api/documents/${version.id}/files/${file.id}/download`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                          >
+                            <Download className="h-4 w-4 mr-2" />
+                            Download
+                          </a>
+                        </Button>
+                      )}
+                    </div>
+                  )
+                })}
               </div>
             ) : (
               <p className="text-gray-500 text-sm">No files attached</p>
@@ -205,7 +240,7 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
               <h4 className="text-sm font-medium mb-3">Approval Progress</h4>
               <div className="space-y-2">
                 {approvers.map((approver: any) => (
-                  <div key={approver.id} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-200">
+                  <div key={approver.id} className="flex items-center justify-between p-3 bg-gray-50 rounded border">
                     <div className="flex-1">
                       <p className="text-sm font-medium">{approver.user_email}</p>
                       {approver.action_date && (
