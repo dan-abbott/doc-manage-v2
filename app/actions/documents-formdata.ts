@@ -3,6 +3,7 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
+import { scanFile } from '@/lib/virustotal'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -39,7 +40,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
       .eq('id', tenantId)
       .single()
     
-    const autoRename = tenant?.auto_rename_files ?? true // Default to true
+    const autoRename = tenant?.auto_rename_files ?? true
 
     if (document.created_by !== user.id) {
       return { success: false, error: 'Not authorized' }
@@ -69,21 +70,21 @@ export async function updateDocumentWithFiles(formData: FormData) {
     const uploadedFileIds: string[] = []
     
     if (files.length > 0) {
-      console.log(`Uploading ${files.length} files for document ${documentId} (async virus scanning)`)
+      console.log(`Uploading ${files.length} files for document ${documentId}`)
       
       for (const file of files) {
-        if (file.size === 0) continue // Skip empty files
+        if (file.size === 0) continue
 
         console.log(`Processing file: ${file.name}, size: ${file.size}`)
 
-        // Convert to buffer for upload
+        // Convert to buffer
         const fileBuffer = await file.arrayBuffer()
 
         // Generate unique file name
         const fileName = `${documentId}/${Date.now()}-${file.name}`
 
-        // Upload to Supabase Storage immediately (no scanning yet)
-        const { data: uploadData, error: uploadError } = await supabase.storage
+        // Upload to Supabase Storage immediately
+        const { error: uploadError } = await supabase.storage
           .from('documents')
           .upload(fileName, fileBuffer, {
             contentType: file.type,
@@ -100,7 +101,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         console.log('File uploaded to storage:', fileName)
 
-        // Use service role client to bypass RLS for file insert
+        // Use service role client for DB insert
         const supabaseAdmin = createServiceRoleClient()
         
         // Format filename with smart renaming
@@ -123,39 +124,25 @@ export async function updateDocumentWithFiles(formData: FormData) {
             mime_type: file.type,
             uploaded_by: user.id,
             tenant_id: document.tenant_id,
-            scan_status: 'pending', // Mark as pending scan
+            scan_status: 'pending',
           })
           .select()
           .single()
 
         if (fileError) {
           console.error('File record creation error:', fileError)
-          
-          // Clean up uploaded file
           await supabase.storage.from('documents').remove([fileName])
-          
           return { 
             success: false, 
             error: `Failed to save file metadata for ${file.name}: ${fileError.message}` 
           }
         }
 
-        console.log('File record created with scan_status=pending:', fileRecord.id)
         uploadedFileIds.push(fileRecord.id)
-      }
 
-      // Trigger async virus scans (non-blocking)
-      if (uploadedFileIds.length > 0) {
-        console.log('Triggering async virus scans for', uploadedFileIds.length, 'files')
-        
-        // Fire and forget - don't await
-        fetch(`${process.env.NEXT_PUBLIC_APP_URL || 'https://app.baselinedocs.com'}/api/scan-files`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ fileIds: uploadedFileIds }),
-        }).catch(err => {
-          console.error('Failed to trigger scan:', err)
-          // Non-fatal - scans will be picked up by cron job
+        // Start async scan immediately (fire and forget)
+        scanFileAsync(fileRecord.id, fileName, file.name, fileBuffer).catch(err => {
+          console.error('[Async Scan] Error:', err)
         })
       }
     }
@@ -171,5 +158,96 @@ export async function updateDocumentWithFiles(formData: FormData) {
   } catch (error: any) {
     console.error('Server action error:', error)
     return { success: false, error: error.message || 'An error occurred' }
+  }
+}
+
+// Background scan function
+async function scanFileAsync(
+  fileId: string,
+  filePath: string,
+  fileName: string,
+  fileBuffer: ArrayBuffer
+) {
+  const supabase = createServiceRoleClient()
+
+  try {
+    console.log('[Async Scan] Starting scan for file:', fileId, fileName)
+
+    // Update status to 'scanning'
+    await supabase
+      .from('document_files')
+      .update({ scan_status: 'scanning' })
+      .eq('id', fileId)
+
+    // Scan with VirusTotal
+    const scanResult = await scanFile(fileBuffer, fileName)
+
+    if ('error' in scanResult) {
+      console.error('[Async Scan] Scan error:', scanResult.error)
+      
+      await supabase
+        .from('document_files')
+        .update({
+          scan_status: 'error',
+          scan_result: scanResult,
+          scanned_at: new Date().toISOString(),
+        })
+        .eq('id', fileId)
+
+      return
+    }
+
+    // Check if file is safe
+    if (!scanResult.safe) {
+      console.error('[Async Scan] ⚠️ MALWARE DETECTED:', fileName)
+      console.error('[Async Scan] Details:', {
+        malicious: scanResult.malicious,
+        suspicious: scanResult.suspicious,
+      })
+
+      // Update record as blocked
+      await supabase
+        .from('document_files')
+        .update({
+          scan_status: 'blocked',
+          scan_result: scanResult,
+          scanned_at: new Date().toISOString(),
+        })
+        .eq('id', fileId)
+
+      // Delete file from storage
+      await supabase.storage
+        .from('documents')
+        .remove([filePath])
+
+      console.log('[Async Scan] Blocked file deleted from storage')
+      return
+    }
+
+    // File is clean
+    console.log('[Async Scan] ✅ File is clean:', fileName)
+
+    await supabase
+      .from('document_files')
+      .update({
+        scan_status: 'safe',
+        scan_result: scanResult,
+        scanned_at: new Date().toISOString(),
+      })
+      .eq('id', fileId)
+
+    console.log('[Async Scan] File marked as safe')
+
+  } catch (error: any) {
+    console.error('[Async Scan] Error:', error)
+
+    await supabase
+      .from('document_files')
+      .update({
+        scan_status: 'error',
+        scan_result: { error: error.message },
+        scanned_at: new Date().toISOString(),
+      })
+      .eq('id', fileId)
   }
 }
