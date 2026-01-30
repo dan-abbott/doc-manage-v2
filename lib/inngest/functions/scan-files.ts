@@ -51,7 +51,7 @@ export const scanPendingFiles = inngest.createFunction(
     })
 
     // Step 3: Download file from storage
-    const fileBuffer = await step.run('download-file', async () => {
+    const fileBlob = await step.run('download-file', async () => {
       const supabase = createServiceRoleClient()
       
       const { data, error } = await supabase.storage
@@ -62,16 +62,19 @@ export const scanPendingFiles = inngest.createFunction(
         throw new Error(`Failed to download file: ${error?.message}`)
       }
       
+      // Convert Blob to base64 string for serialization
       const buffer = await data.arrayBuffer()
+      const base64 = Buffer.from(buffer).toString('base64')
       console.log('[Inngest] File downloaded, size:', buffer.byteLength)
-      return buffer
+      return base64
     })
 
     // Step 4: Scan with VirusTotal
     const scanResult = await step.run('scan-with-virustotal', async () => {
       console.log('[Inngest] Scanning with VirusTotal...')
-      // Convert to Buffer for scanFile function
-      const result = await scanFile(Buffer.from(fileBuffer), fileData.original_file_name)
+      // Convert base64 back to Buffer for scanFile function
+      const fileBuffer = Buffer.from(fileBlob, 'base64')
+      const result = await scanFile(fileBuffer, fileData.original_file_name)
       console.log('[Inngest] Scan complete:', 
         'error' in result ? 'ERROR' : result.safe ? 'SAFE' : 'MALWARE')
       return result
