@@ -13,6 +13,7 @@ interface AdminFileActionsProps {
   documentNumber: string
   files: Array<{
     id: string
+    file_name: string
     original_file_name: string
     file_size: number
   }>
