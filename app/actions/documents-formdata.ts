@@ -3,7 +3,6 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
-import { scanFile } from '@/lib/virustotal'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -65,83 +64,29 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Failed to update document' }
     }
 
-    // Handle file uploads - PARALLEL SCANNING
+    // Handle file uploads - NO SCANNING (just mark as pending)
     const files = formData.getAll('files') as File[]
+    const uploadedFiles: any[] = []
     
     if (files.length > 0) {
       console.log(`Uploading ${files.length} files for document ${documentId}`)
       
-      // Convert all files to buffers first
-      const fileBuffers = await Promise.all(
-        files.map(async (file, i) => {
-          if (file.size === 0) return null
-          console.log(`[${i + 1}/${files.length}] Preparing file: ${file.name}`)
-          return {
-            index: i,
-            file,
-            buffer: await file.arrayBuffer(),
-          }
-        })
-      )
-      
-      const validFiles = fileBuffers.filter(f => f !== null)
-      
-      // ==========================================
-      // PARALLEL VIRUS SCANNING
-      // ==========================================
-      console.log(`Starting parallel virus scans for ${validFiles.length} files`)
-      
-      const scanPromises = validFiles.map(async ({ index, file, buffer }) => {
-        console.log(`[${index + 1}/${files.length}] Starting scan: ${file.name}`)
-        const result = await scanFile(buffer, file.name)
-        console.log(`[${index + 1}/${files.length}] Scan complete: ${file.name}`)
-        return { index, file, buffer, scanResult: result }
-      })
-      
-      // Wait for all scans to complete
-      const scanResults = await Promise.all(scanPromises)
-      
-      console.log('All virus scans complete')
-      
-      // Check for malware
-      for (const { index, file, scanResult } of scanResults) {
-        if ('error' in scanResult) {
-          console.error(`[${index + 1}/${files.length}] Scan error for ${file.name}:`, scanResult.error)
-          // Continue with upload but mark as error
-        } else {
-          console.log(`[${index + 1}/${files.length}] Scan result for ${file.name}:`, {
-            safe: scanResult.safe,
-            malicious: scanResult.malicious,
-            suspicious: scanResult.suspicious,
-          })
-          
-          if (!scanResult.safe) {
-            console.error(`[${index + 1}/${files.length}] ⚠️ MALWARE DETECTED in ${file.name}`)
-            return {
-              success: false,
-              error: `File "${file.name}" blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. Upload aborted.`
-            }
-          }
-        }
-      }
-      
-      console.log('✅ All files passed virus scan, proceeding with upload')
-      
-      // ==========================================
-      // UPLOAD FILES TO STORAGE
-      // ==========================================
-      const uploadedFiles: any[] = []
-      
-      for (const { index, file, buffer, scanResult } of scanResults) {
-        console.log(`[${index + 1}/${files.length}] Uploading ${file.name} to storage`)
-        
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i]
+        if (file.size === 0) continue
+
+        console.log(`[${i + 1}/${files.length}] Processing file: ${file.name}, size: ${file.size}`)
+
+        // Convert to buffer
+        const fileBuffer = await file.arrayBuffer()
+
         // Generate unique file name
         const fileName = `${documentId}/${Date.now()}-${file.name}`
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
           .from('documents')
-          .upload(fileName, buffer, {
+          .upload(fileName, fileBuffer, {
             contentType: file.type,
             upsert: false,
           })
@@ -154,7 +99,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           }
         }
 
-        console.log(`[${index + 1}/${files.length}] File uploaded to storage`)
+        console.log(`[${i + 1}/${files.length}] File uploaded to storage:`, fileName)
 
         // Use service role client for DB insert
         const supabaseAdmin = createServiceRoleClient()
@@ -167,19 +112,8 @@ export async function updateDocumentWithFiles(formData: FormData) {
           autoRename
         )
         
-        // Determine scan status based on scan result
-        let scanStatus = 'safe'
-        let scanResultData = null
-        
-        if ('error' in scanResult) {
-          scanStatus = 'error'
-          scanResultData = scanResult
-        } else {
-          scanStatus = 'safe'
-          scanResultData = scanResult
-        }
-        
-        // Create file record
+        // Create file record with scan_status='pending'
+        // Cron job will pick it up and scan in background
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
@@ -191,9 +125,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
             mime_type: file.type,
             uploaded_by: user.id,
             tenant_id: document.tenant_id,
-            scan_status: scanStatus,
-            scan_result: scanResultData,
-            scanned_at: new Date().toISOString(),
+            scan_status: 'pending', // Will be scanned by cron job
           })
           .select()
           .single()
@@ -207,7 +139,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           }
         }
 
-        console.log(`[${index + 1}/${files.length}] ✅ Complete`)
+        console.log(`[${i + 1}/${files.length}] ✅ File queued for scanning`)
         uploadedFiles.push(fileRecord)
       }
     }
@@ -218,7 +150,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
       success: true,
       documentNumber: document.document_number,
       version: document.version,
-      filesUploaded: files.length,
+      filesUploaded: uploadedFiles.length,
     }
   } catch (error: any) {
     console.error('Server action error:', error)

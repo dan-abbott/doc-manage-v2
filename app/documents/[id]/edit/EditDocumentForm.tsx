@@ -53,13 +53,11 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
     try {
       setIsSubmitting(true)
       
-      // Show scanning notice if files present
+      // Show background scanning notice if files present
       if (files.length > 0) {
         toast.info(
-          files.length === 1 
-            ? 'Scanning file for viruses... This may take 30-60 seconds.'
-            : `Scanning ${files.length} files for viruses... This may take ${files.length * 30}-${files.length * 60} seconds.`,
-          { duration: 5000 }
+          `Uploading ${files.length} file${files.length > 1 ? 's' : ''}. Virus scanning will happen in the background.`,
+          { duration: 4000 }
         )
       }
 
@@ -82,7 +80,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       if (result.success) {
         toast.success(
           files.length > 0
-            ? `Document updated! ${result.filesUploaded} file(s) scanned and uploaded successfully.`
+            ? `Document updated! ${result.filesUploaded} file(s) queued for virus scanning.`
             : 'Document updated successfully'
         )
         
@@ -216,18 +214,21 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
         <Label>Add New Files</Label>
         <FileUpload files={files} onFilesChange={setFiles} />
         
-        {/* Virus scanning notice */}
+        {/* Background scanning notice */}
         {files.length > 0 && (
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-2">
               <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
               <div className="text-sm text-blue-900">
-                <p className="font-medium mb-1">Virus Scanning Required</p>
+                <p className="font-medium mb-1">Background Virus Scanning</p>
                 <p>
                   {files.length === 1 
-                    ? 'This file will be scanned for viruses before upload (~30-60 seconds).'
-                    : `All ${files.length} files will be scanned for viruses before upload (~${files.length * 30}-${files.length * 60} seconds).`
+                    ? 'This file will be scanned for viruses in the background. You can continue working immediately.'
+                    : `All ${files.length} files will be scanned for viruses in the background. You can continue working immediately.`
                   }
+                </p>
+                <p className="text-xs text-blue-700 mt-1">
+                  Scanning typically completes within 2-5 minutes. Files show "⏳ Pending" status until scanned.
                 </p>
               </div>
             </div>
@@ -238,15 +239,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       {/* Actions */}
       <div className="flex gap-3">
         <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting && files.length > 0 && (
-            <Shield className="h-4 w-4 mr-2 animate-pulse" />
-          )}
-          {isSubmitting 
-            ? files.length > 0 
-              ? 'Scanning & Saving...' 
-              : 'Saving...'
-            : 'Save Changes'
-          }
+          {isSubmitting ? 'Saving...' : 'Save Changes'}
         </Button>
         <Button
           type="button"
