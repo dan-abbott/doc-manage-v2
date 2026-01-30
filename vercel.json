@@ -1,8 +1,3 @@
 {
-  "crons": [
-    {
-      "path": "/api/cron/scan-pending-files",
-      "schedule": "*/2 * * * *"
-    }
-  ]
+  "comment": "Cron removed - not available on Hobby plan. Use manual trigger or upgrade to Pro."
 }

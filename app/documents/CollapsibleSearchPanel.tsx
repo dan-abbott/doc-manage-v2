@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Search, X, ChevronLeft, ChevronRight } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import DocumentsTable from './DocumentsTable'
+import { ScanTrigger } from '@/components/ScanTrigger'
 
 interface CollapsibleSearchPanelProps {
   documentTypes: Array<{ id: string; name: string }>
@@ -177,8 +178,11 @@ export default function CollapsibleSearchPanel({
     <div className="w-96 lg:w-[40%] xl:w-[35%] 2xl:w-[30%] max-w-2xl bg-white border-r flex flex-col overflow-hidden">
       {/* Header with collapse button */}
       <div className="p-3 border-b flex items-center justify-between">
-        <div>
-          <h2 className="text-base font-semibold">Search & Filter</h2>
+        <div className="flex-1">
+          <div className="flex items-center gap-2 mb-1">
+            <h2 className="text-base font-semibold">Search & Filter</h2>
+            <ScanTrigger />
+          </div>
           <p className="text-xs text-gray-500">{totalCount} document{totalCount === 1 ? '' : 's'}</p>
         </div>
         <button
