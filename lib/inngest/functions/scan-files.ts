@@ -70,7 +70,8 @@ export const scanPendingFiles = inngest.createFunction(
     // Step 4: Scan with VirusTotal
     const scanResult = await step.run('scan-with-virustotal', async () => {
       console.log('[Inngest] Scanning with VirusTotal...')
-      const result = await scanFile(fileBuffer, fileData.original_file_name)
+      // Convert to Buffer for scanFile function
+      const result = await scanFile(Buffer.from(fileBuffer), fileData.original_file_name)
       console.log('[Inngest] Scan complete:', 
         'error' in result ? 'ERROR' : result.safe ? 'SAFE' : 'MALWARE')
       return result
