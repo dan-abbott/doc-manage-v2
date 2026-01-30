@@ -4,8 +4,9 @@
   "description": "",
   "main": "index.js",
   "scripts": {
-    "dev": "next dev",
-    "build": "next build",
+    "validate-env": "node scripts/validate-env.js",
+    "dev": "npm run validate-env && next dev",
+    "build": "npm run validate-env && next build",
     "start": "next start",
     "lint": "next lint"
   },
