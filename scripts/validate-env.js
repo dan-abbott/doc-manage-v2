@@ -9,10 +9,10 @@
  * Usage:
  *   node scripts/validate-env.js
  *   npm run validate-env
+ * 
+ * Note: This script does NOT load .env files - it only validates what's already
+ * in process.env. Next.js automatically loads .env files during build.
  */
-
-// Load environment variables
-require('dotenv').config({ path: '.env.local' })
 
 const ENV_VARS = [
   // Supabase - Required
@@ -160,9 +160,16 @@ function printResults(result) {
   
   if (!result.valid) {
     console.log('\n💡 Next steps:')
-    console.log('   1. Create a .env.local file if it doesn\'t exist')
-    console.log('   2. Copy .env.example and fill in the missing values')
-    console.log('   3. Get credentials from:')
+    console.log('   For local development:')
+    console.log('      1. Create a .env.local file if it doesn\'t exist')
+    console.log('      2. Copy .env.example and fill in the missing values')
+    console.log('')
+    console.log('   For Vercel deployment:')
+    console.log('      1. Go to your project settings')
+    console.log('      2. Navigate to Environment Variables')
+    console.log('      3. Add the missing variables listed above')
+    console.log('')
+    console.log('   Get credentials from:')
     console.log('      - Supabase: https://supabase.com/dashboard')
     console.log('      - Sentry: https://sentry.io/')
     console.log('      - Resend: https://resend.com/')
