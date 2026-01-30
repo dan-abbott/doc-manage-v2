@@ -87,15 +87,16 @@ export async function scanFile(
 
     console.log(`[VirusTotal] File uploaded, analysis ID: ${analysisId}`)
 
-    // Poll for results - INCREASED TO 60 SECONDS
-    const maxAttempts = 30 // 30 attempts * 2 seconds = 60 seconds max wait
+    // Poll for results - EXTENDED TO 3 MINUTES for background scanning
+    // Background scans via Inngest can afford to wait longer
+    const maxAttempts = 60 // 60 attempts * 3 seconds = 180 seconds (3 minutes) max wait
     let attempts = 0
     
     while (attempts < maxAttempts) {
       attempts++
       
-      // Wait before polling (2 seconds)
-      await new Promise(resolve => setTimeout(resolve, 2000))
+      // Wait before polling (3 seconds for background scans)
+      await new Promise(resolve => setTimeout(resolve, 3000))
       
       console.log(`[VirusTotal] Polling for results (attempt ${attempts}/${maxAttempts})`)
       
@@ -152,10 +153,10 @@ export async function scanFile(
     }
 
     // Timeout - scan took too long
-    console.error('[VirusTotal] Scan timeout after 60 seconds')
+    console.error('[VirusTotal] Scan timeout after 180 seconds (3 minutes)')
     return { 
-      error: 'Scan timeout - file is still being analyzed',
-      details: 'The scan is taking longer than expected. Please try again later.'
+      error: 'Scan timeout - file is still being analyzed after 3 minutes',
+      details: 'The scan is taking longer than expected. The file may be too large or complex. Please try a smaller file.'
     }
 
   } catch (error: any) {

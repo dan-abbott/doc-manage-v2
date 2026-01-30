@@ -13,6 +13,8 @@ export const scanPendingFiles = inngest.createFunction(
     id: 'scan-pending-files',
     name: 'Scan Pending Files for Viruses',
     retries: 3, // Retry up to 3 times on failure
+    // Extend timeout for large files - VirusTotal can take 3+ minutes
+    maxDuration: '5m', // 5 minutes total timeout
   },
   { event: 'file/uploaded' },
   async ({ event, step }) => {

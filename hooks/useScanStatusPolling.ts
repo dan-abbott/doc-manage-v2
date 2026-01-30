@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 
 /**
@@ -17,6 +17,7 @@ export function useScanStatusPolling(
 ) {
   const router = useRouter()
   const [isPolling, setIsPolling] = useState(false)
+  const lastPendingCountRef = useRef<number>(fileIds.length)
 
   useEffect(() => {
     if (!enabled || fileIds.length === 0) {
@@ -45,13 +46,20 @@ export function useScanStatusPolling(
 
         const data = await response.json()
 
-        // data.pendingCount tells us how many files are still scanning
+        // Check if pending count decreased (a file completed)
+        if (data.pendingCount < lastPendingCountRef.current) {
+          console.log('[Scan Poll] File completed! Refreshing...', {
+            was: lastPendingCountRef.current,
+            now: data.pendingCount
+          })
+          router.refresh() // Refresh to show updated badge
+          lastPendingCountRef.current = data.pendingCount
+        }
+
+        // If all files done scanning - stop polling
         if (data.pendingCount === 0) {
-          // All files done scanning - refresh the page
-          console.log('[Scan Poll] All scans complete, refreshing...')
-          router.refresh()
+          console.log('[Scan Poll] All scans complete')
           
-          // Stop polling
           if (intervalId) {
             clearInterval(intervalId)
             intervalId = null
@@ -67,6 +75,9 @@ export function useScanStatusPolling(
         }
       }
     }
+
+    // Initialize the ref
+    lastPendingCountRef.current = fileIds.length
 
     // Start polling
     intervalId = setInterval(checkScanStatus, intervalMs)
