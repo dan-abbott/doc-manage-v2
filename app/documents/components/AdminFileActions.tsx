@@ -148,7 +148,7 @@ export default function AdminFileActions({
                   className="flex items-center justify-between p-2 bg-white rounded border"
                 >
                   <div className="flex-1 min-w-0">
-                    <p className="text-sm truncate">{file.original_file_name}</p>
+                    <p className="text-sm truncate">{file.file_name}</p>
                     <p className="text-xs text-gray-500">
                       {(file.file_size / 1024 / 1024).toFixed(2)} MB
                     </p>
