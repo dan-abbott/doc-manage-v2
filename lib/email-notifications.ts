@@ -7,6 +7,7 @@
 
 import { Resend } from 'resend'
 import { createClient } from '@/lib/supabase/server'
+import { createServiceRoleClient } from '@/lib/supabase/server'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const fromEmail = process.env.EMAIL_FROM || 'notifications@baselinedocs.com'
@@ -25,11 +26,16 @@ interface EmailContext {
 /**
  * Check if user should receive this notification
  */
-async function shouldNotify(
+async function shouldNotifyOrQueue(
   userId: string,
-  notificationType: 'approval_requested' | 'approval_completed' | 'document_rejected' | 'document_released'
-): Promise<{ send: boolean; email: string | null; userName: string }> {
-  const supabase = await createClient()
+  notificationType: string
+): Promise<{
+  send: 'immediate' | 'queue' | 'disabled'
+  email: string | null
+  userName: string
+  tenantId: string | null
+  digestTime: string | null
+}>
 
   // Get user info
   const { data: user } = await supabase

@@ -7,7 +7,7 @@ export async function PUT(request: NextRequest) {
 
     // Get current user
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -18,6 +18,8 @@ export async function PUT(request: NextRequest) {
       approval_completed,
       document_rejected,
       document_released,
+      delivery_mode,  // NEW
+      digest_time,  // NEW
     } = body
 
     // Validate booleans
@@ -25,26 +27,26 @@ export async function PUT(request: NextRequest) {
       typeof approval_requested !== 'boolean' ||
       typeof approval_completed !== 'boolean' ||
       typeof document_rejected !== 'boolean' ||
-      typeof document_released !== 'boolean'
+      typeof document_released !== 'boolean' ||
+      !['immediate', 'digest'].includes(delivery_mode) ||  // NEW
+      typeof digest_time !== 'string'  // NEW
     ) {
       return NextResponse.json({ error: 'Invalid preferences format' }, { status: 400 })
     }
+
 
     // Update or insert preferences
     const { error } = await supabase
       .from('user_notification_preferences')
       .upsert({
         user_id: user.id,
-        tenant_id: (await supabase
-          .from('users')
-          .select('tenant_id')
-          .eq('id', user.id)
-          .single()
-        ).data?.tenant_id,
+        tenant_id: ...,
         approval_requested,
         approval_completed,
         document_rejected,
         document_released,
+        delivery_mode,  // NEW
+        digest_time,  // NEW
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,tenant_id'
@@ -57,14 +59,14 @@ export async function PUT(request: NextRequest) {
 
     console.log(`[Notifications API] Updated preferences for user ${user.id}`)
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       success: true,
-      message: 'Preferences saved successfully' 
+      message: 'Preferences saved successfully'
     })
   } catch (error: any) {
     console.error('[Notifications API] Error:', error)
-    return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+    return NextResponse.json({
+      error: error.message || 'Internal server error'
     }, { status: 500 })
   }
 }
@@ -75,7 +77,7 @@ export async function GET(request: NextRequest) {
 
     // Get current user
     const { data: { user } } = await supabase.auth.getUser()
-    
+
     if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
@@ -111,8 +113,8 @@ export async function GET(request: NextRequest) {
     })
   } catch (error: any) {
     console.error('[Notifications API] Error:', error)
-    return NextResponse.json({ 
-      error: error.message || 'Internal server error' 
+    return NextResponse.json({
+      error: error.message || 'Internal server error'
     }, { status: 500 })
   }
 }

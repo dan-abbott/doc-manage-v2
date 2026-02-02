@@ -14,6 +14,8 @@ interface NotificationPreferences {
   approval_completed: boolean
   document_rejected: boolean
   document_released: boolean
+  delivery_mode: 'immediate' | 'digest'  // NEW
+  digest_time: string  // NEW (e.g., "08:00:00")
 }
 
 interface Props {
@@ -114,6 +116,35 @@ export default function NotificationSettingsClient({ preferences }: Props) {
         </CardContent>
       </Card>
 
+      {/* Delivery Mode Section */}
+      <Card>
+        <CardHeader>
+          <CardTitle>Delivery Mode</CardTitle>
+          <CardDescription>Choose when to receive email notifications</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <RadioGroup value={prefs.delivery_mode} onValueChange={...}>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="immediate" id="immediate" />
+              <Label>Immediate - Receive emails instantly</Label>
+            </div>
+            <div className="flex items-center space-x-2">
+              <RadioGroupItem value="digest" id="digest" />
+              <Label>Daily Digest - Receive a summary once per day</Label>
+            </div>
+          </RadioGroup>
+
+          {prefs.delivery_mode === 'digest' && (
+            <Select value={prefs.digest_time} onValueChange={...}>
+              <option value="06:00:00">6:00 AM</option>
+              <option value="07:00:00">7:00 AM</option>
+              <option value="08:00:00">8:00 AM</option>
+              ...
+            </Select>
+          )}
+        </CardContent>
+      </Card>
+
       {/* Notification Settings */}
       <Card>
         <CardHeader>
@@ -203,7 +234,7 @@ export default function NotificationSettingsClient({ preferences }: Props) {
             About Email Notifications
           </h3>
           <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
-            <li>Emails are sent immediately when events occur</li>
+            <li>Approval requests and rejections are always sent immediately</li>
             <li>Important notifications ensure critical workflow steps aren't missed</li>
             <li>You can change these settings at any time</li>
             <li>All emails include a link to unsubscribe or manage preferences</li>
