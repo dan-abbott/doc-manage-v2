@@ -164,7 +164,7 @@ export async function POST(request: Request) {
             .update({
               status: 'failed',
               error_message: error instanceof Error ? error.message : 'Unknown error',
-              retry_count: supabase.sql('retry_count + 1'),
+              retry_count: 1,
             })
             .eq('user_id', user.id)
             .eq('status', 'pending')
