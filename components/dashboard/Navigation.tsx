@@ -4,18 +4,9 @@ import { createClient } from '@/lib/supabase/client';
 import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { FeedbackButton } from '@/components/FeedbackButton'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { ChevronDown, Settings, LogOut, Bell } from 'lucide-react'
 
 type Props = {
   user: {
@@ -31,6 +22,20 @@ export default function Navigation({ user, isAdmin }: Props) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [companyLogo, setCompanyLogo] = useState<string | null>(null);
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+      }
+    }
+
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   // Fetch company logo
   useEffect(() => {
@@ -167,39 +172,60 @@ export default function Navigation({ user, isAdmin }: Props) {
             <FeedbackButton />
             
             {/* User Dropdown Menu */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 whitespace-nowrap">
-                  <span className="hidden md:inline truncate max-w-[150px]">
-                    {user.fullName || user.email}
-                  </span>
-                  <span className="md:hidden">Account</span>
-                  <ChevronDown className="h-4 w-4 text-slate-500" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuLabel className="font-normal">
-                  <div className="flex flex-col space-y-1">
-                    <p className="text-sm font-medium leading-none">{user.fullName}</p>
-                    <p className="text-xs leading-none text-slate-500">
-                      {user.email}
-                    </p>
+            <div className="relative" ref={dropdownRef}>
+              <button
+                onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+                className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 whitespace-nowrap"
+              >
+                <span className="hidden md:inline truncate max-w-[150px]">
+                  {user.fullName || user.email}
+                </span>
+                <span className="md:hidden">Account</span>
+                <svg 
+                  className={`w-4 h-4 transition-transform ${isDropdownOpen ? 'rotate-180' : ''}`}
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                </svg>
+              </button>
+
+              {/* Dropdown Menu */}
+              {isDropdownOpen && (
+                <div className="absolute right-0 mt-2 w-56 bg-white rounded-md shadow-lg border border-slate-200 py-1 z-50">
+                  {/* User Info */}
+                  <div className="px-4 py-3 border-b border-slate-200">
+                    <p className="text-sm font-medium text-slate-900">{user.fullName}</p>
+                    <p className="text-xs text-slate-500 truncate">{user.email}</p>
                   </div>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem asChild>
-                  <Link href="/settings/notifications" className="flex items-center cursor-pointer">
-                    <Bell className="mr-2 h-4 w-4" />
-                    <span>Email Notifications</span>
+
+                  {/* Menu Items */}
+                  <Link
+                    href="/settings/notifications"
+                    onClick={() => setIsDropdownOpen(false)}
+                    className="flex items-center px-4 py-2 text-sm text-slate-700 hover:bg-slate-50"
+                  >
+                    <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                    </svg>
+                    Email Notifications
                   </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600">
-                  <LogOut className="mr-2 h-4 w-4" />
-                  <span>Sign Out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+
+                  <div className="border-t border-slate-200 my-1"></div>
+
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full flex items-center px-4 py-2 text-sm text-red-600 hover:bg-red-50"
+                  >
+                    <svg className="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
       </div>
