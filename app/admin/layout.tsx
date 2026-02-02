@@ -1,7 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { usePathname } from 'next/navigation'
+import AdminNavTabs from './AdminNavTabs'
 
 export default async function AdminLayout({
   children,
@@ -38,13 +37,7 @@ export default async function AdminLayout({
         </div>
 
         {/* Admin Navigation Tabs */}
-        <div className="mb-6">
-          <nav className="flex space-x-4 border-b border-gray-200">
-            <AdminNavLink href="/admin/users" label="User Management" />
-            <AdminNavLink href="/admin/settings" label="Company Settings" />
-            <AdminNavLink href="/admin/document-types" label="Document Types" />
-          </nav>
-        </div>
+        <AdminNavTabs />
 
         {/* Content */}
         <div>
@@ -52,18 +45,5 @@ export default async function AdminLayout({
         </div>
       </div>
     </div>
-  )
-}
-
-function AdminNavLink({ href, label }: { href: string; label: string }) {
-  // This needs to be a client component for usePathname
-  // For now, using a simple Link - you can enhance with active state later
-  return (
-    <Link
-      href={href}
-      className="px-4 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:border-b-2 hover:border-blue-600 transition-colors"
-    >
-      {label}
-    </Link>
   )
 }
