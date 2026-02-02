@@ -8,6 +8,8 @@ import { createDocumentSchema } from '@/lib/validation/schemas'
 import { validateFormData, validateFile } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } from '@/lib/security/sanitize'
 import { getCurrentTenantId } from '@/lib/tenant'
+import { sendDocumentReleasedEmail } from '@/lib/email-notifications'
+
 
 // ==========================================
 // Action: Create Document
@@ -1025,6 +1027,19 @@ export async function releaseDocument(documentId: string) {
       duration,
     })
 
+    // Send release notification to creator
+    try {
+      await sendDocumentReleasedEmail(document.created_by, {
+        documentNumber: document.document_number,
+        documentVersion: document.version,
+        documentTitle: document.title,
+        documentId: document.id
+      })
+      logger.info('Sent release email to creator', { documentId, creatorId: document.created_by })
+    } catch (emailError) {
+      logger.error('Failed to send release email', { documentId, error: emailError })
+    }
+    
     return { success: true }
   } catch (error) {
     const duration = Date.now() - startTime

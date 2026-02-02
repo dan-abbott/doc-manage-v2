@@ -7,6 +7,11 @@ import { logError, logServerAction, logApproval } from '@/lib/utils/logging-help
 import { addApproverSchema, removeApproverSchema, approveDocumentSchema, rejectDocumentSchema } from '@/lib/validation/schemas'
 import { validateJSON } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeEmail } from '@/lib/security/sanitize'
+import { 
+  sendApprovalRequestEmail,
+  sendApprovalCompletedEmail,
+  sendDocumentRejectedEmail
+} from '@/lib/email-notifications'
 
 // ==========================================
 // Types
@@ -512,6 +517,29 @@ export async function submitForApproval(documentId: string) {
       duration,
     })
 
+    // Send email notifications to all approvers
+    try {
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('email, full_name')
+        .eq('id', user.id)
+        .single()
+
+      for (const approver of approvers) {
+        await sendApprovalRequestEmail(approver.user_id, {
+          documentNumber: document.document_number,
+          documentVersion: document.version,
+          documentTitle: document.title,
+          documentId: document.id,
+          submittedBy: currentUser?.full_name || currentUser?.email || 'Unknown'
+        })
+      }
+      logger.info(`Sent approval request emails to ${approvers.length} approvers`, { documentId })
+    } catch (emailError) {
+      // Log but don't fail - emails are best effort
+      logger.error('Failed to send approval request emails', { documentId, error: emailError })
+    }
+
     return { success: true }
   } catch (error) {
     const duration = Date.now() - startTime
@@ -798,6 +826,21 @@ export async function approveDocument(documentId: string, comments?: string) {
       duration,
     })
 
+    // Send approval completed email to creator
+    if (allApproved && document.status === 'Released') {
+      try {
+        await sendApprovalCompletedEmail(document.created_by, {
+          documentNumber: document.document_number,
+          documentVersion: document.version,
+          documentTitle: document.title,
+          documentId: document.id
+        })
+        logger.info('Sent approval completed email to creator', { documentId, creatorId: document.created_by })
+      } catch (emailError) {
+        logger.error('Failed to send approval completed email', { documentId, error: emailError })
+      }
+    }
+
     return { 
       success: true, 
       allApproved: allApproved === true 
@@ -987,6 +1030,27 @@ export async function rejectDocument(documentId: string, rejectionReason: string
       success: true,
       duration,
     })
+
+    // Send rejection email to creator
+    try {
+      const { data: currentUser } = await supabase
+        .from('users')
+        .select('email, full_name')
+        .eq('id', user.id)
+        .single()
+      
+      await sendDocumentRejectedEmail(document.created_by, {
+        documentNumber: document.document_number,
+        documentVersion: document.version,
+        documentTitle: document.title,
+        documentId: document.id,
+        rejectedBy: currentUser?.full_name || currentUser?.email || 'Unknown',
+        rejectionReason: cleanReason
+      })
+      logger.info('Sent rejection email to creator', { documentId, creatorId: document.created_by })
+    } catch (emailError) {
+      logger.error('Failed to send rejection email', { documentId, error: emailError })
+    }
 
     return { success: true }
   } catch (error) {
