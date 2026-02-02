@@ -519,26 +519,35 @@ export async function submitForApproval(documentId: string) {
 
     // Send email notifications to all approvers
     try {
-      const { data: currentUser } = await supabase
-        .from('users')
-        .select('email, full_name')
-        .eq('id', user.id)
-        .single()
+      // Fetch approvers for this document
+      const { data: approversList } = await supabase
+        .from('approvers')
+        .select('user_id, user_email')
+        .eq('document_id', documentId)
+      
+      if (approversList && approversList.length > 0) {
+        const { data: currentUser } = await supabase
+          .from('users')
+          .select('email, full_name')
+          .eq('id', user.id)
+          .single()
 
-      for (const approver of approvers) {
-        await sendApprovalRequestEmail(approver.user_id, {
-          documentNumber: document.document_number,
-          documentVersion: document.version,
-          documentTitle: document.title,
-          documentId: document.id,
-          submittedBy: currentUser?.full_name || currentUser?.email || 'Unknown'
-        })
+        for (const approver of approversList) {
+          await sendApprovalRequestEmail(approver.user_id, {
+            documentNumber: document.document_number,
+            documentVersion: document.version,
+            documentTitle: document.title,
+            documentId: document.id,
+            submittedBy: currentUser?.full_name || currentUser?.email || 'Unknown'
+          })
+        }
+        logger.info(`Sent approval request emails to ${approversList.length} approvers`, { documentId })
       }
-      logger.info(`Sent approval request emails to ${approvers.length} approvers`, { documentId })
     } catch (emailError) {
       // Log but don't fail - emails are best effort
       logger.error('Failed to send approval request emails', { documentId, error: emailError })
     }
+
 
     return { success: true }
   } catch (error) {
