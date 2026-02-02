@@ -7,6 +7,15 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect } from 'react';
 import Image from 'next/image';
 import { FeedbackButton } from '@/components/FeedbackButton'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import { ChevronDown, Settings, LogOut, Bell } from 'lucide-react'
 
 type Props = {
   user: {
@@ -156,15 +165,41 @@ export default function Navigation({ user, isAdmin }: Props) {
           {/* Right side - Feedback & User menu */}
           <div className="flex-shrink-0 flex items-center gap-2">
             <FeedbackButton />
-            <span className="text-sm text-slate-700 font-medium hidden md:inline truncate max-w-[150px]">
-              {user.fullName || user.email}
-            </span>
-            <button
-              onClick={handleSignOut}
-              className="inline-flex items-center px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 whitespace-nowrap"
-            >
-              Sign Out
-            </button>
+            
+            {/* User Dropdown Menu */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <button className="inline-flex items-center gap-2 px-3 py-1.5 border border-slate-300 rounded-md text-sm font-medium text-slate-700 bg-white hover:bg-slate-50 whitespace-nowrap">
+                  <span className="hidden md:inline truncate max-w-[150px]">
+                    {user.fullName || user.email}
+                  </span>
+                  <span className="md:hidden">Account</span>
+                  <ChevronDown className="h-4 w-4 text-slate-500" />
+                </button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-56">
+                <DropdownMenuLabel className="font-normal">
+                  <div className="flex flex-col space-y-1">
+                    <p className="text-sm font-medium leading-none">{user.fullName}</p>
+                    <p className="text-xs leading-none text-slate-500">
+                      {user.email}
+                    </p>
+                  </div>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem asChild>
+                  <Link href="/settings/notifications" className="flex items-center cursor-pointer">
+                    <Bell className="mr-2 h-4 w-4" />
+                    <span>Email Notifications</span>
+                  </Link>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut} className="cursor-pointer text-red-600 focus:text-red-600">
+                  <LogOut className="mr-2 h-4 w-4" />
+                  <span>Sign Out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </div>
       </div>
@@ -190,6 +225,13 @@ export default function Navigation({ user, isAdmin }: Props) {
               </Link>
             );
           })}
+          {/* Mobile - Settings Link */}
+          <Link
+            href="/settings/notifications"
+            className="block px-3 py-2 rounded-md text-base font-medium text-slate-500 hover:bg-slate-50 hover:text-slate-700"
+          >
+            Email Notifications
+          </Link>
         </div>
       </div>
     </nav>
