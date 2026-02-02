@@ -39,7 +39,8 @@ export default async function AdminScanMonitoringPage() {
       scanned_at,
       uploaded_at,
       uploaded_by,
-      document:documents(
+      document_id,
+      documents!inner(
         id,
         document_number,
         version,
@@ -63,7 +64,8 @@ export default async function AdminScanMonitoringPage() {
       scanned_at,
       uploaded_at,
       uploaded_by,
-      document:documents(
+      document_id,
+      documents!inner(
         id,
         document_number,
         version,
@@ -73,6 +75,17 @@ export default async function AdminScanMonitoringPage() {
     .eq('scan_status', 'blocked')
     .order('scanned_at', { ascending: false })
     .limit(50)
+
+  // Transform to match client component type
+  const transformedProblemFiles = problemFiles?.map(file => ({
+    ...file,
+    document: Array.isArray(file.documents) ? file.documents[0] : file.documents
+  })) || []
+
+  const transformedBlockedFiles = blockedFiles?.map(file => ({
+    ...file,
+    document: Array.isArray(file.documents) ? file.documents[0] : file.documents
+  })) || []
 
   // Get scan statistics
   const { data: stats } = await supabase
@@ -98,8 +111,8 @@ export default async function AdminScanMonitoringPage() {
       </div>
 
       <ScanMonitoringClient
-        problemFiles={problemFiles || []}
-        blockedFiles={blockedFiles || []}
+        problemFiles={transformedProblemFiles}
+        blockedFiles={transformedBlockedFiles}
         statistics={statistics}
       />
     </div>
