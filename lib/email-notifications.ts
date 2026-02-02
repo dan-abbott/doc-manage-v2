@@ -42,15 +42,15 @@ async function shouldNotify(
     return { send: false, email: null, userName: '' }
   }
 
-  // Get user preferences
+  // Get user preferences - select all fields
   const { data: prefs } = await supabase
     .from('user_notification_preferences')
-    .select(notificationType)
+    .select('approval_requested, approval_completed, document_rejected, document_released')
     .eq('user_id', userId)
     .single()
 
   // If no preferences, use defaults (all enabled)
-  const enabled = prefs?.[notificationType] ?? true
+  const enabled = prefs ? (prefs as any)[notificationType] ?? true : true
 
   return {
     send: enabled,
