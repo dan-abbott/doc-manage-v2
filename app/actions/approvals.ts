@@ -9,7 +9,7 @@ import { validateJSON } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeEmail } from '@/lib/security/sanitize'
 import { 
   sendApprovalRequestEmail,
-  sendApprovalCompletedEmail,
+  sendApprovalCompleteEmail,
   sendDocumentRejectedEmail
 } from '@/lib/email-notifications'
 
@@ -838,7 +838,7 @@ export async function approveDocument(documentId: string, comments?: string) {
     // Send approval completed email to creator
     if (allApproved && document.status === 'Released') {
       try {
-        await sendApprovalCompletedEmail(document.created_by, {
+        await sendApprovalCompleteEmail(document.created_by, {
           documentNumber: document.document_number,
           documentVersion: document.version,
           documentTitle: document.title,
