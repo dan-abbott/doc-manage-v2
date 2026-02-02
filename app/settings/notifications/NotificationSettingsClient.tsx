@@ -14,8 +14,8 @@ interface NotificationPreferences {
   approval_completed: boolean
   document_rejected: boolean
   document_released: boolean
-  delivery_mode: 'immediate' | 'digest'  // NEW
-  digest_time: string  // NEW (e.g., "08:00:00")
+  delivery_mode: 'immediate' | 'digest'
+  digest_time: string
 }
 
 interface Props {
@@ -27,10 +27,24 @@ export default function NotificationSettingsClient({ preferences }: Props) {
   const [isSaving, setIsSaving] = useState(false)
   const [prefs, setPrefs] = useState<NotificationPreferences>(preferences)
 
-  const handleToggle = (key: keyof NotificationPreferences) => {
+  const handleToggle = (key: keyof Omit<NotificationPreferences, 'delivery_mode' | 'digest_time'>) => {
     setPrefs(prev => ({
       ...prev,
       [key]: !prev[key]
+    }))
+  }
+
+  const handleDeliveryModeChange = (mode: 'immediate' | 'digest') => {
+    setPrefs(prev => ({
+      ...prev,
+      delivery_mode: mode
+    }))
+  }
+
+  const handleDigestTimeChange = (time: string) => {
+    setPrefs(prev => ({
+      ...prev,
+      digest_time: time
     }))
   }
 
@@ -99,6 +113,17 @@ export default function NotificationSettingsClient({ preferences }: Props) {
     },
   ]
 
+  const timeOptions = [
+    { value: '06:00:00', label: '6:00 AM' },
+    { value: '07:00:00', label: '7:00 AM' },
+    { value: '08:00:00', label: '8:00 AM' },
+    { value: '09:00:00', label: '9:00 AM' },
+    { value: '10:00:00', label: '10:00 AM' },
+    { value: '12:00:00', label: '12:00 PM' },
+    { value: '17:00:00', label: '5:00 PM' },
+    { value: '18:00:00', label: '6:00 PM' },
+  ]
+
   return (
     <div className="space-y-6">
       {/* Info Card */}
@@ -108,8 +133,8 @@ export default function NotificationSettingsClient({ preferences }: Props) {
             <Mail className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm text-blue-900">
-                <strong>All emails are sent immediately</strong> when events occur. 
-                You can disable non-critical notifications below.
+                <strong>Approval requests and rejections</strong> are always sent immediately. 
+                Other notifications respect your delivery mode preference.
               </p>
             </div>
           </div>
@@ -122,25 +147,61 @@ export default function NotificationSettingsClient({ preferences }: Props) {
           <CardTitle>Delivery Mode</CardTitle>
           <CardDescription>Choose when to receive email notifications</CardDescription>
         </CardHeader>
-        <CardContent>
-          <RadioGroup value={prefs.delivery_mode} onValueChange={...}>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="immediate" id="immediate" />
-              <Label>Immediate - Receive emails instantly</Label>
+        <CardContent className="space-y-4">
+          <div className="space-y-3">
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="immediate"
+                name="delivery_mode"
+                value="immediate"
+                checked={prefs.delivery_mode === 'immediate'}
+                onChange={() => handleDeliveryModeChange('immediate')}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <Label htmlFor="immediate" className="text-base font-semibold cursor-pointer">
+                  Immediate
+                </Label>
+                <p className="text-sm text-gray-600">Receive emails instantly when events occur</p>
+              </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <RadioGroupItem value="digest" id="digest" />
-              <Label>Daily Digest - Receive a summary once per day</Label>
+
+            <div className="flex items-start space-x-3">
+              <input
+                type="radio"
+                id="digest"
+                name="delivery_mode"
+                value="digest"
+                checked={prefs.delivery_mode === 'digest'}
+                onChange={() => handleDeliveryModeChange('digest')}
+                className="mt-1"
+              />
+              <div className="flex-1">
+                <Label htmlFor="digest" className="text-base font-semibold cursor-pointer">
+                  Daily Digest
+                </Label>
+                <p className="text-sm text-gray-600">Receive a summary once per day at your chosen time</p>
+              </div>
             </div>
-          </RadioGroup>
+          </div>
 
           {prefs.delivery_mode === 'digest' && (
-            <Select value={prefs.digest_time} onValueChange={...}>
-              <option value="06:00:00">6:00 AM</option>
-              <option value="07:00:00">7:00 AM</option>
-              <option value="08:00:00">8:00 AM</option>
-              ...
-            </Select>
+            <div className="pl-7 pt-2">
+              <Label htmlFor="digest-time" className="text-sm font-medium">Digest Time</Label>
+              <select
+                id="digest-time"
+                value={prefs.digest_time}
+                onChange={(e) => handleDigestTimeChange(e.target.value)}
+                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
+              >
+                {timeOptions.map(option => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
+              </select>
+            </div>
           )}
         </CardContent>
       </Card>

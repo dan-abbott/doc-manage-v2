@@ -18,35 +18,41 @@ export async function PUT(request: NextRequest) {
       approval_completed,
       document_rejected,
       document_released,
-      delivery_mode,  // NEW
-      digest_time,  // NEW
+      delivery_mode,
+      digest_time,
     } = body
 
-    // Validate booleans
+    // Validate booleans and new fields
     if (
       typeof approval_requested !== 'boolean' ||
       typeof approval_completed !== 'boolean' ||
       typeof document_rejected !== 'boolean' ||
       typeof document_released !== 'boolean' ||
-      !['immediate', 'digest'].includes(delivery_mode) ||  // NEW
-      typeof digest_time !== 'string'  // NEW
+      !['immediate', 'digest'].includes(delivery_mode) ||
+      typeof digest_time !== 'string'
     ) {
       return NextResponse.json({ error: 'Invalid preferences format' }, { status: 400 })
     }
 
+    // Get user's tenant_id
+    const { data: userData } = await supabase
+      .from('users')
+      .select('tenant_id')
+      .eq('id', user.id)
+      .single()
 
     // Update or insert preferences
     const { error } = await supabase
       .from('user_notification_preferences')
       .upsert({
         user_id: user.id,
-        tenant_id: ...,
+        tenant_id: userData?.tenant_id,
         approval_requested,
         approval_completed,
         document_rejected,
         document_released,
-        delivery_mode,  // NEW
-        digest_time,  // NEW
+        delivery_mode,
+        digest_time,
         updated_at: new Date().toISOString(),
       }, {
         onConflict: 'user_id,tenant_id'
@@ -103,6 +109,8 @@ export async function GET(request: NextRequest) {
           approval_completed: true,
           document_rejected: true,
           document_released: true,
+          delivery_mode: 'immediate',
+          digest_time: '08:00:00',
         }
       })
     }
