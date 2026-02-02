@@ -1,8 +1,8 @@
 /**
- * Email Notification Service - Phase 1
+ * Email Notification Service - Phase 2
  * 
- * Sends immediate email notifications using Resend
- * Respects user notification preferences
+ * Sends immediate or queued email notifications using Resend
+ * Critical notifications always immediate, others respect user delivery mode
  */
 
 import { Resend } from 'resend'
@@ -23,57 +23,152 @@ interface EmailContext {
 }
 
 /**
- * Check if user should receive this notification
+ * Check if user should receive this notification immediately, queue it, or skip it
+ * Critical notifications (approval_requested, document_rejected) always immediate
  */
-async function shouldNotify(
+async function shouldNotifyOrQueue(
   userId: string,
   notificationType: 'approval_requested' | 'approval_completed' | 'document_rejected' | 'document_released'
-): Promise<{ send: boolean; email: string | null; userName: string }> {
+): Promise<{
+  action: 'immediate' | 'queue' | 'disabled'
+  email: string | null
+  userName: string
+  tenantId: string | null
+  digestTime: string | null
+}> {
   const supabase = await createClient()
 
   // Get user info
   const { data: user } = await supabase
     .from('users')
-    .select('email, full_name')
+    .select('email, full_name, tenant_id')
     .eq('id', userId)
     .single()
 
   if (!user?.email) {
-    return { send: false, email: null, userName: '' }
+    return { action: 'disabled', email: null, userName: '', tenantId: null, digestTime: null }
   }
 
-  // Get user preferences - select all fields
+  // Get user preferences
   const { data: prefs } = await supabase
     .from('user_notification_preferences')
-    .select('approval_requested, approval_completed, document_rejected, document_released')
+    .select('approval_requested, approval_completed, document_rejected, document_released, delivery_mode, digest_time')
     .eq('user_id', userId)
     .single()
 
-  // If no preferences, use defaults (all enabled)
+  // Check if notification type is enabled
   const enabled = prefs ? (prefs as any)[notificationType] ?? true : true
+  
+  if (!enabled) {
+    return { action: 'disabled', email: null, userName: user.full_name || '', tenantId: user.tenant_id, digestTime: null }
+  }
 
+  // Critical notifications always immediate
+  const criticalNotifications = ['approval_requested', 'document_rejected']
+  if (criticalNotifications.includes(notificationType)) {
+    return {
+      action: 'immediate',
+      email: user.email,
+      userName: user.full_name || user.email.split('@')[0],
+      tenantId: user.tenant_id,
+      digestTime: null
+    }
+  }
+
+  // Non-critical: respect delivery mode
+  const deliveryMode = prefs?.delivery_mode || 'immediate'
+  const digestTime = prefs?.digest_time || '01:00:00'
+
+  if (deliveryMode === 'digest') {
+    return {
+      action: 'queue',
+      email: user.email,
+      userName: user.full_name || user.email.split('@')[0],
+      tenantId: user.tenant_id,
+      digestTime: digestTime
+    }
+  }
+
+  // Default: immediate
   return {
-    send: enabled,
+    action: 'immediate',
     email: user.email,
-    userName: user.full_name || user.email.split('@')[0]
+    userName: user.full_name || user.email.split('@')[0],
+    tenantId: user.tenant_id,
+    digestTime: null
   }
 }
 
 /**
- * 1. Approval Request Email
- * Sent when user is assigned as approver
+ * Queue an email for digest delivery
+ */
+async function queueEmail(
+  userId: string,
+  tenantId: string,
+  notificationType: string,
+  subject: string,
+  htmlBody: string,
+  context: EmailContext,
+  digestTime: string
+) {
+  const supabase = await createClient()
+
+  // Calculate next digest time (today at digestTime, or tomorrow if already past)
+  const now = new Date()
+  const [hours, minutes] = digestTime.split(':').map(Number)
+  const scheduledFor = new Date()
+  scheduledFor.setUTCHours(hours, minutes, 0, 0)
+  
+  // If time already passed today, schedule for tomorrow
+  if (scheduledFor <= now) {
+    scheduledFor.setDate(scheduledFor.getDate() + 1)
+  }
+
+  const { error } = await supabase
+    .from('email_queue')
+    .insert({
+      user_id: userId,
+      tenant_id: tenantId,
+      notification_type: notificationType,
+      subject: subject,
+      html_body: htmlBody,
+      document_id: context.documentId,
+      document_number: context.documentNumber,
+      document_version: context.documentVersion,
+      document_title: context.documentTitle,
+      metadata: {
+        submittedBy: context.submittedBy,
+        rejectedBy: context.rejectedBy,
+        rejectionReason: context.rejectionReason
+      },
+      scheduled_for: scheduledFor.toISOString(),
+      status: 'pending'
+    })
+
+  if (error) {
+    console.error('[Email Queue] Failed to queue email:', error)
+    return { success: false, error }
+  }
+
+  console.log(`[Email Queue] ✓ Queued ${notificationType} for ${userId} at ${scheduledFor.toISOString()}`)
+  return { success: true }
+}
+
+/**
+ * 1. Approval Request Email (ALWAYS IMMEDIATE)
  */
 export async function sendApprovalRequestEmail(
   approverId: string,
   context: EmailContext
 ) {
-  const check = await shouldNotify(approverId, 'approval_requested')
+  const check = await shouldNotifyOrQueue(approverId, 'approval_requested')
   
-  if (!check.send || !check.email) {
+  if (check.action === 'disabled' || !check.email) {
     console.log(`[Email] Skipping approval request for ${approverId} (disabled)`)
     return { success: false, reason: 'disabled' }
   }
 
+  // Always immediate for approval requests
   const viewUrl = `${siteUrl}/documents?selected=${context.documentNumber}&version=${context.documentVersion}`
 
   try {
@@ -93,28 +188,35 @@ export async function sendApprovalRequestEmail(
 }
 
 /**
- * 2. Approval Complete Email
- * Sent when all approvals are completed
+ * 2. Approval Complete Email (RESPECTS DELIVERY MODE)
  */
 export async function sendApprovalCompleteEmail(
   creatorId: string,
   context: EmailContext
 ) {
-  const check = await shouldNotify(creatorId, 'approval_completed')
+  const check = await shouldNotifyOrQueue(creatorId, 'approval_completed')
   
-  if (!check.send || !check.email) {
+  if (check.action === 'disabled' || !check.email) {
     console.log(`[Email] Skipping approval complete for ${creatorId} (disabled)`)
     return { success: false, reason: 'disabled' }
   }
 
   const viewUrl = `${siteUrl}/documents?selected=${context.documentNumber}&version=${context.documentVersion}`
+  const subject = `✅ Document Approved: ${context.documentNumber}${context.documentVersion}`
+  const htmlBody = generateApprovalCompleteHTML(check.userName, context, viewUrl)
 
+  // Queue if digest mode
+  if (check.action === 'queue' && check.tenantId && check.digestTime) {
+    return await queueEmail(creatorId, check.tenantId, 'approval_completed', subject, htmlBody, context, check.digestTime)
+  }
+
+  // Send immediately
   try {
     await resend.emails.send({
       from: fromEmail,
       to: check.email,
-      subject: `✅ Document Approved: ${context.documentNumber}${context.documentVersion}`,
-      html: generateApprovalCompleteHTML(check.userName, context, viewUrl),
+      subject: subject,
+      html: htmlBody,
     })
 
     console.log(`[Email] ✓ Sent approval complete to ${check.email}`)
@@ -126,20 +228,20 @@ export async function sendApprovalCompleteEmail(
 }
 
 /**
- * 3. Document Rejected Email
- * Sent when document is rejected by an approver
+ * 3. Document Rejected Email (ALWAYS IMMEDIATE)
  */
 export async function sendDocumentRejectedEmail(
   creatorId: string,
   context: EmailContext
 ) {
-  const check = await shouldNotify(creatorId, 'document_rejected')
+  const check = await shouldNotifyOrQueue(creatorId, 'document_rejected')
   
-  if (!check.send || !check.email) {
+  if (check.action === 'disabled' || !check.email) {
     console.log(`[Email] Skipping rejection for ${creatorId} (disabled)`)
     return { success: false, reason: 'disabled' }
   }
 
+  // Always immediate for rejections
   const editUrl = `${siteUrl}/documents/${context.documentId}/edit`
 
   try {
@@ -159,28 +261,35 @@ export async function sendDocumentRejectedEmail(
 }
 
 /**
- * 4. Document Released Email
- * Sent when document is released
+ * 4. Document Released Email (RESPECTS DELIVERY MODE)
  */
 export async function sendDocumentReleasedEmail(
   creatorId: string,
   context: EmailContext
 ) {
-  const check = await shouldNotify(creatorId, 'document_released')
+  const check = await shouldNotifyOrQueue(creatorId, 'document_released')
   
-  if (!check.send || !check.email) {
+  if (check.action === 'disabled' || !check.email) {
     console.log(`[Email] Skipping release notification for ${creatorId} (disabled)`)
     return { success: false, reason: 'disabled' }
   }
 
   const viewUrl = `${siteUrl}/documents?selected=${context.documentNumber}&version=${context.documentVersion}`
+  const subject = `🎉 Document Released: ${context.documentNumber}${context.documentVersion}`
+  const htmlBody = generateDocumentReleasedHTML(check.userName, context, viewUrl)
 
+  // Queue if digest mode
+  if (check.action === 'queue' && check.tenantId && check.digestTime) {
+    return await queueEmail(creatorId, check.tenantId, 'document_released', subject, htmlBody, context, check.digestTime)
+  }
+
+  // Send immediately
   try {
     await resend.emails.send({
       from: fromEmail,
       to: check.email,
-      subject: `🎉 Document Released: ${context.documentNumber}${context.documentVersion}`,
-      html: generateDocumentReleasedHTML(check.userName, context, viewUrl),
+      subject: subject,
+      html: htmlBody,
     })
 
     console.log(`[Email] ✓ Sent release notification to ${check.email}`)
@@ -192,7 +301,7 @@ export async function sendDocumentReleasedEmail(
 }
 
 // ============================================================================
-// HTML EMAIL TEMPLATES
+// HTML EMAIL TEMPLATES (Same as Phase 1)
 // ============================================================================
 
 function generateApprovalRequestHTML(userName: string, context: EmailContext, viewUrl: string): string {
@@ -315,7 +424,7 @@ function generateDocumentReleasedHTML(userName: string, context: EmailContext, v
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="viewport" content="width=device-width, initial-case1.0">
 </head>
 <body style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">

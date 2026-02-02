@@ -37,14 +37,10 @@ export default function NotificationSettingsClient({ preferences }: Props) {
   const handleDeliveryModeChange = (mode: 'immediate' | 'digest') => {
     setPrefs(prev => ({
       ...prev,
-      delivery_mode: mode
-    }))
-  }
-
-  const handleDigestTimeChange = (time: string) => {
-    setPrefs(prev => ({
-      ...prev,
-      digest_time: time
+      delivery_mode: mode,
+      // Fixed time: 5 PM PT = 01:00 UTC next day (during PST) or 00:00 UTC (during PDT)
+      // We'll use 01:00 UTC as the consistent time
+      digest_time: '01:00:00'
     }))
   }
 
@@ -113,17 +109,6 @@ export default function NotificationSettingsClient({ preferences }: Props) {
     },
   ]
 
-  const timeOptions = [
-    { value: '06:00:00', label: '6:00 AM' },
-    { value: '07:00:00', label: '7:00 AM' },
-    { value: '08:00:00', label: '8:00 AM' },
-    { value: '09:00:00', label: '9:00 AM' },
-    { value: '10:00:00', label: '10:00 AM' },
-    { value: '12:00:00', label: '12:00 PM' },
-    { value: '17:00:00', label: '5:00 PM' },
-    { value: '18:00:00', label: '6:00 PM' },
-  ]
-
   return (
     <div className="space-y-6">
       {/* Info Card */}
@@ -134,7 +119,7 @@ export default function NotificationSettingsClient({ preferences }: Props) {
             <div>
               <p className="text-sm text-blue-900">
                 <strong>Approval requests and rejections</strong> are always sent immediately. 
-                Other notifications respect your delivery mode preference.
+                Other notifications respect your delivery mode preference below.
               </p>
             </div>
           </div>
@@ -181,26 +166,21 @@ export default function NotificationSettingsClient({ preferences }: Props) {
                 <Label htmlFor="digest" className="text-base font-semibold cursor-pointer">
                   Daily Digest
                 </Label>
-                <p className="text-sm text-gray-600">Receive a summary once per day at your chosen time</p>
+                <p className="text-sm text-gray-600">
+                  Receive a summary once per day at <strong>5:00 PM PT</strong>
+                </p>
               </div>
             </div>
           </div>
 
           {prefs.delivery_mode === 'digest' && (
-            <div className="pl-7 pt-2">
-              <Label htmlFor="digest-time" className="text-sm font-medium">Digest Time</Label>
-              <select
-                id="digest-time"
-                value={prefs.digest_time}
-                onChange={(e) => handleDigestTimeChange(e.target.value)}
-                className="mt-1 block w-full rounded-md border border-gray-300 px-3 py-2 text-sm"
-              >
-                {timeOptions.map(option => (
-                  <option key={option.value} value={option.value}>
-                    {option.label}
-                  </option>
-                ))}
-              </select>
+            <div className="pl-7 pt-2 pb-2 bg-blue-50 rounded-lg border border-blue-200">
+              <p className="text-sm text-blue-900">
+                <strong>📬 Digest Time:</strong> Daily at 5:00 PM Pacific Time
+              </p>
+              <p className="text-xs text-blue-700 mt-1">
+                (Critical notifications like approval requests are still sent immediately)
+              </p>
             </div>
           )}
         </CardContent>
@@ -243,7 +223,7 @@ export default function NotificationSettingsClient({ preferences }: Props) {
                       </Label>
                       {type.critical && (
                         <span className="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium">
-                          Important
+                          Always Immediate
                         </span>
                       )}
                     </div>
@@ -296,9 +276,9 @@ export default function NotificationSettingsClient({ preferences }: Props) {
           </h3>
           <ul className="text-sm text-gray-600 space-y-1 list-disc list-inside">
             <li>Approval requests and rejections are always sent immediately</li>
-            <li>Important notifications ensure critical workflow steps aren't missed</li>
+            <li>Daily digest emails are sent at 5:00 PM Pacific Time</li>
             <li>You can change these settings at any time</li>
-            <li>All emails include a link to unsubscribe or manage preferences</li>
+            <li>Important notifications ensure critical workflow steps aren't missed</li>
           </ul>
         </CardContent>
       </Card>
