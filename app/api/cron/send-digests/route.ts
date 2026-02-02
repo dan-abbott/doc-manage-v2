@@ -132,7 +132,7 @@ export async function POST(request: Request) {
           html: html,
         })
         
-        if (!emailResult.id) {
+        if (!emailResult.data?.id) {
           throw new Error('No email ID returned from Resend')
         }
         
