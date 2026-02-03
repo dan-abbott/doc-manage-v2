@@ -1,26 +1,43 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import Link from 'next/link'
-import { Button } from '@/components/ui/button'
-import { Plus } from 'lucide-react'
-import CollapsibleSearchPanel from './CollapsibleSearchPanel'
-import DocumentDetailPanel from './DocumentDetailPanel'
-import DocumentActionsPanel from './DocumentActionsPanel'
+import DocumentsPageClient from './DocumentsPageClient'
+import { 
+  searchDocuments, 
+  getUsersForFilters, 
+  getProjectCodesForFilters, 
+  getDocumentTypesForFilters 
+} from '@/app/actions/advanced-search'
+import type { AdvancedSearchFilters } from '@/lib/types/advanced-search'
 
 // Disable caching but allow dynamic rendering
 export const revalidate = 0
 
 interface PageProps {
   searchParams: {
-    search?: string
-    type?: string
-    status?: string
-    project?: string
+    // Advanced search params
+    q?: string
+    createdAfter?: string
+    createdBefore?: string
+    updatedAfter?: string
+    updatedBefore?: string
+    releasedAfter?: string
+    releasedBefore?: string
+    types?: string  // comma-separated IDs
+    statuses?: string  // comma-separated statuses
+    projects?: string  // comma-separated project codes
+    createdBy?: string
+    releasedBy?: string
+    isProduction?: string
+    hasAttachments?: string
     myDocs?: string
     page?: string
-    viewAll?: string
+    sortBy?: string
+    sortOrder?: string
+    
+    // Document selection (keep existing)
     selected?: string
     version?: string
+    viewAll?: string
   }
 }
 
@@ -35,7 +52,7 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     redirect('/auth/login')
   }
 
-  console.log('[DocumentsPage] User:', user.id, 'Selected:', searchParams.selected)
+  console.log('[DocumentsPage] User:', user.id)
 
   // Check if user is admin
   const { data: userData } = await supabase
@@ -45,94 +62,37 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     .single()
 
   const isAdmin = userData?.is_admin || false
-  const viewAll = searchParams.viewAll === 'true'
 
-  // Get document types for filter
-  const { data: documentTypes } = await supabase
-    .from('document_types')
-    .select('id, name')
-    .eq('is_active', true)
-    .order('name')
-
-  // Get unique project codes for filter dropdown
-  const { data: projectCodes } = await supabase
-    .from('documents')
-    .select('project_code')
-    .not('project_code', 'is', null)
-    .order('project_code')
-  
-  // Extract unique project codes
-  const uniqueProjectCodes = [...new Set(projectCodes?.map(d => d.project_code).filter(Boolean))] as string[]
-
-  // Build query
-  const page = parseInt(searchParams.page || '1')
-  const pageSize = 50
-  const offset = (page - 1) * pageSize
-
-  let query = supabase
-    .from('documents')
-    .select(`
-      *,
-      document_type:document_types(name, prefix)
-    `, { count: 'exact' })
-
-  // Apply RLS based on admin status and viewAll toggle
-  if (!isAdmin || !viewAll) {
-    query = query.or(`created_by.eq.${user.id},status.eq.Released,status.eq.Obsolete`)
+  // Parse search params into AdvancedSearchFilters
+  const filters: AdvancedSearchFilters = {
+    searchQuery: searchParams.q,
+    createdAfter: searchParams.createdAfter,
+    createdBefore: searchParams.createdBefore,
+    updatedAfter: searchParams.updatedAfter,
+    updatedBefore: searchParams.updatedBefore,
+    releasedAfter: searchParams.releasedAfter,
+    releasedBefore: searchParams.releasedBefore,
+    documentTypes: searchParams.types ? searchParams.types.split(',') : undefined,
+    statuses: searchParams.statuses ? searchParams.statuses.split(',') : ['Draft', 'In Approval', 'Released'], // Default: exclude Obsolete
+    projectCodes: searchParams.projects ? searchParams.projects.split(',') : undefined,
+    createdBy: searchParams.createdBy,
+    releasedBy: searchParams.releasedBy,
+    isProduction: searchParams.isProduction ? searchParams.isProduction === 'true' : null,
+    hasAttachments: searchParams.hasAttachments ? searchParams.hasAttachments === 'true' : null,
+    myDocumentsOnly: searchParams.myDocs === 'true',
+    page: searchParams.page ? parseInt(searchParams.page) : 1,
+    pageSize: 50,
+    sortBy: (searchParams.sortBy as any) || 'updated_at',
+    sortOrder: (searchParams.sortOrder as any) || 'desc'
   }
 
-  // Search filter
-  if (searchParams.search) {
-    const searchTerm = `%${searchParams.search}%`
-    query = query.or(`document_number.ilike.${searchTerm},title.ilike.${searchTerm}`)
-  }
-
-  // Type filter
-  if (searchParams.type) {
-    query = query.eq('document_type_id', searchParams.type)
-  }
-
-  // Status filter - multi-select or default to exclude Obsolete
-  if (searchParams.status) {
-    const statuses = searchParams.status.split(',')
-    query = query.in('status', statuses)
-  } else {
-    // Default: exclude Obsolete documents
-    query = query.in('status', ['Draft', 'In Approval', 'Released'])
-  }
-
-  // Project filter
-  if (searchParams.project) {
-    query = query.eq('project_code', searchParams.project.toUpperCase())
-  }
-
-  // My Documents filter
-  if (searchParams.myDocs === 'true') {
-    const { data: userDocNumbers } = await supabase
-      .from('documents')
-      .select('document_number')
-      .eq('created_by', user.id)
-    
-    if (userDocNumbers && userDocNumbers.length > 0) {
-      const docNumbers = [...new Set(userDocNumbers.map(d => d.document_number))]
-      query = query.in('document_number', docNumbers)
-    } else {
-      query = query.eq('created_by', user.id)
-    }
-  }
-
-  // Pagination and sorting
-  query = query
-    .order('updated_at', { ascending: false })
-    .range(offset, offset + pageSize - 1)
-
-  const { data: documents, error, count } = await query
-
-  if (error) {
-    console.error('Error fetching documents:', error)
-  }
-
-  const totalPages = count ? Math.ceil(count / pageSize) : 0
+  // Fetch data in parallel
+  const [searchResults, users, projectCodes, documentTypes] = await Promise.all([
+    searchDocuments(filters),
+    getUsersForFilters(),
+    getProjectCodesForFilters(),
+    getDocumentTypesForFilters()
+  ])
 
   // Get selected document versions if document_number provided
   let selectedDocumentData = null
@@ -155,79 +115,30 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
     }
 
     // Fetch available users for approver management (exclude current user)
-    const { data: users } = await supabase
+    const { data: usersData } = await supabase
       .from('users')
       .select('id, email, full_name')
       .neq('id', user.id)
       .order('email')
     
-    availableUsers = users || []
+    availableUsers = usersData || []
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
-      {/* Collapsible Search/Filter Panel */}
-      <CollapsibleSearchPanel
-        documentTypes={documentTypes || []}
-        projectCodes={uniqueProjectCodes}
-        documents={documents || []}
-        totalCount={count || 0}
-        currentFilters={searchParams}
-        isAdmin={isAdmin}
-      />
-
-      {/* Main Content Area */}
-      <div className="flex-1 flex overflow-hidden">
-        {selectedDocumentData ? (
-          <>
-            {/* Left: Document Detail with Version Tabs */}
-            <div className="w-1/2 overflow-y-auto border-r">
-              <DocumentDetailPanel
-                documentData={selectedDocumentData}
-                selectedVersion={searchParams.version}
-                availableUsers={availableUsers}
-                isAdmin={isAdmin}
-                currentUserId={user.id}
-                currentUserEmail={user.email || ''}
-              />
-            </div>
-
-            {/* Right: Actions Panel */}
-            <div className="w-1/2 overflow-y-auto">
-              <DocumentActionsPanel
-                documentData={selectedDocumentData}
-                auditLogs={auditLogs}
-                isAdmin={isAdmin}
-                currentUserId={user.id}
-                currentUserEmail={user.email || ''}
-              />
-            </div>
-          </>
-        ) : (
-          /* No Document Selected - Show Message */
-          <div className="flex-1 flex items-center justify-center bg-gray-50">
-            <div className="text-center">
-              <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
-                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m2.25 0H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-medium text-gray-900 mb-2">
-                Select a document to view details
-              </h3>
-              <p className="text-sm text-gray-500 mb-6">
-                Use the search and filters to find documents, then click on one to see its details
-              </p>
-              <Button asChild>
-                <Link href="/documents/new">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create New Document
-                </Link>
-              </Button>
-            </div>
-          </div>
-        )}
-      </div>
-    </div>
+    <DocumentsPageClient
+      initialFilters={filters}
+      initialResults={searchResults}
+      documentTypes={documentTypes}
+      users={users}
+      projectCodes={projectCodes}
+      selectedDocument={searchParams.selected}
+      selectedVersion={searchParams.version}
+      selectedDocumentData={selectedDocumentData}
+      auditLogs={auditLogs}
+      availableUsers={availableUsers}
+      isAdmin={isAdmin}
+      currentUserId={user.id}
+      currentUserEmail={user.email || ''}
+    />
   )
 }
