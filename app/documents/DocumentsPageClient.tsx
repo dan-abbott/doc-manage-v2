@@ -54,7 +54,7 @@ export default function DocumentsPageClient({
   const [filters, setFilters] = useState<AdvancedSearchFilters>(initialFilters)
   const [isSearchPanelCollapsed, setIsSearchPanelCollapsed] = useState(false)
 
-  const handleFiltersChange = async (newFilters: AdvancedSearchFilters) => {
+  const handleFiltersChange = (newFilters: AdvancedSearchFilters) => {
     setFilters(newFilters)
 
     // Build URL params
