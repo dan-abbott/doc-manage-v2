@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronUp, X, Search } from 'lucide-react'
 import type { AdvancedSearchFilters } from '@/lib/types/advanced-search'
 import { QUICK_FILTERS } from '@/lib/types/advanced-search'
+import Autocomplete from './Autocomplete'
 
 interface Props {
   filters: AdvancedSearchFilters
@@ -260,42 +261,42 @@ export default function AdvancedFilters({
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Created By</Label>
-                <select
+                <Autocomplete
                   value={filters.createdBy || ''}
-                  onChange={(e) => onFiltersChange({
+                  onChange={(value) => onFiltersChange({
                     ...filters,
-                    createdBy: e.target.value || undefined,
+                    createdBy: value || undefined,
                     page: 1
                   })}
-                  className="w-full border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Users</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name || user.email}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'All Users' },
+                    ...users.map(user => ({
+                      value: user.id,
+                      label: user.full_name || user.email
+                    }))
+                  ]}
+                  placeholder="Search users..."
+                />
               </div>
 
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Released By</Label>
-                <select
+                <Autocomplete
                   value={filters.releasedBy || ''}
-                  onChange={(e) => onFiltersChange({
+                  onChange={(value) => onFiltersChange({
                     ...filters,
-                    releasedBy: e.target.value || undefined,
+                    releasedBy: value || undefined,
                     page: 1
                   })}
-                  className="w-full border rounded-md p-2 focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  <option value="">All Users</option>
-                  {users.map(user => (
-                    <option key={user.id} value={user.id}>
-                      {user.full_name || user.email}
-                    </option>
-                  ))}
-                </select>
+                  options={[
+                    { value: '', label: 'All Users' },
+                    ...users.map(user => ({
+                      value: user.id,
+                      label: user.full_name || user.email
+                    }))
+                  ]}
+                  placeholder="Search users..."
+                />
               </div>
             </div>
 
@@ -356,22 +357,22 @@ export default function AdvancedFilters({
             {projectCodes.length > 0 && (
               <div className="space-y-2">
                 <Label className="text-sm font-semibold">Project Code</Label>
-                <select
-                  multiple
-                  value={filters.projectCodes || []}
-                  onChange={(e) => {
-                    const selected = Array.from(e.target.selectedOptions, option => option.value)
-                    onFiltersChange({ ...filters, projectCodes: selected, page: 1 })
-                  }}
-                  className="w-full border rounded-md p-2 min-h-[80px] focus:outline-none focus:ring-2 focus:ring-blue-500"
-                >
-                  {projectCodes.map(code => (
-                    <option key={code} value={code}>
-                      {code}
-                    </option>
-                  ))}
-                </select>
-                <p className="text-xs text-gray-500">Hold Ctrl/Cmd to select multiple</p>
+                <Autocomplete
+                  value={filters.projectCodes?.[0] || ''}
+                  onChange={(value) => onFiltersChange({
+                    ...filters,
+                    projectCodes: value ? [value] : undefined,
+                    page: 1
+                  })}
+                  options={[
+                    { value: '', label: 'All Projects' },
+                    ...projectCodes.map(code => ({
+                      value: code,
+                      label: code
+                    }))
+                  ]}
+                  placeholder="Search projects..."
+                />
               </div>
             )}
           </CardContent>
