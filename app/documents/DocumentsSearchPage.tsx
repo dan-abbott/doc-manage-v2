@@ -34,7 +34,7 @@ export default function DocumentsSearchPage({
   const [results, setResults] = useState(initialResults)
   const [filters, setFilters] = useState<AdvancedSearchFilters>(initialFilters)
 
-  const handleFiltersChange = (newFilters: AdvancedSearchFilters) => {
+  const handleFiltersChange = async (newFilters: AdvancedSearchFilters) => {
     setFilters(newFilters)
 
     // Build URL params
@@ -68,13 +68,22 @@ export default function DocumentsSearchPage({
     if (newFilters.sortBy && newFilters.sortBy !== 'updated_at') params.set('sortBy', newFilters.sortBy)
     if (newFilters.sortOrder && newFilters.sortOrder !== 'desc') params.set('sortOrder', newFilters.sortOrder)
     
+    // Update URL
     router.push(`/documents?${params.toString()}`, { scroll: false })
 
-    // Fetch new results
-    startTransition(async () => {
-      const newResults = await searchDocuments(newFilters)
-      setResults(newResults)
-    })
+    // Fetch new results with proper transition
+    try {
+      startTransition(() => {
+        searchDocuments(newFilters).then(newResults => {
+          setResults(newResults)
+        }).catch(error => {
+          console.error('Search error:', error)
+          // Keep showing old results on error
+        })
+      })
+    } catch (error) {
+      console.error('Search error:', error)
+    }
   }
 
   const handleDocumentClick = (documentNumber: string) => {
