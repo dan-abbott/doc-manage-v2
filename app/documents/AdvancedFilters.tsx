@@ -12,7 +12,7 @@ import { Label } from '@/components/ui/label'
 import { Input } from '@/components/ui/input'
 import { ChevronDown, ChevronUp, X, Search } from 'lucide-react'
 import type { AdvancedSearchFilters } from '@/lib/types/advanced-search'
-import { QUICK_FILTERS, getQuickFilterValues } from '@/lib/types/advanced-search'
+import { QUICK_FILTERS } from '@/lib/types/advanced-search'
 
 interface Props {
   filters: AdvancedSearchFilters
@@ -33,7 +33,7 @@ export default function AdvancedFilters({
 
   const handleQuickFilter = (index: number) => {
     const quickFilter = QUICK_FILTERS[index]
-    const filterValues = getQuickFilterValues(quickFilter)
+    const filterValues = quickFilter.getFilters()
     onFiltersChange({ ...filters, ...filterValues, page: 1 })
   }
 

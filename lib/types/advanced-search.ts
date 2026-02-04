@@ -47,57 +47,46 @@ export interface SearchResult {
 
 export interface QuickFilter {
   label: string
-  filters: Partial<AdvancedSearchFilters>
+  getFilters: () => Partial<AdvancedSearchFilters>
   icon?: string
 }
 
 export const QUICK_FILTERS: QuickFilter[] = [
   {
     label: 'Last 7 Days',
-    filters: {
-      updatedAfter: () => new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
-    } as any,
+    getFilters: () => ({
+      updatedAfter: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString()
+    }),
     icon: '📅'
   },
   {
     label: 'Last 30 Days',
-    filters: {
-      updatedAfter: () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    } as any,
+    getFilters: () => ({
+      updatedAfter: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    }),
     icon: '📆'
   },
   {
     label: 'My Drafts',
-    filters: {
+    getFilters: () => ({
       myDocumentsOnly: true,
       statuses: ['Draft']
-    },
+    }),
     icon: '✏️'
   },
   {
     label: 'Pending Approval',
-    filters: {
+    getFilters: () => ({
       statuses: ['In Approval']
-    },
+    }),
     icon: '⏳'
   },
   {
     label: 'Recently Released',
-    filters: {
+    getFilters: () => ({
       statuses: ['Released'],
-      releasedAfter: () => new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
-    } as any,
+      releasedAfter: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString()
+    }),
     icon: '🎉'
   }
 ]
-
-// Helper to evaluate quick filter functions
-export function getQuickFilterValues(filter: QuickFilter): Partial<AdvancedSearchFilters> {
-  const result: any = {}
-  
-  for (const [key, value] of Object.entries(filter.filters)) {
-    result[key] = typeof value === 'function' ? value() : value
-  }
-  
-  return result
-}
