@@ -282,7 +282,7 @@ export default function DocumentsPageClient({
             </div>
           </>
         ) : (
-          /* No Document Selected - Show Message */}
+          /* No Document Selected - Show Message */
           <div className="flex-1 flex items-center justify-center bg-gray-50">
             <div className="text-center">
               <div className="mx-auto h-12 w-12 text-gray-400 mb-4">
