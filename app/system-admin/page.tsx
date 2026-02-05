@@ -1,11 +1,11 @@
 /**
- * FIXED System Admin Dashboard Page
+ * FINAL System Admin Dashboard Page
  * app/system-admin/page.tsx
  * 
- * Changes:
- * 1. Removed Link component (causing 404 prefetch errors)
- * 2. Made rows non-clickable until detail page exists
- * 3. Added note about future feature
+ * FIXES:
+ * 1. Smart unit display - shows MB for small values, GB for large
+ * 2. Consistent formatting across all tenants
+ * 3. Better readability
  */
 
 import { getAllTenantMetrics, getSystemMetrics } from '@/app/actions/system-admin'
@@ -27,11 +27,31 @@ export default async function SystemAdminPage() {
     }).format(amount)
   }
 
-  // Format file size
-  const formatSize = (gb: number) => {
-    if (gb < 0.001) {
-      return `${(gb * 1024).toFixed(2)} MB`
+  // Smart file size formatting - shows MB or GB based on size
+  const formatSize = (bytes: number) => {
+    if (bytes === 0) return '0 MB'
+    
+    const mb = bytes / (1024 * 1024)
+    const gb = mb / 1024
+    
+    // If less than 1 GB, show in MB
+    if (gb < 1) {
+      return `${mb.toFixed(2)} MB`
     }
+    
+    // Otherwise show in GB
+    return `${gb.toFixed(2)} GB`
+  }
+
+  // Format system-wide storage (always in GB for overview)
+  const formatSystemStorage = (bytes: number) => {
+    const gb = bytes / (1024 * 1024 * 1024)
+    
+    if (gb < 0.01) {
+      const mb = bytes / (1024 * 1024)
+      return `${mb.toFixed(2)} MB`
+    }
+    
     return `${gb.toFixed(2)} GB`
   }
 
@@ -67,7 +87,7 @@ export default async function SystemAdminPage() {
           />
           <MetricCard
             title="Total Storage"
-            value={formatSize(systemMetrics.total_storage_gb)}
+            value={formatSystemStorage(systemMetrics.total_storage_gb * 1024 * 1024 * 1024)}
             subtitle={`${formatCurrency(systemMetrics.total_storage_gb * 0.023)}/mo`}
             color="orange"
           />
@@ -157,7 +177,9 @@ export default async function SystemAdminPage() {
                     {tenant.document_count}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="text-gray-900">{formatSize(tenant.storage_gb)}</div>
+                    <div className="text-gray-900 font-medium">
+                      {formatSize(tenant.storage_bytes)}
+                    </div>
                     <div className="text-xs text-gray-500">
                       {formatCurrency(tenant.storage_gb * 0.023)}/mo
                     </div>
