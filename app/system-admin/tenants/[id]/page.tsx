@@ -1,8 +1,6 @@
 /**
- * Tenant Detail Page with Real Billing
+ * Tenant Detail Page with Invoice History
  * app/system-admin/tenants/[id]/page.tsx
- * 
- * Shows billing data from tenant_billing table
  */
 
 import { getTenantDetails } from '@/app/actions/system-admin'
@@ -27,7 +25,7 @@ export default async function TenantDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const { tenant, users, recentDocs, apiUsage, billing } = tenantData
+  const { tenant, users, recentDocs, apiUsage, billing, invoices } = tenantData
 
   // Format helpers
   const formatDate = (dateString: string | null) => {
@@ -215,6 +213,85 @@ export default async function TenantDetailPage({ params }: PageProps) {
         </div>
       </div>
 
+      {/* Invoice History - NEW */}
+      {invoices && invoices.length > 0 && (
+        <div className="bg-white rounded-lg border shadow-sm mb-6">
+          <div className="px-6 py-4 border-b">
+            <h2 className="text-xl font-bold text-gray-900">Invoice History</h2>
+          </div>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b">
+                <tr>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Invoice Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Amount
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Status
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Paid Date
+                  </th>
+                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                    Actions
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200">
+                {invoices.map((invoice: any) => (
+                  <tr key={invoice.id} className="hover:bg-gray-50">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                      {formatDate(invoice.invoice_date)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">
+                        {formatCurrency(invoice.amount_paid)}
+                      </div>
+                      {invoice.amount_due !== invoice.amount_paid && (
+                        <div className="text-xs text-gray-500">
+                          Due: {formatCurrency(invoice.amount_due)}
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <InvoiceStatusBadge status={invoice.status} />
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                      {formatDate(invoice.paid_at)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                      {invoice.hosted_invoice_url && (
+                        <a
+                          href={invoice.hosted_invoice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700"
+                        >
+                          View Invoice →
+                        </a>
+                      )}
+                      {invoice.invoice_pdf_url && (
+                        <a
+                          href={invoice.invoice_pdf_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="ml-4 text-blue-600 hover:text-blue-700"
+                        >
+                          Download PDF
+                        </a>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
+
       {/* Users Table */}
       <div className="bg-white rounded-lg border shadow-sm mb-6">
         <div className="px-6 py-4 border-b">
@@ -327,6 +404,22 @@ function StatusBadge({ status }: { status: string }) {
   return (
     <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
       {status}
+    </span>
+  )
+}
+
+function InvoiceStatusBadge({ status }: { status: string }) {
+  const styles: Record<string, string> = {
+    paid: 'bg-green-100 text-green-800',
+    open: 'bg-blue-100 text-blue-800',
+    draft: 'bg-gray-100 text-gray-800',
+    void: 'bg-gray-200 text-gray-600',
+    uncollectible: 'bg-red-100 text-red-800'
+  }
+
+  return (
+    <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
+      {status.charAt(0).toUpperCase() + status.slice(1)}
     </span>
   )
 }
