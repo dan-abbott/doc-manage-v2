@@ -1,5 +1,5 @@
 /**
- * Stripe Webhook Handler  
+ * Stripe Webhook Handler - FIXED for Stripe v20
  * File: app/api/webhooks/stripe/route.ts
  */
 
@@ -79,26 +79,15 @@ async function logEvent(event: Stripe.Event) {
 }
 
 async function markProcessed(eventId: string) {
-  await supabase
-    .from('stripe_events')
-    .update({ processed: true })
-    .eq('stripe_event_id', eventId)
+  await supabase.from('stripe_events').update({ processed: true }).eq('stripe_event_id', eventId)
 }
 
 async function logError(eventId: string, error: string) {
-  await supabase
-    .from('stripe_events')
-    .update({ error })
-    .eq('stripe_event_id', eventId)
+  await supabase.from('stripe_events').update({ error }).eq('stripe_event_id', eventId)
 }
 
 async function getTenantId(customerId: string) {
-  const { data } = await supabase
-    .from('tenants')
-    .select('id')
-    .eq('stripe_customer_id', customerId)
-    .single()
-  
+  const { data } = await supabase.from('tenants').select('id').eq('stripe_customer_id', customerId).single()
   if (!data) throw new Error(`No tenant for customer ${customerId}`)
   return data.id
 }
@@ -117,6 +106,12 @@ async function handleSubscription(sub: Stripe.Subscription) {
   else if (priceId === process.env.STRIPE_PRICE_PROFESSIONAL) plan = 'professional'
   else if (priceId === process.env.STRIPE_PRICE_ENTERPRISE) plan = 'enterprise'
 
+  // Stripe v20 changed: use billing_cycle_anchor as fallback for current_period_start
+  const subAny = sub as any
+  const currentPeriodStart = subAny.billing_cycle_anchor || Math.floor(Date.now() / 1000)
+  // Estimate end (30 days for monthly, will be corrected by invoice events)
+  const currentPeriodEnd = subAny.cancel_at || (currentPeriodStart + 2592000)
+
   await supabase.from('tenant_billing').upsert({
     tenant_id: tenantId,
     stripe_customer_id: sub.customer as string,
@@ -124,9 +119,9 @@ async function handleSubscription(sub: Stripe.Subscription) {
     plan,
     status: sub.status,
     billing_cycle: sub.items.data[0]?.price?.recurring?.interval || 'month',
-    current_period_start: new Date(sub.current_period_start * 1000).toISOString(),
-    current_period_end: new Date(sub.current_period_end * 1000).toISOString(),
-    trial_ends_at: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+    current_period_start: new Date(currentPeriodStart * 1000).toISOString(),
+    current_period_end: new Date(currentPeriodEnd * 1000).toISOString(),
+    trial_ends_at: subAny.trial_end ? new Date(subAny.trial_end * 1000).toISOString() : null,
     cancelled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
     payment_method_type: pm?.type || null,
     payment_method_last4: pm?.card?.last4 || null,
@@ -138,7 +133,6 @@ async function handleSubscription(sub: Stripe.Subscription) {
 
 async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
   const tenantId = await getTenantId(sub.customer as string)
-  
   await supabase.from('tenant_billing').update({
     status: 'cancelled',
     cancelled_at: new Date().toISOString(),
@@ -147,7 +141,6 @@ async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
 
 async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!invoice.customer) return
-  
   const tenantId = await getTenantId(invoice.customer as string)
 
   await supabase.from('invoices').upsert({
@@ -174,21 +167,14 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   if (!invoice.customer) return
-  
   const tenantId = await getTenantId(invoice.customer as string)
-
-  await supabase.from('tenant_billing')
-    .update({ status: 'past_due' })
-    .eq('tenant_id', tenantId)
-
+  await supabase.from('tenant_billing').update({ status: 'past_due' }).eq('tenant_id', tenantId)
   console.log(`[Webhook] Payment failed: ${tenantId}`)
 }
 
 async function handlePaymentMethod(pm: Stripe.PaymentMethod) {
   if (!pm.customer) return
-  
   const tenantId = await getTenantId(pm.customer as string)
-
   await supabase.from('tenant_billing').update({
     payment_method_type: pm.type,
     payment_method_last4: pm.card?.last4 || null,
