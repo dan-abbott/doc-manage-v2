@@ -253,8 +253,15 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
  * Get detailed tenant information
  * UPDATED: Now includes billing data
  */
-export async function getTenantDetails(tenantId: string) {
-  const { supabase } = await checkMasterAdmin()
+export async function getTenantDetails(tenantId: string): Promise<{
+  tenant: any
+  users: any[]
+  recentDocs: any[]
+  apiUsage: any[]
+  billing: any
+  invoices: any[]
+}> {
+    const { supabase } = await checkMasterAdmin()
 
   const { data: tenant } = await supabase
     .from('tenants')
@@ -281,7 +288,7 @@ export async function getTenantDetails(tenantId: string) {
     .order('created_at', { ascending: false })
     .limit(10)
 
-  // Get API usage over time (last 30 days)
+  // Get API usage (last 30 days)
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
@@ -299,11 +306,20 @@ export async function getTenantDetails(tenantId: string) {
     .eq('tenant_id', tenantId)
     .single()
 
+  // ✅ NEW: Get invoice history
+  const { data: invoices } = await supabase
+    .from('invoices')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .order('invoice_date', { ascending: false })
+    .limit(20)
+
   return {
     tenant,
     users: users || [],
     recentDocs: recentDocs || [],
     apiUsage: apiUsage || [],
-    billing: billing || null
+    billing: billing || null,
+    invoices: invoices || []  // ✅ ADD THIS
   }
 }
