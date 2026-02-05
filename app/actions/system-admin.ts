@@ -1,8 +1,6 @@
 /**
- * System Admin Server Actions - COMPLETE
+ * System Admin Server Actions - WITH BILLING
  * app/actions/system-admin.ts
- * 
- * Includes getTenantDetails function for detail pages
  */
 
 'use server'
@@ -253,7 +251,7 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
 
 /**
  * Get detailed tenant information
- * NEW: For tenant detail pages
+ * UPDATED: Now includes billing data
  */
 export async function getTenantDetails(tenantId: string) {
   const { supabase } = await checkMasterAdmin()
@@ -294,7 +292,7 @@ export async function getTenantDetails(tenantId: string) {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .order('created_at')
 
-
+  // Get billing information
   const { data: billing } = await supabase
     .from('tenant_billing')
     .select('*')
@@ -306,6 +304,6 @@ export async function getTenantDetails(tenantId: string) {
     users: users || [],
     recentDocs: recentDocs || [],
     apiUsage: apiUsage || [],
-    billing: billing || null  // ✅ ADD THIS LINE
+    billing: billing || null
   }
 }
