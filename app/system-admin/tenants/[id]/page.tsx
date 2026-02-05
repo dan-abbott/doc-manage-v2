@@ -1,6 +1,8 @@
 /**
- * Tenant Detail Page
+ * Tenant Detail Page with Real Billing
  * app/system-admin/tenants/[id]/page.tsx
+ * 
+ * Shows billing data from tenant_billing table
  */
 
 import { getTenantDetails } from '@/app/actions/system-admin'
@@ -25,53 +27,69 @@ export default async function TenantDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  const { tenant, users, recentDocs, apiUsage } = tenantData
+  const { tenant, users, recentDocs, apiUsage, billing } = tenantData
 
-  // Format date
+  // Format helpers
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Never'
     return new Date(dateString).toLocaleDateString('en-US', {
       year: 'numeric',
       month: 'short',
-      day: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit'
+      day: 'numeric'
     })
   }
 
-  // Format storage
-  const formatStorage = (bytes: number) => {
-    if (bytes === 0) return '0 MB'
-    const mb = bytes / (1024 * 1024)
-    const gb = mb / 1024
-    return gb < 1 ? `${mb.toFixed(2)} MB` : `${gb.toFixed(2)} GB`
+  const formatCurrency = (amount: number) => {
+    return new Intl.NumberFormat('en-US', {
+      style: 'currency',
+      currency: 'USD'
+    }).format(amount)
   }
 
-  // Calculate API usage by day (last 30 days)
+  // Calculate API usage
   const apiByDay = apiUsage.reduce((acc: any, usage: any) => {
     const date = new Date(usage.created_at).toLocaleDateString()
     if (!acc[date]) {
       acc[date] = { virustotal: 0, email: 0 }
     }
-    if (usage.api_type === 'virustotal') {
-      acc[date].virustotal++
-    } else if (usage.api_type === 'resend_email') {
-      acc[date].email++
-    }
+    if (usage.api_type === 'virustotal') acc[date].virustotal++
+    else if (usage.api_type === 'resend_email') acc[date].email++
     return acc
   }, {})
 
-  const totalVtCalls = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.virustotal, 0)
-  const totalEmails = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.email, 0)
+  const totalVt = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.virustotal, 0)
+  const totalEmail = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.email, 0)
+
+  // Calculate usage costs
+  const vtCost = totalVt * 0.005
+  const emailCost = totalEmail * 0.001
+  const storageCost = 0 // TODO: Get from tenant metrics
+
+  // Get plan price
+  const planPrices: Record<string, number> = {
+    trial: 0,
+    starter: 29,
+    professional: 99,
+    enterprise: 299
+  }
+  const planPrice = planPrices[billing?.plan || 'trial'] || 0
+
+  const totalMonthlyCost = vtCost + emailCost + storageCost + planPrice
+
+  // Status badge color
+  const statusColors: Record<string, string> = {
+    trial: 'bg-blue-100 text-blue-800',
+    active: 'bg-green-100 text-green-800',
+    past_due: 'bg-red-100 text-red-800',
+    cancelled: 'bg-gray-100 text-gray-800',
+    suspended: 'bg-yellow-100 text-yellow-800'
+  }
 
   return (
     <div className="container mx-auto px-4 py-8 max-w-7xl">
       {/* Back Button */}
       <div className="mb-6">
-        <Link
-          href="/system-admin"
-          className="text-sm text-blue-600 hover:text-blue-700 flex items-center gap-2"
-        >
+        <Link href="/system-admin" className="text-sm text-blue-600 hover:text-blue-700">
           ← Back to System Admin
         </Link>
       </div>
@@ -87,13 +105,6 @@ export default async function TenantDetailPage({ params }: PageProps) {
               <span>Created: {formatDate(tenant.created_at)}</span>
             </div>
           </div>
-          {tenant.logo_url && (
-            <img
-              src={tenant.logo_url}
-              alt={tenant.company_name}
-              className="w-16 h-16 object-contain"
-            />
-          )}
         </div>
       </div>
 
@@ -101,8 +112,107 @@ export default async function TenantDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard title="Users" value={users.length} color="blue" />
         <MetricCard title="Documents" value={recentDocs.length} color="green" />
-        <MetricCard title="VT Scans (30d)" value={totalVtCalls} color="red" />
-        <MetricCard title="Emails (30d)" value={totalEmails} color="indigo" />
+        <MetricCard title="VT Scans (30d)" value={totalVt} color="red" />
+        <MetricCard title="Emails (30d)" value={totalEmail} color="indigo" />
+      </div>
+
+      {/* Billing & Payment Section */}
+      <div className="bg-white rounded-lg border shadow-sm mb-6">
+        <div className="px-6 py-4 border-b">
+          <h2 className="text-xl font-bold text-gray-900">Billing & Payment</h2>
+        </div>
+        <div className="p-6">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {/* Billing Status */}
+            <div>
+              <div className="text-sm text-gray-600 mb-2">Billing Status</div>
+              <div className="space-y-3">
+                <div>
+                  <span className={`px-3 py-1 text-sm font-medium rounded-full ${
+                    statusColors[billing?.status || 'trial']
+                  }`}>
+                    {(billing?.status || 'trial').charAt(0).toUpperCase() + (billing?.status || 'trial').slice(1)}
+                  </span>
+                </div>
+                <div className="text-sm space-y-1">
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Plan:</span>
+                    <span className="text-gray-900 capitalize">{billing?.plan || 'Trial'}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-600">Billing:</span>
+                    <span className="text-gray-900 capitalize">{billing?.billing_cycle || 'N/A'}</span>
+                  </div>
+                  {billing?.current_period_end && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Next Bill:</span>
+                      <span className="text-gray-900">{formatDate(billing.current_period_end)}</span>
+                    </div>
+                  )}
+                  {billing?.trial_ends_at && (
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Trial Ends:</span>
+                      <span className="text-gray-900">{formatDate(billing.trial_ends_at)}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* Payment Info */}
+            <div>
+              <div className="text-sm text-gray-600 mb-2">Payment Method</div>
+              <div className="space-y-3">
+                {billing?.payment_method_last4 ? (
+                  <div className="text-sm space-y-1">
+                    <div className="flex justify-between">
+                      <span className="text-gray-600">Method:</span>
+                      <span className="text-gray-900 capitalize">
+                        {billing.payment_method_brand} •••• {billing.payment_method_last4}
+                      </span>
+                    </div>
+                    {billing.payment_method_exp_month && billing.payment_method_exp_year && (
+                      <div className="flex justify-between">
+                        <span className="text-gray-600">Expires:</span>
+                        <span className="text-gray-900">
+                          {billing.payment_method_exp_month}/{billing.payment_method_exp_year}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="text-sm text-gray-500">No payment method on file</div>
+                )}
+              </div>
+            </div>
+
+            {/* Monthly Cost */}
+            <div>
+              <div className="text-sm text-gray-600 mb-2">Estimated Monthly Cost</div>
+              <div className="text-3xl font-bold text-gray-900 mb-3">
+                {formatCurrency(totalMonthlyCost)}
+              </div>
+              <div className="space-y-1 text-sm">
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Subscription:</span>
+                  <span className="text-gray-900">{formatCurrency(planPrice)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Storage:</span>
+                  <span className="text-gray-900">{formatCurrency(storageCost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">VirusTotal:</span>
+                  <span className="text-gray-900">{formatCurrency(vtCost)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-gray-600">Email:</span>
+                  <span className="text-gray-900">{formatCurrency(emailCost)}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
 
       {/* Users Table */}
@@ -114,46 +224,30 @@ export default async function TenantDetailPage({ params }: PageProps) {
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Name
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Email
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Role
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Joined
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Last Sign In
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Joined</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {users.map((user: any) => (
                 <tr key={user.id} className="hover:bg-gray-50">
                   <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-medium text-gray-900">{user.full_name}</div>
+                    <div className="font-medium text-gray-900">{user.full_name || 'N/A'}</div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {user.email}
+                    {user.email || 'N/A'}
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <span className={`px-2 py-1 text-xs font-medium rounded-full ${
-                      user.role === 'Admin' 
-                        ? 'bg-purple-100 text-purple-800' 
-                        : 'bg-gray-100 text-gray-800'
+                      user.role === 'Admin' ? 'bg-purple-100 text-purple-800' : 'bg-gray-100 text-gray-800'
                     }`}>
-                      {user.role}
+                      {user.role || 'Normal'}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
                     {formatDate(user.created_at)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                    {formatDate(user.last_sign_in_at)}
                   </td>
                 </tr>
               ))}
@@ -161,9 +255,7 @@ export default async function TenantDetailPage({ params }: PageProps) {
           </table>
         </div>
         {users.length === 0 && (
-          <div className="px-6 py-12 text-center text-gray-500">
-            No users found
-          </div>
+          <div className="px-6 py-12 text-center text-gray-500">No users found</div>
         )}
       </div>
 
@@ -171,37 +263,24 @@ export default async function TenantDetailPage({ params }: PageProps) {
       <div className="bg-white rounded-lg border shadow-sm mb-6">
         <div className="px-6 py-4 border-b">
           <h2 className="text-xl font-bold text-gray-900">Recent Documents</h2>
-          <p className="text-sm text-gray-600 mt-1">Last 10 documents</p>
         </div>
         <div className="overflow-x-auto">
           <table className="w-full">
             <thead className="bg-gray-50 border-b">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Document #
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Title
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  Created
-                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Document #</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Title</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
               {recentDocs.map((doc: any) => (
                 <tr key={doc.id} className="hover:bg-gray-50">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="font-mono text-sm text-gray-900">
-                      {doc.document_number}{doc.version}
-                    </div>
+                  <td className="px-6 py-4 whitespace-nowrap font-mono text-sm">
+                    {doc.document_number}{doc.version}
                   </td>
-                  <td className="px-6 py-4">
-                    <div className="text-sm text-gray-900">{doc.title}</div>
-                  </td>
+                  <td className="px-6 py-4 text-sm text-gray-900">{doc.title}</td>
                   <td className="px-6 py-4 whitespace-nowrap">
                     <StatusBadge status={doc.status} />
                   </td>
@@ -214,56 +293,15 @@ export default async function TenantDetailPage({ params }: PageProps) {
           </table>
         </div>
         {recentDocs.length === 0 && (
-          <div className="px-6 py-12 text-center text-gray-500">
-            No documents found
-          </div>
+          <div className="px-6 py-12 text-center text-gray-500">No documents found</div>
         )}
       </div>
-
-      {/* API Usage Chart (simplified) */}
-      {Object.keys(apiByDay).length > 0 && (
-        <div className="bg-white rounded-lg border shadow-sm">
-          <div className="px-6 py-4 border-b">
-            <h2 className="text-xl font-bold text-gray-900">API Usage (Last 30 Days)</h2>
-          </div>
-          <div className="p-6">
-            <div className="space-y-3">
-              {Object.entries(apiByDay)
-                .sort(([a], [b]) => new Date(b).getTime() - new Date(a).getTime())
-                .slice(0, 10)
-                .map(([date, counts]: [string, any]) => (
-                  <div key={date} className="flex items-center gap-4">
-                    <div className="w-24 text-sm text-gray-600">{date}</div>
-                    <div className="flex-1 flex gap-2">
-                      {counts.virustotal > 0 && (
-                        <div className="px-3 py-1 bg-red-100 text-red-800 text-xs rounded">
-                          VT: {counts.virustotal}
-                        </div>
-                      )}
-                      {counts.email > 0 && (
-                        <div className="px-3 py-1 bg-indigo-100 text-indigo-800 text-xs rounded">
-                          Email: {counts.email}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-interface MetricCardProps {
-  title: string
-  value: number
-  color: 'blue' | 'green' | 'red' | 'indigo'
-}
-
-function MetricCard({ title, value, color }: MetricCardProps) {
-  const colorClasses = {
+function MetricCard({ title, value, color }: { title: string; value: number; color: string }) {
+  const colors: Record<string, string> = {
     blue: 'bg-blue-50 border-blue-200',
     green: 'bg-green-50 border-green-200',
     red: 'bg-red-50 border-red-200',
@@ -271,7 +309,7 @@ function MetricCard({ title, value, color }: MetricCardProps) {
   }
 
   return (
-    <div className={`rounded-lg border p-6 ${colorClasses[color]}`}>
+    <div className={`rounded-lg border p-6 ${colors[color]}`}>
       <div className="text-sm font-medium text-gray-600 mb-1">{title}</div>
       <div className="text-2xl font-bold text-gray-900">{value}</div>
     </div>
@@ -279,7 +317,7 @@ function MetricCard({ title, value, color }: MetricCardProps) {
 }
 
 function StatusBadge({ status }: { status: string }) {
-  const styles = {
+  const styles: Record<string, string> = {
     Draft: 'bg-gray-100 text-gray-800',
     'In Approval': 'bg-yellow-100 text-yellow-800',
     Released: 'bg-green-100 text-green-800',
@@ -287,7 +325,7 @@ function StatusBadge({ status }: { status: string }) {
   }
 
   return (
-    <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status as keyof typeof styles] || 'bg-gray-100 text-gray-800'}`}>
+    <span className={`px-2 py-1 text-xs font-medium rounded-full ${styles[status] || 'bg-gray-100 text-gray-800'}`}>
       {status}
     </span>
   )
