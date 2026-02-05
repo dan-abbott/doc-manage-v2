@@ -1,16 +1,12 @@
 /**
- * FINAL System Admin Dashboard Page
+ * System Admin Dashboard - WITH WORKING LINKS
  * app/system-admin/page.tsx
- * 
- * FIXES:
- * 1. Smart unit display - shows MB for small values, GB for large
- * 2. Consistent formatting across all tenants
- * 3. Better readability
  */
 
 import { getAllTenantMetrics, getSystemMetrics } from '@/app/actions/system-admin'
+import Link from 'next/link'
 
-export const revalidate = 0 // Disable caching
+export const revalidate = 0
 
 export default async function SystemAdminPage() {
   const [tenantMetrics, systemMetrics] = await Promise.all([
@@ -27,23 +23,21 @@ export default async function SystemAdminPage() {
     }).format(amount)
   }
 
-  // Smart file size formatting - shows MB or GB based on size
+  // Smart file size formatting
   const formatSize = (bytes: number) => {
     if (bytes === 0) return '0 MB'
     
     const mb = bytes / (1024 * 1024)
     const gb = mb / 1024
     
-    // If less than 1 GB, show in MB
     if (gb < 1) {
       return `${mb.toFixed(2)} MB`
     }
     
-    // Otherwise show in GB
     return `${gb.toFixed(2)} GB`
   }
 
-  // Format system-wide storage (always in GB for overview)
+  // Format system-wide storage
   const formatSystemStorage = (bytes: number) => {
     const gb = bytes / (1024 * 1024 * 1024)
     
@@ -122,7 +116,7 @@ export default async function SystemAdminPage() {
         <div className="px-6 py-4 border-b">
           <h2 className="text-xl font-bold text-gray-900">Tenant Details</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Individual tenant detail pages coming soon
+            Click any tenant to view detailed information
           </p>
         </div>
 
@@ -160,15 +154,20 @@ export default async function SystemAdminPage() {
               {tenantMetrics.map((tenant) => (
                 <tr
                   key={tenant.tenant_id}
-                  className="hover:bg-gray-50 transition-colors"
+                  className="hover:bg-gray-50 cursor-pointer transition-colors"
                 >
                   <td className="px-6 py-4">
-                    <div className="font-medium text-gray-900">
-                      {tenant.company_name}
-                    </div>
-                    <div className="text-sm text-gray-500">
-                      {tenant.subdomain}.yourdomain.com
-                    </div>
+                    <Link
+                      href={`/system-admin/tenants/${tenant.tenant_id}`}
+                      className="block"
+                    >
+                      <div className="font-medium text-gray-900 hover:text-blue-600">
+                        {tenant.company_name}
+                      </div>
+                      <div className="text-sm text-gray-500">
+                        {tenant.subdomain}.yourdomain.com
+                      </div>
+                    </Link>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {tenant.user_count}
