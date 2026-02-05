@@ -1,11 +1,8 @@
 /**
- * FIXED System Admin Server Actions
+ * System Admin Server Actions - COMPLETE
  * app/actions/system-admin.ts
  * 
- * Changes:
- * 1. Fixed storage query - joins through documents table to get tenant_id
- * 2. Added better error handling
- * 3. Added console logs for debugging
+ * Includes getTenantDetails function for detail pages
  */
 
 'use server'
@@ -65,7 +62,6 @@ async function checkMasterAdmin() {
 
 /**
  * Get storage for a tenant
- * Handles both cases: tenant_id directly on document_files OR needs join through documents
  */
 async function getTenantStorage(supabase: any, tenantId: string): Promise<number> {
   // Try direct query first (if tenant_id exists on document_files)
@@ -108,7 +104,6 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
 
   console.log('[System Admin] Fetching tenant metrics...')
 
-  // Get all tenants
   const { data: tenants } = await supabase
     .from('tenants')
     .select('id, company_name, subdomain, created_at')
@@ -121,27 +116,22 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
 
   console.log(`[System Admin] Found ${tenants.length} tenants`)
 
-  // Get metrics for each tenant
   const metrics = await Promise.all(
     tenants.map(async (tenant) => {
-      // User count
       const { count: userCount } = await supabase
         .from('users')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
 
-      // Document count  
       const { count: documentCount } = await supabase
         .from('documents')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
 
-      // Storage usage
       const storageBytes = await getTenantStorage(supabase, tenant.id)
       const storageMB = storageBytes / (1024 * 1024)
       const storageGB = storageMB / 1024
 
-      // API usage (if tracking enabled)
       const { count: virusTotalCalls } = await supabase
         .from('api_usage')
         .select('*', { count: 'exact', head: true })
@@ -154,7 +144,6 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
         .eq('tenant_id', tenant.id)
         .eq('api_type', 'resend_email')
 
-      // Last activity
       const { data: lastDoc } = await supabase
         .from('documents')
         .select('updated_at')
@@ -163,7 +152,6 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
         .limit(1)
         .single()
 
-      // Cost estimates
       const virusTotalCost = (virusTotalCalls || 0) * 0.005
       const emailCost = (emailSends || 0) * 0.001
       const storageCost = storageGB * 0.023
@@ -198,25 +186,20 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
 
   console.log('[System Admin] Fetching system metrics...')
 
-  // Total tenants
   const { count: totalTenants } = await supabase
     .from('tenants')
     .select('*', { count: 'exact', head: true })
 
-  // Total users
   const { count: totalUsers } = await supabase
     .from('users')
     .select('*', { count: 'exact', head: true })
 
-  // Total documents
   const { count: totalDocuments } = await supabase
     .from('documents')
     .select('*', { count: 'exact', head: true })
 
-  // Total storage - try both methods
   let totalStorageBytes = 0
   
-  // Method 1: Direct query
   const { data: allFilesDirectData } = await supabase
     .from('document_files')
     .select('file_size')
@@ -227,7 +210,6 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     )
   }
 
-  // Method 2: If no data, try join (shouldn't be needed for system-wide)
   if (totalStorageBytes === 0) {
     const { data: allFilesJoinData } = await supabase
       .from('document_files')
@@ -243,7 +225,6 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
   const totalStorageGB = totalStorageBytes / (1024 * 1024 * 1024)
   console.log(`[System Admin] Total storage: ${totalStorageBytes} bytes (${totalStorageGB.toFixed(2)} GB)`)
 
-  // Total API usage
   const { count: totalVirusTotalCalls } = await supabase
     .from('api_usage')
     .select('*', { count: 'exact', head: true })
@@ -254,7 +235,6 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     .select('*', { count: 'exact', head: true })
     .eq('api_type', 'resend_email')
 
-  // Total estimated costs
   const virusTotalCost = (totalVirusTotalCalls || 0) * 0.005
   const emailCost = (totalEmailSends || 0) * 0.001
   const storageCost = totalStorageGB * 0.023
@@ -268,5 +248,56 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     total_virustotal_calls: totalVirusTotalCalls || 0,
     total_email_sends: totalEmailSends || 0,
     total_estimated_cost: totalEstimatedCost
+  }
+}
+
+/**
+ * Get detailed tenant information
+ * NEW: For tenant detail pages
+ */
+export async function getTenantDetails(tenantId: string) {
+  const { supabase } = await checkMasterAdmin()
+
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('*')
+    .eq('id', tenantId)
+    .single()
+
+  if (!tenant) {
+    throw new Error('Tenant not found')
+  }
+
+  // Get users
+  const { data: users } = await supabase
+    .from('users')
+    .select('id, full_name, role, email, created_at, last_sign_in_at')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+
+  // Get recent documents
+  const { data: recentDocs } = await supabase
+    .from('documents')
+    .select('id, document_number, version, title, status, created_at')
+    .eq('tenant_id', tenantId)
+    .order('created_at', { ascending: false })
+    .limit(10)
+
+  // Get API usage over time (last 30 days)
+  const thirtyDaysAgo = new Date()
+  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
+
+  const { data: apiUsage } = await supabase
+    .from('api_usage')
+    .select('api_type, created_at')
+    .eq('tenant_id', tenantId)
+    .gte('created_at', thirtyDaysAgo.toISOString())
+    .order('created_at')
+
+  return {
+    tenant,
+    users: users || [],
+    recentDocs: recentDocs || [],
+    apiUsage: apiUsage || []
   }
 }
