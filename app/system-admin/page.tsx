@@ -1,10 +1,14 @@
 /**
- * System Admin Dashboard
+ * FIXED System Admin Dashboard Page
  * app/system-admin/page.tsx
+ * 
+ * Changes:
+ * 1. Removed Link component (causing 404 prefetch errors)
+ * 2. Made rows non-clickable until detail page exists
+ * 3. Added note about future feature
  */
 
 import { getAllTenantMetrics, getSystemMetrics } from '@/app/actions/system-admin'
-import Link from 'next/link'
 
 export const revalidate = 0 // Disable caching
 
@@ -98,7 +102,7 @@ export default async function SystemAdminPage() {
         <div className="px-6 py-4 border-b">
           <h2 className="text-xl font-bold text-gray-900">Tenant Details</h2>
           <p className="text-sm text-gray-600 mt-1">
-            Click any tenant to view detailed information
+            Individual tenant detail pages coming soon
           </p>
         </div>
 
@@ -136,20 +140,15 @@ export default async function SystemAdminPage() {
               {tenantMetrics.map((tenant) => (
                 <tr
                   key={tenant.tenant_id}
-                  className="hover:bg-gray-50 cursor-pointer transition-colors"
+                  className="hover:bg-gray-50 transition-colors"
                 >
                   <td className="px-6 py-4">
-                    <Link
-                      href={`/system-admin/tenants/${tenant.tenant_id}`}
-                      className="block"
-                    >
-                      <div className="font-medium text-gray-900">
-                        {tenant.company_name}
-                      </div>
-                      <div className="text-sm text-gray-500">
-                        {tenant.subdomain}.yourdomain.com
-                      </div>
-                    </Link>
+                    <div className="font-medium text-gray-900">
+                      {tenant.company_name}
+                    </div>
+                    <div className="text-sm text-gray-500">
+                      {tenant.subdomain}.yourdomain.com
+                    </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
                     {tenant.user_count}

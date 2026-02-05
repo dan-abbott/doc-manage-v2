@@ -1,9 +1,11 @@
 /**
- * System Admin Server Actions
+ * FIXED System Admin Server Actions
  * app/actions/system-admin.ts
  * 
- * IMPORTANT: These actions bypass tenant_id filtering!
- * Only accessible to is_master_admin users
+ * Changes:
+ * 1. Fixed storage query - joins through documents table to get tenant_id
+ * 2. Added better error handling
+ * 3. Added console logs for debugging
  */
 
 'use server'
@@ -55,10 +57,47 @@ async function checkMasterAdmin() {
     .single()
 
   if (!userData?.is_master_admin) {
-    redirect('/dashboard') // Not authorized
+    redirect('/dashboard')
   }
 
   return { supabase, user }
+}
+
+/**
+ * Get storage for a tenant
+ * Handles both cases: tenant_id directly on document_files OR needs join through documents
+ */
+async function getTenantStorage(supabase: any, tenantId: string): Promise<number> {
+  // Try direct query first (if tenant_id exists on document_files)
+  const { data: directData, error: directError } = await supabase
+    .from('document_files')
+    .select('file_size')
+    .eq('tenant_id', tenantId)
+
+  if (!directError && directData) {
+    const bytes = directData.reduce((sum: number, file: any) => sum + (file.file_size || 0), 0)
+    console.log(`[Storage] Tenant ${tenantId}: ${bytes} bytes (direct query)`)
+    return bytes
+  }
+
+  // If that fails, join through documents table
+  const { data: joinData, error: joinError } = await supabase
+    .from('document_files')
+    .select(`
+      file_size,
+      document_id,
+      documents!inner(tenant_id)
+    `)
+    .eq('documents.tenant_id', tenantId)
+
+  if (joinError) {
+    console.error(`[Storage Error] Tenant ${tenantId}:`, joinError)
+    return 0
+  }
+
+  const bytes = joinData?.reduce((sum: number, file: any) => sum + (file.file_size || 0), 0) || 0
+  console.log(`[Storage] Tenant ${tenantId}: ${bytes} bytes (join query)`)
+  return bytes
 }
 
 /**
@@ -67,13 +106,20 @@ async function checkMasterAdmin() {
 export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
   const { supabase } = await checkMasterAdmin()
 
+  console.log('[System Admin] Fetching tenant metrics...')
+
   // Get all tenants
   const { data: tenants } = await supabase
     .from('tenants')
     .select('id, company_name, subdomain, created_at')
     .order('company_name')
 
-  if (!tenants) return []
+  if (!tenants) {
+    console.log('[System Admin] No tenants found')
+    return []
+  }
+
+  console.log(`[System Admin] Found ${tenants.length} tenants`)
 
   // Get metrics for each tenant
   const metrics = await Promise.all(
@@ -90,13 +136,8 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
 
-      // Storage usage (sum of file sizes)
-      const { data: storageData } = await supabase
-        .from('document_files')
-        .select('file_size')
-        .eq('tenant_id', tenant.id)
-
-      const storageBytes = storageData?.reduce((sum, file) => sum + (file.file_size || 0), 0) || 0
+      // Storage usage
+      const storageBytes = await getTenantStorage(supabase, tenant.id)
       const storageMB = storageBytes / (1024 * 1024)
       const storageGB = storageMB / 1024
 
@@ -113,7 +154,7 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
         .eq('tenant_id', tenant.id)
         .eq('api_type', 'resend_email')
 
-      // Last activity (most recent document update)
+      // Last activity
       const { data: lastDoc } = await supabase
         .from('documents')
         .select('updated_at')
@@ -122,10 +163,10 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
         .limit(1)
         .single()
 
-      // Cost estimates (adjust these based on actual pricing)
-      const virusTotalCost = (virusTotalCalls || 0) * 0.005 // $0.005 per scan
-      const emailCost = (emailSends || 0) * 0.001 // $0.001 per email
-      const storageCost = storageGB * 0.023 // $0.023 per GB/month (Supabase pricing)
+      // Cost estimates
+      const virusTotalCost = (virusTotalCalls || 0) * 0.005
+      const emailCost = (emailSends || 0) * 0.001
+      const storageCost = storageGB * 0.023
       const totalCost = virusTotalCost + emailCost + storageCost
 
       return {
@@ -155,6 +196,8 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
 export async function getSystemMetrics(): Promise<SystemMetrics> {
   const { supabase } = await checkMasterAdmin()
 
+  console.log('[System Admin] Fetching system metrics...')
+
   // Total tenants
   const { count: totalTenants } = await supabase
     .from('tenants')
@@ -170,13 +213,35 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     .from('documents')
     .select('*', { count: 'exact', head: true })
 
-  // Total storage
-  const { data: allFiles } = await supabase
+  // Total storage - try both methods
+  let totalStorageBytes = 0
+  
+  // Method 1: Direct query
+  const { data: allFilesDirectData } = await supabase
     .from('document_files')
     .select('file_size')
 
-  const totalStorageBytes = allFiles?.reduce((sum, file) => sum + (file.file_size || 0), 0) || 0
+  if (allFilesDirectData && allFilesDirectData.length > 0) {
+    totalStorageBytes = allFilesDirectData.reduce((sum: number, file: any) => 
+      sum + (file.file_size || 0), 0
+    )
+  }
+
+  // Method 2: If no data, try join (shouldn't be needed for system-wide)
+  if (totalStorageBytes === 0) {
+    const { data: allFilesJoinData } = await supabase
+      .from('document_files')
+      .select('file_size, document_id, documents!inner(id)')
+
+    if (allFilesJoinData) {
+      totalStorageBytes = allFilesJoinData.reduce((sum: number, file: any) => 
+        sum + (file.file_size || 0), 0
+      )
+    }
+  }
+
   const totalStorageGB = totalStorageBytes / (1024 * 1024 * 1024)
+  console.log(`[System Admin] Total storage: ${totalStorageBytes} bytes (${totalStorageGB.toFixed(2)} GB)`)
 
   // Total API usage
   const { count: totalVirusTotalCalls } = await supabase
@@ -203,55 +268,5 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     total_virustotal_calls: totalVirusTotalCalls || 0,
     total_email_sends: totalEmailSends || 0,
     total_estimated_cost: totalEstimatedCost
-  }
-}
-
-/**
- * Get detailed tenant information
- */
-export async function getTenantDetails(tenantId: string) {
-  const { supabase } = await checkMasterAdmin()
-
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('*')
-    .eq('id', tenantId)
-    .single()
-
-  if (!tenant) {
-    throw new Error('Tenant not found')
-  }
-
-  // Get users
-  const { data: users } = await supabase
-    .from('users')
-    .select('id, full_name, role, email, created_at, last_sign_in_at')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-
-  // Get recent documents
-  const { data: recentDocs } = await supabase
-    .from('documents')
-    .select('id, document_number, version, title, status, created_at')
-    .eq('tenant_id', tenantId)
-    .order('created_at', { ascending: false })
-    .limit(10)
-
-  // Get API usage over time (last 30 days)
-  const thirtyDaysAgo = new Date()
-  thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
-
-  const { data: apiUsage } = await supabase
-    .from('api_usage')
-    .select('api_type, created_at')
-    .eq('tenant_id', tenantId)
-    .gte('created_at', thirtyDaysAgo.toISOString())
-    .order('created_at')
-
-  return {
-    tenant,
-    users: users || [],
-    recentDocs: recentDocs || [],
-    apiUsage: apiUsage || []
   }
 }
