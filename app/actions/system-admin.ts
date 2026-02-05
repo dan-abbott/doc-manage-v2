@@ -294,10 +294,18 @@ export async function getTenantDetails(tenantId: string) {
     .gte('created_at', thirtyDaysAgo.toISOString())
     .order('created_at')
 
+
+  const { data: billing } = await supabase
+    .from('tenant_billing')
+    .select('*')
+    .eq('tenant_id', tenantId)
+    .single()
+
   return {
     tenant,
     users: users || [],
     recentDocs: recentDocs || [],
-    apiUsage: apiUsage || []
+    apiUsage: apiUsage || [],
+    billing: billing || null  // ✅ ADD THIS LINE
   }
 }
