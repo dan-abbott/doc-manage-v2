@@ -143,10 +143,16 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   if (!invoice.customer) return
   const tenantId = await getTenantId(invoice.customer as string)
 
+  // Stripe v20: subscription might be string or object
+  const invoiceAny = invoice as any
+  const subscriptionId = typeof invoiceAny.subscription === 'string' 
+    ? invoiceAny.subscription 
+    : invoiceAny.subscription?.id || null
+
   await supabase.from('invoices').upsert({
     tenant_id: tenantId,
     stripe_invoice_id: invoice.id,
-    stripe_subscription_id: invoice.subscription as string || null,
+    stripe_subscription_id: subscriptionId,
     amount_due: (invoice.amount_due || 0) / 100,
     amount_paid: (invoice.amount_paid || 0) / 100,
     currency: invoice.currency,
