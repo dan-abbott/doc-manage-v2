@@ -6,7 +6,7 @@ export default function SignInButton() {
   const handleSignIn = async () => {
     const supabase = createClient()
     
-    // ADDED: Store subdomain before OAuth redirect
+    // Store subdomain before OAuth redirect
     const host = window.location.host
     const subdomain = host.split('.')[0]
     
@@ -18,7 +18,9 @@ export default function SignInButton() {
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        // CRITICAL: Always redirect to app.baselinedocs.com
+        // The callback will read the cookie and redirect to correct subdomain
+        redirectTo: 'https://app.baselinedocs.com/auth/callback',
       },
     })
 
