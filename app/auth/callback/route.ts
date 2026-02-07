@@ -76,15 +76,16 @@ export async function GET(request: Request) {
 
     console.log('[Auth Callback] Found tenant:', tenant.company_name, tenant.id)
 
-    // Get user's current tenant assignment (or create if doesn't exist)
-    let { data: userRecord, error: userError } = await supabase
+    // Get user's current tenant assignment (check globally, not just this tenant)
+    // Use maybeSingle() instead of single() to handle "not found" gracefully
+    const { data: userRecord, error: userError } = await supabase
       .from('users')
       .select('tenant_id, is_master_admin, full_name')
       .eq('id', user.id)
-      .single()
+      .maybeSingle()
 
-    // CRITICAL FIX: Create user record if it doesn't exist
-    if (userError && userError.code === 'PGRST116') {
+    // CRITICAL FIX: Create user record ONLY if it truly doesn't exist
+    if (!userRecord && (!userError || userError.code === 'PGRST116')) {
       console.log('[Auth Callback] User record not found, creating...')
       
       // Extract full name from Google OAuth metadata
@@ -93,7 +94,7 @@ export async function GET(request: Request) {
                       user.email?.split('@')[0] || 
                       'User'
       
-      // Create user record
+      // Create user record for this tenant
       const { data: newUser, error: createError } = await supabase
         .from('users')
         .insert({
@@ -117,8 +118,30 @@ export async function GET(request: Request) {
         return NextResponse.redirect(`${origin}/auth/error?message=user_creation_failed`)
       }
       
-      userRecord = newUser
-      console.log('[Auth Callback] Created user record:', userRecord)
+      // Use the newly created user record
+      const finalUserRecord = newUser
+      
+      if (!finalUserRecord) {
+        console.error('[Auth Callback] Created user record is null')
+        
+        if (oauthOriginCookie) {
+          cookieStore.delete('oauth_origin_subdomain')
+        }
+        
+        return NextResponse.redirect(`${origin}/auth/error?message=user_record_null`)
+      }
+      
+      console.log('[Auth Callback] Created new user record:', finalUserRecord)
+      
+      // New users are never master admin, so redirect to their tenant only
+      const redirectUrl = `https://${tenant.subdomain}.baselinedocs.com/dashboard`
+      console.log('[Auth Callback] Redirecting new user to:', redirectUrl)
+      
+      if (oauthOriginCookie) {
+        cookieStore.delete('oauth_origin_subdomain')
+      }
+      
+      return NextResponse.redirect(redirectUrl)
     } else if (userError) {
       console.error('[Auth Callback] User lookup error:', userError)
       
