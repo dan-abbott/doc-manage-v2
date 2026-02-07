@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { NextResponse } from 'next/server'
 import { cookies } from 'next/headers'
 
@@ -55,8 +55,11 @@ export async function GET(request: Request) {
 
     console.log('[Auth Callback] Final subdomain:', subdomain)
 
+    // Use service role client to bypass RLS for tenant/user lookups
+    const supabaseAdmin = createServiceRoleClient()
+
     // Look up tenant by subdomain
-    const { data: tenant, error: tenantError } = await supabase
+    const { data: tenant, error: tenantError } = await supabaseAdmin
       .from('tenants')
       .select('id, company_name, subdomain')
       .eq('subdomain', subdomain)
@@ -77,8 +80,9 @@ export async function GET(request: Request) {
     console.log('[Auth Callback] Found tenant:', tenant.company_name, tenant.id)
 
     // Get user's current tenant assignment (check globally, not just this tenant)
+    // Use service role client to bypass RLS and find user across all tenants
     // Use maybeSingle() instead of single() to handle "not found" gracefully
-    const { data: userRecord, error: userError } = await supabase
+    const { data: userRecord, error: userError } = await supabaseAdmin
       .from('users')
       .select('tenant_id, is_master_admin, full_name')
       .eq('id', user.id)
@@ -95,7 +99,7 @@ export async function GET(request: Request) {
                       'User'
       
       // Create user record for this tenant
-      const { data: newUser, error: createError } = await supabase
+      const { data: newUser, error: createError } = await supabaseAdmin
         .from('users')
         .insert({
           id: user.id,
@@ -183,7 +187,7 @@ export async function GET(request: Request) {
       
       // Update full_name if it's missing
       if (!userRecord.full_name) {
-        await supabase
+        await supabaseAdmin
           .from('users')
           .update({ full_name: fullName })
           .eq('id', user.id)
@@ -225,7 +229,7 @@ export async function GET(request: Request) {
 
     // Update user's full_name if missing
     if (!userRecord.full_name) {
-      const { error: updateError } = await supabase
+      const { error: updateError } = await supabaseAdmin
         .from('users')
         .update({ 
           full_name: fullName,
