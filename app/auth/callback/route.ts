@@ -34,7 +34,7 @@ export async function GET(request: Request) {
 
     console.log('[Auth Callback] User:', user.email)
 
-    // CRITICAL FIX: Get the original subdomain from OAuth cookie (set by SignInButton)
+    // Get the original subdomain from OAuth cookie (set by SignInButton)
     const oauthOriginCookie = cookieStore.get('oauth_origin_subdomain')
     let subdomain = oauthOriginCookie?.value
     
@@ -67,31 +67,8 @@ export async function GET(request: Request) {
       console.log('[Auth Callback] Tenant not found for subdomain:', subdomain)
       console.error('[Auth Callback] Tenant error:', tenantError)
       
-      // Clear the OAuth origin cookie
       if (oauthOriginCookie) {
         cookieStore.delete('oauth_origin_subdomain')
-      }
-      
-      // If using default 'app' subdomain, allow it (backward compatibility)
-      if (subdomain === 'app') {
-        console.log('[Auth Callback] Using default tenant for app subdomain')
-        const tenantId = '00000000-0000-0000-0000-000000000001'
-        
-        // Update user's tenant_id
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ tenant_id: tenantId })
-          .eq('id', user.id)
-
-        if (updateError) {
-          console.error('[Auth Callback] Error updating user tenant:', updateError)
-        } else {
-          console.log('[Auth Callback] User tenant updated to default:', user.email, '→', tenantId)
-        }
-        
-        const redirectUrl = `https://app.baselinedocs.com/dashboard`
-        console.log('[Auth Callback] Redirecting to default:', redirectUrl)
-        return NextResponse.redirect(redirectUrl)
       }
       
       return NextResponse.redirect(`${origin}/auth/error?message=tenant_not_found`)
@@ -99,27 +76,63 @@ export async function GET(request: Request) {
 
     console.log('[Auth Callback] Found tenant:', tenant.company_name, tenant.id)
 
-    // Get user's current tenant assignment
-    const { data: userRecord, error: userError } = await supabase
+    // Get user's current tenant assignment (or create if doesn't exist)
+    let { data: userRecord, error: userError } = await supabase
       .from('users')
-      .select('tenant_id, is_master_admin')
+      .select('tenant_id, is_master_admin, full_name')
       .eq('id', user.id)
       .single()
 
-    if (userError || !userRecord) {
-      console.error('[Auth Callback] User record not found:', userError)
+    // CRITICAL FIX: Create user record if it doesn't exist
+    if (userError && userError.code === 'PGRST116') {
+      console.log('[Auth Callback] User record not found, creating...')
       
-      // Clear the OAuth origin cookie
+      // Extract full name from Google OAuth metadata
+      const fullName = user.user_metadata?.full_name || 
+                      user.user_metadata?.name || 
+                      user.email?.split('@')[0] || 
+                      'User'
+      
+      // Create user record
+      const { data: newUser, error: createError } = await supabase
+        .from('users')
+        .insert({
+          id: user.id,
+          email: user.email,
+          full_name: fullName,
+          tenant_id: tenant.id,
+          is_admin: false, // Regular user by default
+          is_master_admin: false,
+        })
+        .select('tenant_id, is_master_admin, full_name')
+        .single()
+      
+      if (createError) {
+        console.error('[Auth Callback] Error creating user record:', createError)
+        
+        if (oauthOriginCookie) {
+          cookieStore.delete('oauth_origin_subdomain')
+        }
+        
+        return NextResponse.redirect(`${origin}/auth/error?message=user_creation_failed`)
+      }
+      
+      userRecord = newUser
+      console.log('[Auth Callback] Created user record:', userRecord)
+    } else if (userError) {
+      console.error('[Auth Callback] User lookup error:', userError)
+      
       if (oauthOriginCookie) {
         cookieStore.delete('oauth_origin_subdomain')
       }
       
-      return NextResponse.redirect(`${origin}/auth/error?message=user_not_found`)
+      return NextResponse.redirect(`${origin}/auth/error?message=user_lookup_failed`)
     }
 
     console.log('[Auth Callback] User record:', {
       tenant_id: userRecord.tenant_id,
       is_master_admin: userRecord.is_master_admin,
+      full_name: userRecord.full_name,
       requested_tenant: tenant.id
     })
 
@@ -127,12 +140,29 @@ export async function GET(request: Request) {
     if (userRecord.is_master_admin) {
       console.log('[Auth Callback] Master admin - access granted to all tenants')
       
+      // Extract full name from Google OAuth metadata if missing
+      const fullName = userRecord.full_name || 
+                      user.user_metadata?.full_name || 
+                      user.user_metadata?.name || 
+                      user.email?.split('@')[0] || 
+                      'User'
+      
+      // Update full_name if it's missing
+      if (!userRecord.full_name) {
+        await supabase
+          .from('users')
+          .update({ full_name: fullName })
+          .eq('id', user.id)
+        
+        console.log('[Auth Callback] Updated missing full_name:', fullName)
+      }
+      
       // Clear the OAuth origin cookie
       if (oauthOriginCookie) {
         cookieStore.delete('oauth_origin_subdomain')
       }
       
-      const redirectUrl = `https://${tenant.subdomain}.baselinedocs.com/dashboard`
+      const redirectUrl = `https://${subdomain}.baselinedocs.com/dashboard`
       console.log('[Auth Callback] Redirecting master admin to:', redirectUrl)
       return NextResponse.redirect(redirectUrl)
     }
@@ -143,7 +173,6 @@ export async function GET(request: Request) {
       console.error('[Auth Callback]   User belongs to tenant:', userRecord.tenant_id)
       console.error('[Auth Callback]   Requested tenant:', tenant.id)
       
-      // Clear the OAuth origin cookie
       if (oauthOriginCookie) {
         cookieStore.delete('oauth_origin_subdomain')
       }
@@ -153,16 +182,28 @@ export async function GET(request: Request) {
 
     console.log('[Auth Callback] User verified for tenant:', tenant.company_name)
 
-    // Update user's tenant_id (should already match, but ensure consistency)
-    const { error: updateError } = await supabase
-      .from('users')
-      .update({ tenant_id: tenant.id })
-      .eq('id', user.id)
+    // Extract full name from Google OAuth metadata
+    const fullName = userRecord.full_name || 
+                    user.user_metadata?.full_name || 
+                    user.user_metadata?.name || 
+                    user.email?.split('@')[0] || 
+                    'User'
 
-    if (updateError) {
-      console.error('[Auth Callback] Error updating user tenant:', updateError)
-    } else {
-      console.log('[Auth Callback] User tenant confirmed:', user.email, '→', tenant.id)
+    // Update user's full_name if missing
+    if (!userRecord.full_name) {
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ 
+          full_name: fullName,
+          email: user.email
+        })
+        .eq('id', user.id)
+
+      if (updateError) {
+        console.error('[Auth Callback] Error updating user name:', updateError)
+      } else {
+        console.log('[Auth Callback] Updated missing full_name:', fullName)
+      }
     }
 
     // Clear the OAuth origin cookie (no longer needed)
@@ -171,9 +212,9 @@ export async function GET(request: Request) {
       console.log('[Auth Callback] Cleaned up OAuth origin cookie')
     }
 
-    // CRITICAL FIX: Redirect to the ORIGINAL subdomain, not the current origin
-    const redirectUrl = `https://${tenant.subdomain}.baselinedocs.com/dashboard`
-    console.log('[Auth Callback] Redirecting to original subdomain:', redirectUrl)
+    // Redirect to the dashboard on the subdomain they logged in from
+    const redirectUrl = `https://${subdomain}.baselinedocs.com/dashboard`
+    console.log('[Auth Callback] Redirecting to:', redirectUrl)
     
     return NextResponse.redirect(redirectUrl)
   }
