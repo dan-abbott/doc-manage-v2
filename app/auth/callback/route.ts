@@ -129,6 +129,17 @@ export async function GET(request: Request) {
       return NextResponse.redirect(`${origin}/auth/error?message=user_lookup_failed`)
     }
 
+    // TypeScript null check
+    if (!userRecord) {
+      console.error('[Auth Callback] User record is null after creation/lookup')
+      
+      if (oauthOriginCookie) {
+        cookieStore.delete('oauth_origin_subdomain')
+      }
+      
+      return NextResponse.redirect(`${origin}/auth/error?message=user_record_null`)
+    }
+
     console.log('[Auth Callback] User record:', {
       tenant_id: userRecord.tenant_id,
       is_master_admin: userRecord.is_master_admin,
