@@ -6,6 +6,15 @@ export default function SignInButton() {
   const handleSignIn = async () => {
     const supabase = createClient()
     
+    // ADDED: Store subdomain before OAuth redirect
+    const host = window.location.host
+    const subdomain = host.split('.')[0]
+    
+    console.log('[SignInButton] Storing subdomain before OAuth:', subdomain)
+    
+    // Set OAuth origin cookie (expires in 10 minutes - enough for OAuth flow)
+    document.cookie = `oauth_origin_subdomain=${subdomain}; path=/; max-age=600; secure; samesite=lax`
+    
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {

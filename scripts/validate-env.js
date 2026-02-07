@@ -13,6 +13,13 @@
  * Note: This script does NOT load .env files - it only validates what's already
  * in process.env. Next.js automatically loads .env files during build.
  */
+require('dotenv').config({ path: '.env.local' })
+
+console.log('Loading from:', process.cwd())
+console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'FOUND' : 'MISSING')
+
+
+
 
 const ENV_VARS = [
   // Supabase - Required
