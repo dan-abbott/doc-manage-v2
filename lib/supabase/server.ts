@@ -15,7 +15,14 @@ export async function createClient() {
         },
         set(name: string, value: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value, ...options })
+            // CRITICAL FIX: Set cookie domain to work across all subdomains
+            const cookieOptions = {
+              ...options,
+              domain: '.baselinedocs.com', // Allows cookies to work across subdomains
+              secure: process.env.NODE_ENV === 'production',
+              sameSite: 'lax' as const,
+            }
+            cookieStore.set({ name, value, ...cookieOptions })
           } catch (error) {
             // The `set` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
@@ -24,7 +31,12 @@ export async function createClient() {
         },
         remove(name: string, options: CookieOptions) {
           try {
-            cookieStore.set({ name, value: '', ...options })
+            // CRITICAL FIX: Remove cookie with same domain
+            const cookieOptions = {
+              ...options,
+              domain: '.baselinedocs.com',
+            }
+            cookieStore.set({ name, value: '', ...cookieOptions })
           } catch (error) {
             // The `remove` method was called from a Server Component.
             // This can be ignored if you have middleware refreshing
