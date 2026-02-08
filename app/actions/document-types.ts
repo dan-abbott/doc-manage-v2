@@ -47,10 +47,10 @@ export async function createDocumentType(data: { name: string; prefix: string; d
     const userId = user.id
     const userEmail = user.email
 
-    // Check admin status
+    // Check admin status and get tenant_id
     const { data: userData, error: adminCheckError } = await supabase
       .from('users')
-      .select('is_admin')
+      .select('is_admin, tenant_id')
       .eq('id', userId)
       .single()
 
@@ -65,6 +65,16 @@ export async function createDocumentType(data: { name: string; prefix: string; d
         error: { message: 'Only administrators can create document types' } 
       }
     }
+
+    if (!userData.tenant_id) {
+      logger.error('User has no tenant_id', { userId, userEmail })
+      return { 
+        success: false, 
+        error: { message: 'User is not associated with a tenant' } 
+      }
+    }
+
+    const tenantId = userData.tenant_id
 
     // Validate input data
     const rawData = {
@@ -107,20 +117,23 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       userId,
       userEmail,
       documentType: sanitizedData.name,
-      prefix: sanitizedData.prefix
+      prefix: sanitizedData.prefix,
+      tenantId
     })
 
-    // Check for duplicate prefix
+    // Check for duplicate prefix within this tenant
     const { data: existingType, error: checkError } = await supabase
       .from('document_types')
       .select('id, prefix')
       .eq('prefix', sanitizedData.prefix)
+      .eq('tenant_id', tenantId)
       .maybeSingle()
 
     if (checkError) {
       logger.error('Database error checking for duplicate prefix', {
         userId,
         prefix: sanitizedData.prefix,
+        tenantId,
         error: checkError
       })
       throw checkError
@@ -131,6 +144,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
         userId,
         userEmail,
         prefix: sanitizedData.prefix,
+        tenantId,
         existingTypeId: existingType.id
       })
       return { 
@@ -150,6 +164,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
         prefix: sanitizedData.prefix,
         description: sanitizedData.description,
         is_active: sanitizedData.is_active,
+        tenant_id: tenantId,  // FIXED: Include tenant_id for RLS
         next_number: 1 // Start sequential numbering at 1
       })
       .select()
@@ -159,6 +174,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       logger.error('Failed to insert document type', {
         userId,
         userEmail,
+        tenantId,
         error: insertError,
         data: sanitizedData
       })
@@ -170,6 +186,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
     logger.info('Document type created successfully', {
       userId,
       userEmail,
+      tenantId,
       documentTypeId: newType.id,
       name: newType.name,
       prefix: newType.prefix,
@@ -179,6 +196,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
     logServerAction('createDocumentType', {
       userId,
       userEmail,
+      tenantId,
       documentTypeId: newType.id,
       prefix: newType.prefix,
       duration,
@@ -186,6 +204,7 @@ export async function createDocumentType(data: { name: string; prefix: string; d
     })
 
     revalidatePath('/document-types')
+    revalidatePath('/admin/document-types')
     
     return { 
       success: true, 
