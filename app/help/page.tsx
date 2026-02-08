@@ -1,4 +1,6 @@
-import { Metadata } from 'next'
+'use client'
+
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { 
   BookOpen, 
@@ -13,10 +15,6 @@ import {
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 
-export const metadata: Metadata = {
-  title: 'Help Center | BaselineDocs',
-  description: 'Get help with BaselineDocs - guides, tutorials, and support resources'
-}
 
 const quickStartSteps = [
   {
