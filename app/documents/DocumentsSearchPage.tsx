@@ -86,8 +86,8 @@ export default function DocumentsSearchPage({
     }
   }
 
-  const handleDocumentClick = (documentNumber: string) => {
-    router.push(`/documents/${documentNumber}`)
+  const handleDocumentClick = (documentId: string) => {
+    router.push(`/documents/${documentId}`)
   }
 
   return (
@@ -167,7 +167,7 @@ export default function DocumentsSearchPage({
                     {results.documents.map((doc: any) => (
                       <tr
                         key={doc.id}
-                        onClick={() => handleDocumentClick(doc.document_number)}
+                        onClick={() => handleDocumentClick(doc.id)}
                         className="hover:bg-gray-50 cursor-pointer transition-colors"
                       >
                         <td className="px-6 py-4 whitespace-nowrap">

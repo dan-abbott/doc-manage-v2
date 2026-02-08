@@ -14,6 +14,7 @@ export const revalidate = 0
 
 interface PageProps {
   searchParams: {
+    selected?: string  // Document number for split-panel view
     q?: string
     createdAfter?: string
     createdBefore?: string
