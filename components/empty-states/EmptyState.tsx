@@ -127,7 +127,7 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
           )}
 
           {/* Primary Action */}
-          {state.action && (
+          {'action' in state && state.action && (
             <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
               {state.action.href ? (
                 <Link href={state.action.href}>
