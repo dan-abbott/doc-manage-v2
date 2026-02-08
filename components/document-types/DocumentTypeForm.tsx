@@ -37,7 +37,7 @@ export default function DocumentTypeForm({ documentType, mode }: Props) {
           : await updateDocumentType(documentType!.id, formData);
 
       if (result.success) {
-        router.push('/dashboard/document-types');
+        router.push('/admin/document-types');
         router.refresh();
       } else if (result.error) {
         if (result.error.field) {
@@ -168,14 +168,14 @@ export default function DocumentTypeForm({ documentType, mode }: Props) {
       {/* Action Buttons */}
       <div className="flex items-center justify-between pt-4 border-t border-slate-200">
         <Link
-          href="/dashboard/document-types"
+          href="/admin/document-types"
           className="text-sm font-medium text-slate-700 hover:text-slate-900"
         >
           ← Back to Document Types
         </Link>
         <div className="flex gap-3">
           <Link
-            href="/dashboard/document-types"
+            href="/admin/document-types"
             className="px-4 py-2 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50"
           >
             Cancel

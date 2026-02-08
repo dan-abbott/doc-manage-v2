@@ -19,7 +19,7 @@ interface TourStep {
 const TOUR_STEPS: TourStep[] = [
   {
     title: 'Welcome to BaselineDocs! 👋',
-    content: 'Let\'s take a quick 2-minute tour to help you get started with managing your documents. You can skip this tour anytime by clicking the X.',
+    content: 'Let\'s take a quick tour to help you get started with managing your documents. You can skip this tour anytime by clicking the X or pressing Escape.',
     position: 'center'
   },
   {
@@ -30,31 +30,27 @@ const TOUR_STEPS: TourStep[] = [
   },
   {
     title: 'Create Documents',
-    content: 'Click here to create a new document. You\'ll choose a document type, add a title and description, upload files, and assign approvers if needed.',
+    content: 'This is where you create new documents. Choose a document type, add a title and description, upload files, and assign approvers if needed. Your admin can set up document types in the Admin Panel.',
     target: '[href="/documents/new"]',
-    position: 'left',
-    action: {
-      label: 'Try creating a document',
-      href: '/documents/new'
-    }
+    position: 'left'
   },
   {
-    title: 'Document Status',
-    content: 'Documents move through states: Draft (editable), In Approval (awaiting reviewers), Released (approved & active), and Obsolete (superseded by newer version).',
+    title: 'Document Lifecycle',
+    content: 'Documents move through different states: Draft (editable), In Approval (awaiting reviewers), Released (approved & active), and Obsolete (superseded by a newer version). You can create new versions of Released documents.',
     position: 'center'
   },
   {
     title: 'Pending Approvals',
-    content: 'When documents are submitted for your review, they\'ll appear here. You can approve or reject documents assigned to you.',
+    content: 'When documents are submitted for your review, they\'ll appear here. You can approve or reject documents assigned to you, with the option to add comments.',
     target: '[href="/approvals"]',
     position: 'left'
   },
   {
-    title: 'All Set!',
-    content: 'You\'re ready to start managing documents! Need more help? Click the Help link in the navigation or check our documentation.',
+    title: 'You\'re All Set! 🎉',
+    content: 'You\'re ready to start managing documents! Need more help? Click the Help link in the navigation for guides, tutorials, and FAQs.',
     position: 'center',
     action: {
-      label: 'View Help Center',
+      label: 'Visit Help Center',
       href: '/help'
     }
   }
@@ -148,7 +144,8 @@ export default function ProductTour() {
   let modalStyle: React.CSSProperties = {
     position: 'fixed',
     zIndex: 9999,
-    maxWidth: '400px'
+    maxWidth: '480px',
+    width: '90%'
   }
 
   if (step.position === 'center' || !targetElement) {
@@ -250,8 +247,8 @@ export default function ProductTour() {
 
           {/* Actions */}
           <div className="flex items-center justify-between">
-            <div className="text-sm text-gray-500">
-              {currentStep + 1} of {TOUR_STEPS.length}
+            <div className="text-sm text-gray-500 whitespace-nowrap">
+              Step {currentStep + 1} of {TOUR_STEPS.length}
             </div>
 
             <div className="flex gap-2">

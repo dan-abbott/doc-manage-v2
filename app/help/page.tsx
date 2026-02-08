@@ -125,49 +125,54 @@ export default function HelpPage() {
 
         {/* Quick Access Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-12">
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
-                <BookOpen className="h-6 w-6 text-blue-600" />
-              </div>
-              <CardTitle>Quick Start Guide</CardTitle>
-              <CardDescription>
-                Get up and running in 5 minutes
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="link" className="p-0 text-blue-600">
-                View guide <ArrowRight className="ml-2 h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
+          <Link href="/help/quick-start">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
+                <div className="w-12 h-12 bg-blue-100 rounded-lg flex items-center justify-center mb-4">
+                  <BookOpen className="h-6 w-6 text-blue-600" />
+                </div>
+                <CardTitle>Quick Start Guide</CardTitle>
+                <CardDescription>
+                  Get up and running in 5 minutes
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="link" className="p-0 text-blue-600">
+                  View guide <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
-                <FileText className="h-6 w-6 text-green-600" />
-              </div>
-              <CardTitle>Complete Documentation</CardTitle>
-              <CardDescription>
-                Detailed guide covering all features
-              </CardDescription>
-            </CardHeader>
-            <CardContent>
-              <Button variant="link" className="p-0 text-blue-600">
-                Download PDF <Download className="ml-2 h-4 w-4" />
-              </Button>
-            </CardContent>
-          </Card>
+          <Link href="/help/documentation">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
+                <div className="w-12 h-12 bg-green-100 rounded-lg flex items-center justify-center mb-4">
+                  <FileText className="h-6 w-6 text-green-600" />
+                </div>
+                <CardTitle>Complete Documentation</CardTitle>
+                <CardDescription>
+                  Detailed guide covering all features
+                </CardDescription>
+              </CardHeader>
+              <CardContent>
+                <Button variant="link" className="p-0 text-blue-600">
+                  Read docs <ArrowRight className="ml-2 h-4 w-4" />
+                </Button>
+              </CardContent>
+            </Card>
+          </Link>
 
-          <Card className="hover:shadow-lg transition-shadow cursor-pointer">
-            <CardHeader>
-              <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
-                <MessageCircle className="h-6 w-6 text-purple-600" />
-              </div>
-              <CardTitle>Contact Support</CardTitle>
-              <CardDescription>
-                Need help? We're here for you
-              </CardDescription>
+          <Link href="/help/contact">
+            <Card className="hover:shadow-lg transition-shadow cursor-pointer">
+              <CardHeader>
+                <div className="w-12 h-12 bg-purple-100 rounded-lg flex items-center justify-center mb-4">
+                  <MessageCircle className="h-6 w-6 text-purple-600" />
+                </div>
+                <CardTitle>Contact Support</CardTitle>
+                <CardDescription>
+                  Need help? We're here for you
+                </CardDescription>
             </CardHeader>
             <CardContent>
               <Button variant="link" className="p-0 text-blue-600">
@@ -175,6 +180,7 @@ export default function HelpPage() {
               </Button>
             </CardContent>
           </Card>
+          </Link>
         </div>
 
         {/* Quick Start Section */}
