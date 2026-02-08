@@ -105,14 +105,14 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
             {state.description}
           </p>
 
-          {state.secondaryDescription && (
+          {'secondaryDescription' in state && state.secondaryDescription && (
             <p className="text-gray-500 mb-6 text-sm">
               {state.secondaryDescription}
             </p>
           )}
 
           {/* Tips (if any) */}
-          {state.tips && (
+          {'tips' in state && state.tips && (
             <div className="bg-blue-50 rounded-lg p-4 mb-6 text-left max-w-md mx-auto">
               <p className="font-medium text-gray-900 mb-2 text-sm">💡 Tips:</p>
               <ul className="space-y-1 text-sm text-gray-700">
@@ -148,7 +148,7 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
               )}
 
               {/* Secondary Action */}
-              {state.secondaryAction && (
+              {'secondaryAction' in state && state.secondaryAction && (
                 <>
                   {state.secondaryAction.href ? (
                     <Link href={state.secondaryAction.href}>
@@ -172,7 +172,7 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
           )}
 
           {/* Help Text */}
-          {state.helpText && (
+          {'helpText' in state && state.helpText && (
             <p className="text-sm text-gray-500 mt-6">
               {state.helpText}
             </p>
