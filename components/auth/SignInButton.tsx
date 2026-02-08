@@ -10,10 +10,22 @@ export function SignInButton() {
   const handleSignIn = async () => {
     try {
       setIsLoading(true)
+      
+      // Store subdomain before OAuth redirect
+      const host = window.location.host
+      const subdomain = host.split('.')[0]
+      
+      console.log('[SignInButton] Storing subdomain before OAuth:', subdomain)
+      
+      // Set OAuth origin cookie (expires in 10 minutes - enough for OAuth flow)
+      document.cookie = `oauth_origin_subdomain=${subdomain}; path=/; domain=.baselinedocs.com; max-age=600; secure; samesite=lax`
+      
       const { error } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
-          redirectTo: `${window.location.origin}/auth/callback`,
+          // Always redirect to app.baselinedocs.com
+          // The callback will read the cookie and redirect to correct subdomain
+          redirectTo: 'https://app.baselinedocs.com/auth/callback',
           skipBrowserRedirect: false,
           queryParams: {
             access_type: 'offline',
