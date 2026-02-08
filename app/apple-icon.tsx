@@ -1,16 +1,9 @@
 import { ImageResponse } from 'next/og'
  
-// Route segment config
 export const runtime = 'edge'
- 
-// Image metadata
-export const size = {
-  width: 180,
-  height: 180,
-}
+export const size = { width: 180, height: 180 }
 export const contentType = 'image/png'
  
-// Image generation with BaselineDocs logo for Apple devices
 export default function AppleIcon() {
   return new ImageResponse(
     (
@@ -24,7 +17,13 @@ export default function AppleIcon() {
           background: 'white',
         }}
       >
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 400" width="160" height="160">
+        {/* BaselineDocs Logo */}
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          viewBox="0 0 400 400"
+          width="160"
+          height="160"
+        >
           <rect x="100" y="80" width="200" height="240" rx="8" fill="none" stroke="#2E7DB5" strokeWidth="8"/>
           <path d="M 300 80 L 300 120 L 260 120 Z" fill="#2E7DB5"/>
           <path d="M 260 120 L 300 120 L 300 80" fill="none" stroke="#2E7DB5" strokeWidth="8" strokeLinejoin="miter"/>
@@ -38,8 +37,6 @@ export default function AppleIcon() {
         </svg>
       </div>
     ),
-    {
-      ...size,
-    }
+    { ...size }
   )
 }
