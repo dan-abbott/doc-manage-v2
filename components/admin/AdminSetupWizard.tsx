@@ -121,7 +121,10 @@ export default function AdminSetupWizard({ onComplete }: AdminSetupWizardProps) 
           router.push('/admin/document-types')
         }
       } else {
-        toast.error(result.error || 'Failed to create document type')
+        const errorMessage = typeof result.error === 'string' 
+          ? result.error 
+          : result.error?.message || 'Failed to create document type'
+        toast.error(errorMessage)
       }
     } catch (error) {
       console.error('Custom setup failed:', error)
