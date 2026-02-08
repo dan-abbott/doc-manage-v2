@@ -129,43 +129,43 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
           {/* Primary Action */}
           {'action' in state && state.action && (
             <div className="flex flex-col sm:flex-row gap-3 justify-center mb-4">
-              {state.action.href ? (
+              {'href' in state.action && state.action.href ? (
                 <Link href={state.action.href}>
                   <Button className="bg-blue-600 hover:bg-blue-700">
-                    {state.action.icon && <state.action.icon className="mr-2 h-4 w-4" />}
+                    {'icon' in state.action && state.action.icon && <state.action.icon className="mr-2 h-4 w-4" />}
                     {state.action.label}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </Link>
-              ) : state.action.onClick && (
+              ) : 'onClick' in state.action && state.action.onClick ? (
                 <Button 
                   onClick={state.action.onClick}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {state.action.icon && <state.action.icon className="mr-2 h-4 w-4" />}
+                  {'icon' in state.action && state.action.icon && <state.action.icon className="mr-2 h-4 w-4" />}
                   {state.action.label}
                 </Button>
-              )}
+              ) : null}
 
               {/* Secondary Action */}
               {'secondaryAction' in state && state.secondaryAction && (
                 <>
-                  {state.secondaryAction.href ? (
+                  {'href' in state.secondaryAction && state.secondaryAction.href ? (
                     <Link href={state.secondaryAction.href}>
                       <Button variant="outline">
-                        {state.secondaryAction.icon && <state.secondaryAction.icon className="mr-2 h-4 w-4" />}
+                        {'icon' in state.secondaryAction && state.secondaryAction.icon && <state.secondaryAction.icon className="mr-2 h-4 w-4" />}
                         {state.secondaryAction.label}
                       </Button>
                     </Link>
-                  ) : state.secondaryAction.onClick && (
+                  ) : 'onClick' in state.secondaryAction && state.secondaryAction.onClick ? (
                     <Button 
                       variant="outline"
                       onClick={state.secondaryAction.onClick}
                     >
-                      {state.secondaryAction.icon && <state.secondaryAction.icon className="mr-2 h-4 w-4" />}
+                      {'icon' in state.secondaryAction && state.secondaryAction.icon && <state.secondaryAction.icon className="mr-2 h-4 w-4" />}
                       {state.secondaryAction.label}
                     </Button>
-                  )}
+                  ) : null}
                 </>
               )}
             </div>
