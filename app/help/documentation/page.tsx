@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { ArrowLeft, Book, FileText, GitBranch, CheckCircle, Users, Settings } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
 
 export const metadata = {
   title: 'Documentation | BaselineDocs',
