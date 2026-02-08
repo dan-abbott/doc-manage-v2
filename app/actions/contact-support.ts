@@ -180,6 +180,9 @@ export async function submitContactForm(data: ContactFormData) {
               <div class="label">Organization:</div>
               <div class="value">${tenantData?.name || 'Unknown'} (${tenantData?.subdomain || 'N/A'})</div>
               
+              <div class="label">Tenant ID:</div>
+              <div class="value"><code>${userData?.tenant_id || 'N/A'}</code></div>
+              
               <div class="label">User ID:</div>
               <div class="value"><code>${user.id}</code></div>
               
@@ -225,7 +228,9 @@ export async function submitContactForm(data: ContactFormData) {
       userId: user.id,
       userEmail: userData?.email || user.email,
       userName: userData?.full_name,
-      tenant: tenantData?.subdomain,
+      tenantId: userData?.tenant_id,
+      tenantName: tenantData?.name,
+      tenantSubdomain: tenantData?.subdomain,
       category: validatedData.category,
       priority: validatedData.priority,
       subject: validatedData.subject,
@@ -238,7 +243,7 @@ export async function submitContactForm(data: ContactFormData) {
       from: FROM_EMAIL,
       to: SUPPORT_EMAIL,
       replyTo: userData?.email || user.email || undefined,
-      subject: `[${priorityLabels[validatedData.priority]}] ${categoryLabels[validatedData.category]} - ${validatedData.subject}`,
+      subject: `[${tenantData?.subdomain || 'UNKNOWN'}] [${priorityLabels[validatedData.priority]}] ${categoryLabels[validatedData.category]} - ${validatedData.subject}`,
       html: emailHtml
     })
 
@@ -257,6 +262,8 @@ export async function submitContactForm(data: ContactFormData) {
     logger.info('Support email sent successfully', {
       userId: user.id,
       emailId: emailResult.data?.id,
+      tenantId: userData?.tenant_id,
+      tenantSubdomain: tenantData?.subdomain,
       category: validatedData.category,
       priority: validatedData.priority
     })
