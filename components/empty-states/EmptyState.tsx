@@ -133,8 +133,8 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
               {'href' in state.action && state.action.href ? (
                 <Link href={state.action.href}>
                   <Button className="bg-blue-600 hover:bg-blue-700">
-                    {'icon' in state.action && state.action.icon && 
-                      React.createElement(state.action.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" })
+                    {('icon' in state.action && state.action.icon) ? 
+                      React.createElement(state.action.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" }) : null
                     }
                     {state.action.label}
                     <ArrowRight className="ml-2 h-4 w-4" />
@@ -145,8 +145,8 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
                   onClick={state.action.onClick}
                   className="bg-blue-600 hover:bg-blue-700"
                 >
-                  {'icon' in state.action && state.action.icon && 
-                    React.createElement(state.action.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" })
+                  {('icon' in state.action && state.action.icon) ? 
+                    React.createElement(state.action.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" }) : null
                   }
                   {state.action.label}
                 </Button>
@@ -158,8 +158,8 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
                   {'href' in state.secondaryAction && state.secondaryAction.href ? (
                     <Link href={state.secondaryAction.href}>
                       <Button variant="outline">
-                        {'icon' in state.secondaryAction && state.secondaryAction.icon && 
-                          React.createElement(state.secondaryAction.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" })
+                        {('icon' in state.secondaryAction && state.secondaryAction.icon) ? 
+                          React.createElement(state.secondaryAction.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" }) : null
                         }
                         {state.secondaryAction.label}
                       </Button>
@@ -169,8 +169,8 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
                       variant="outline"
                       onClick={state.secondaryAction.onClick}
                     >
-                      {'icon' in state.secondaryAction && state.secondaryAction.icon && 
-                        React.createElement(state.secondaryAction.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" })
+                      {('icon' in state.secondaryAction && state.secondaryAction.icon) ? 
+                        React.createElement(state.secondaryAction.icon as React.ComponentType<any>, { className: "mr-2 h-4 w-4" }) : null
                       }
                       {state.secondaryAction.label}
                     </Button>
