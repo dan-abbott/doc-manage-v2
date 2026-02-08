@@ -1,5 +1,6 @@
 import { redirect } from 'next/navigation';
 import { createClient } from '@/lib/supabase/server';
+import ProductTour from '@/components/onboarding/ProductTour';
 
 export default async function DashboardLayout({
   children,
@@ -23,6 +24,9 @@ export default async function DashboardLayout({
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {children}
       </div>
+      
+      {/* Product Tour - only shows on first login */}
+      <ProductTour />
     </div>
   );
 }

@@ -92,8 +92,8 @@ export default async function DashboardPage() {
         </Link>
       </div>
 
-      {/* Statistics Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Statistics Cards - Add class for tour targeting */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 dashboard-stats">
         {/* Total Documents */}
         <Link href="/documents">
           <Card className="hover:shadow-lg cursor-pointer transition-all hover:border-blue-300">
