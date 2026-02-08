@@ -121,10 +121,11 @@ export default function AdminSetupWizard({ onComplete }: AdminSetupWizardProps) 
           router.push('/admin/document-types')
         }
       } else {
-        // Handle error - it's an object with message property
-        const errorMessage = 'error' in result && result.error 
-          ? (typeof result.error === 'string' ? result.error : result.error.message)
-          : 'Failed to create document type'
+        // Type assertion needed because TypeScript can't narrow properly
+        const error = (result as any).error
+        const errorMessage = typeof error === 'string' 
+          ? error 
+          : error?.message || 'Failed to create document type'
         toast.error(errorMessage)
       }
     } catch (error) {
