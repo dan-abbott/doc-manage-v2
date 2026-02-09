@@ -7,6 +7,7 @@
 
 import { createClient } from '@/lib/supabase/server'
 import type { AdvancedSearchFilters, SearchResult } from '@/lib/types/advanced-search'
+import { getSubdomainTenantId } from '@/lib/tenant'
 
 /**
  * Main advanced search function
@@ -17,23 +18,19 @@ export async function searchDocuments(
 ): Promise<SearchResult> {
   const supabase = await createClient()
 
-  // Get current user and tenant
+  // Get current user
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) {
     throw new Error('Not authenticated')
   }
 
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
+  // Get tenant based on CURRENT SUBDOMAIN (not user's home tenant)
+  // This ensures master admins see the correct tenant's data
+  const tenantId = await getSubdomainTenantId()
 
-  if (!userData?.tenant_id) {
-    throw new Error('User has no tenant')
+  if (!tenantId) {
+    throw new Error('Invalid tenant subdomain')
   }
-
-  const tenantId = userData.tenant_id
 
   // Build base query with joins for related data
   let query = supabase
