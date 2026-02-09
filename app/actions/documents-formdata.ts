@@ -142,14 +142,18 @@ export async function updateDocumentWithFiles(formData: FormData) {
         console.log(`[${i + 1}/${files.length}] ✅ File queued for scanning`)
 
         // ✨ TRIGGER INNGEST BACKGROUND SCAN ✨
-        await inngest.send({
-          name: 'file/uploaded',
-          data: {
-            fileId: fileRecord.id,
-          },
-        })
-
-        console.log(`[${i + 1}/${files.length}] 🚀 Inngest scan triggered`)
+        try {
+          await inngest.send({
+            name: 'file/uploaded',
+            data: {
+              fileId: fileRecord.id,
+            },
+          })
+          console.log(`[${i + 1}/${files.length}] 🚀 Inngest scan triggered`)
+        } catch (inngestError) {
+          console.warn(`[${i + 1}/${files.length}] ⚠️ Inngest not configured, skipping background scan:`, inngestError instanceof Error ? inngestError.message : 'Unknown error')
+          // File upload succeeded, just no background scanning
+        }
 
         uploadedFiles.push(fileRecord)
       }
