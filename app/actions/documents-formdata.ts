@@ -25,7 +25,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
     // Get document to check ownership and status
     const { data: document, error: getError } = await supabase
       .from('documents')
-      .select('*, users!documents_created_by_fkey(tenant_id)')
+      .select('*')
       .eq('id', documentId)
       .single()
 
@@ -33,8 +33,8 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Document not found' }
     }
 
-    // Get tenant's auto_rename setting
-    const tenantId = (document.users as any)?.tenant_id || document.tenant_id
+    // Use the DOCUMENT's tenant_id (not the creator's home tenant)
+    const tenantId = document.tenant_id
     const { data: tenant } = await supabase
       .from('tenants')
       .select('auto_rename_files')

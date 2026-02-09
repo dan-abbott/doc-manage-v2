@@ -1,6 +1,7 @@
 import { Activity, FileText, CheckCircle, XCircle, ArrowUp, GitBranch, Clock } from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
+import { getSubdomainTenantId } from '@/lib/tenant'
 
 // Map actions to icons and labels
 const actionConfig: Record<string, { icon: any, label: string, color: string }> = {
@@ -50,6 +51,17 @@ function ActivityLabel({ action }: { action: string }) {
 export default async function RecentActivityFeed() {
   const supabase = await createClient()
   
+  // Get tenant from CURRENT SUBDOMAIN
+  const tenantId = await getSubdomainTenantId()
+  
+  if (!tenantId) {
+    return (
+      <div className="text-sm text-gray-500">
+        Unable to load recent activity
+      </div>
+    )
+  }
+  
   // Get recent activities (get more to ensure we have 10 unique docs)
   // Use explicit foreign key relationship to avoid ambiguity
   const { data: activities, error } = await supabase
@@ -66,6 +78,7 @@ export default async function RecentActivityFeed() {
         version
       )
     `)
+    .eq('tenant_id', tenantId)  // ✅ Filter by subdomain's tenant
     .order('created_at', { ascending: false })
     .limit(50) // Get 50 to ensure 10 unique documents
 

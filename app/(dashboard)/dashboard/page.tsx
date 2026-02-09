@@ -1,4 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import Link from 'next/link'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Clock, User, CheckCircle, Plus } from 'lucide-react'
@@ -18,20 +19,23 @@ export default async function DashboardPage() {
     return null
   }
 
-  // Get user's full name and tenant_id
+  // Get user's full name
   const { data: userData } = await supabase
     .from('users')
-    .select('full_name, tenant_id')
+    .select('full_name')
     .eq('id', user.id)
     .single()
 
+  // Get tenant from CURRENT SUBDOMAIN
+  const tenantId = await getSubdomainTenantId()
+
   // Get tenant info (company name and timezone)
   let tenant = null
-  if (userData?.tenant_id) {
+  if (tenantId) {
     const { data: tenantData } = await supabase
       .from('tenants')
       .select('company_name, timezone')
-      .eq('id', userData.tenant_id)
+      .eq('id', tenantId)
       .single()
     
     tenant = tenantData
@@ -40,32 +44,36 @@ export default async function DashboardPage() {
   // Server-side greeting with timezone
   const greeting = getGreetingWithName(userData?.full_name, tenant?.timezone)
 
-  // Get total documents count
+  // Get total documents count (filtered by subdomain tenant)
   const { count: totalDocuments } = await supabase
     .from('documents')
     .select('*', { count: 'exact', head: true })
+    .eq('tenant_id', tenantId)
 
   // Get documents pending approval (where I'm an approver with Pending status and document is In Approval)
   const { data: pendingApprovals } = await supabase
     .from('approvers')
-    .select('document_id, document:documents!inner(status)')
+    .select('document_id, document:documents!inner(status, tenant_id)')
     .eq('user_email', user.email)
     .eq('status', 'Pending')
     .eq('document.status', 'In Approval')
+    .eq('document.tenant_id', tenantId)
 
   const pendingApprovalsCount = pendingApprovals?.length || 0
 
-  // Get my documents (documents I created)
+  // Get my documents (documents I created in this tenant)
   const { count: myDocumentsCount } = await supabase
     .from('documents')
     .select('*', { count: 'exact', head: true })
     .eq('created_by', user.id)
+    .eq('tenant_id', tenantId)
 
-  // Get released documents count
+  // Get released documents count (in this tenant)
   const { count: releasedDocumentsCount } = await supabase
     .from('documents')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'Released')
+    .eq('tenant_id', tenantId)
 
   return (
     <div className="space-y-6">
