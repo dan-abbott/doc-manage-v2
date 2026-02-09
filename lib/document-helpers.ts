@@ -1,5 +1,6 @@
 // lib/document-helpers.ts
 import { createClient } from '@/lib/supabase/server'
+import { getSubdomainTenantId } from '@/lib/tenant'
 
 export interface DocumentVersion {
   id: string
@@ -50,18 +51,14 @@ export async function fetchDocumentVersions(
 ): Promise<DocumentVersionsData | null> {
   const supabase = await createClient()
 
-  // First get user's tenant_id
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', userId)
-    .single()
+  // Get tenant from CURRENT SUBDOMAIN (not user's home tenant)
+  const tenantId = await getSubdomainTenantId()
 
-  if (!userData?.tenant_id) {
+  if (!tenantId) {
     return null
   }
 
-  // Fetch all versions of this document within the user's tenant
+  // Fetch all versions of this document within the subdomain's tenant
   const { data: versions, error } = await supabase
     .from('documents')
     .select(`
@@ -73,7 +70,7 @@ export async function fetchDocumentVersions(
       approvers!approvers_document_id_fkey(*)
     `)
     .eq('document_number', documentNumber)
-    .eq('tenant_id', userData.tenant_id)
+    .eq('tenant_id', tenantId)
     .order('created_at', { ascending: true })
 
   if (error) {
@@ -139,14 +136,10 @@ export async function fetchSpecificVersion(
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
 
-  // Get user's tenant_id
-  const { data: userData } = await supabase
-    .from('users')
-    .select('tenant_id')
-    .eq('id', user.id)
-    .single()
+  // Get tenant from CURRENT SUBDOMAIN (not user's home tenant)
+  const tenantId = await getSubdomainTenantId()
 
-  if (!userData?.tenant_id) return null
+  if (!tenantId) return null
 
   const { data, error } = await supabase
     .from('documents')
@@ -160,7 +153,7 @@ export async function fetchSpecificVersion(
     `)
     .eq('document_number', documentNumber)
     .eq('version', version)
-    .eq('tenant_id', userData.tenant_id)
+    .eq('tenant_id', tenantId)
     .single()
 
   if (error || !data) {
