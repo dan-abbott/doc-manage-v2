@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
 const companySettingsSchema = z.object({
+  tenantId: z.string().uuid('Invalid tenant ID'),
   company_name: z.string().min(1, 'Company name is required').max(100),
   logo_url: z.string().url().nullable().optional(),
   primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
@@ -29,15 +30,27 @@ export async function uploadCompanyLogo(formData: FormData) {
       return { success: false, error: 'You must be logged in' }
     }
 
-    // Get user's tenant and verify admin
+    // Get user's tenant and admin status
     const { data: userData } = await supabase
       .from('users')
-      .select('tenant_id, is_admin')
+      .select('tenant_id, is_admin, is_master_admin')
       .eq('id', user.id)
       .single()
 
-    if (!userData?.is_admin) {
+    if (!userData?.is_admin && !userData?.is_master_admin) {
       return { success: false, error: 'Only administrators can upload logos' }
+    }
+
+    // Get the tenant ID from form data
+    const tenantId = formData.get('tenantId') as string
+    
+    if (!tenantId) {
+      return { success: false, error: 'Tenant ID is required' }
+    }
+
+    // Authorization check: regular admins can only update their own tenant
+    if (!userData.is_master_admin && tenantId !== userData.tenant_id) {
+      return { success: false, error: 'You can only update your own tenant settings' }
     }
 
     // Get the file
@@ -62,7 +75,7 @@ export async function uploadCompanyLogo(formData: FormData) {
     const { data: tenant } = await supabase
       .from('tenants')
       .select('subdomain')
-      .eq('id', userData.tenant_id)
+      .eq('id', tenantId)
       .single()
 
     if (!tenant) {
@@ -92,14 +105,14 @@ export async function uploadCompanyLogo(formData: FormData) {
       .from('company-logos')
       .getPublicUrl(filePath)
 
-    // Update tenant with logo URL
+    // Update tenant with logo URL (using the tenantId, not user's tenant_id)
     const { error: updateError } = await supabase
       .from('tenants')
       .update({ 
         logo_url: publicUrl,
         updated_at: new Date().toISOString()
       })
-      .eq('id', userData.tenant_id)
+      .eq('id', tenantId)
 
     if (updateError) {
       console.error('Update tenant error:', updateError)
@@ -129,6 +142,7 @@ export async function uploadCompanyLogo(formData: FormData) {
  * Update company settings
  */
 export async function updateCompanySettings(data: {
+  tenantId: string
   company_name: string
   logo_url: string | null
   primary_color: string
@@ -159,15 +173,24 @@ export async function updateCompanySettings(data: {
     // Get user's tenant and verify admin
     const { data: userData } = await supabase
       .from('users')
-      .select('tenant_id, is_admin')
+      .select('tenant_id, is_admin, is_master_admin')
       .eq('id', user.id)
       .single()
 
-    if (!userData?.is_admin) {
+    if (!userData?.is_admin && !userData?.is_master_admin) {
       return { success: false, error: 'Only administrators can update company settings' }
     }
 
-    // Update tenant settings
+    // FIXED: Authorization check - regular admins can only update their own tenant
+    // Master admins can update any tenant
+    if (!userData.is_master_admin && validation.data.tenantId !== userData.tenant_id) {
+      return { 
+        success: false, 
+        error: 'You can only update your own tenant settings. Master admin access required to update other tenants.' 
+      }
+    }
+
+    // FIXED: Update the specified tenant (not user's tenant_id)
     const { error: updateError } = await supabase
       .from('tenants')
       .update({
@@ -180,7 +203,7 @@ export async function updateCompanySettings(data: {
         timezone: validation.data.timezone,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', userData.tenant_id)
+      .eq('id', validation.data.tenantId) // Use tenantId from form, not userData.tenant_id
 
     if (updateError) {
       console.error('Update tenant error:', updateError)
