@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation';
 import {
   toggleDocumentTypeStatus,
   deleteDocumentType,
+  resetDocumentTypeCounter,
   type DocumentType,
 } from '@/app/actions/document-types';
 
@@ -17,6 +18,7 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
   const router = useRouter();
   const [loading, setLoading] = useState<string | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
+  const [resetConfirm, setResetConfirm] = useState<string | null>(null);
 
   const handleToggleStatus = async (id: string) => {
     setLoading(id);
@@ -41,6 +43,21 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
         router.refresh();
       } else {
         alert(result.error?.message || 'Failed to delete document type');
+      }
+    } finally {
+      setLoading(null);
+    }
+  };
+
+  const handleResetCounter = async (id: string) => {
+    setLoading(id);
+    try {
+      const result = await resetDocumentTypeCounter(id);
+      if (result.success) {
+        setResetConfirm(null);
+        router.refresh();
+      } else {
+        alert(result.error?.message || 'Failed to reset counter');
       }
     } finally {
       setLoading(null);
@@ -90,8 +107,19 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="text-sm text-slate-600">
-                    {type.prefix}-{String(type.next_number).padStart(5, '0')}
+                  <div className="flex items-center gap-2">
+                    <div className="text-sm text-slate-600">
+                      {type.prefix}-{String(type.next_number).padStart(5, '0')}
+                    </div>
+                    {type.next_number > 1 && (
+                      <button
+                        onClick={() => setResetConfirm(type.id)}
+                        className="text-xs text-blue-600 hover:text-blue-800 underline"
+                        title="Reset to 00001"
+                      >
+                        Reset
+                      </button>
+                    )}
                   </div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
@@ -161,6 +189,51 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
                 className="px-4 py-2 bg-red-600 text-white rounded-md text-sm font-medium hover:bg-red-700 disabled:opacity-50"
               >
                 {loading === deleteConfirm ? 'Deleting...' : 'Delete'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Reset Counter Confirmation Modal */}
+      {resetConfirm && (
+        <div className="fixed inset-0 bg-slate-900 bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white rounded-lg max-w-md w-full p-6">
+            <h3 className="text-lg font-semibold text-slate-900 mb-2">Reset Document Counter?</h3>
+            <p className="text-slate-600 mb-4">
+              This will reset the counter to <strong>00001</strong> for this document type.
+              {documentTypes.find((t) => t.id === resetConfirm) && (
+                <span className="block mt-3 p-3 bg-blue-50 rounded border border-blue-200">
+                  <strong className="block text-slate-900">
+                    {documentTypes.find((t) => t.id === resetConfirm)?.name}
+                  </strong>
+                  <span className="text-sm">
+                    Current: {documentTypes.find((t) => t.id === resetConfirm)?.prefix}-
+                    {String(documentTypes.find((t) => t.id === resetConfirm)?.next_number).padStart(5, '0')}
+                    <br />
+                    After reset: {documentTypes.find((t) => t.id === resetConfirm)?.prefix}-00001
+                  </span>
+                </span>
+              )}
+            </p>
+            <div className="mb-4 p-3 bg-yellow-50 border border-yellow-200 rounded">
+              <p className="text-sm text-yellow-800">
+                ⚠️ <strong>Safety Check:</strong> This will only work if no documents exist for this type.
+              </p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button
+                onClick={() => setResetConfirm(null)}
+                className="px-4 py-2 border border-slate-300 rounded-md text-sm font-medium text-slate-700 hover:bg-slate-50"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={() => handleResetCounter(resetConfirm)}
+                disabled={loading === resetConfirm}
+                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm font-medium hover:bg-blue-700 disabled:opacity-50"
+              >
+                {loading === resetConfirm ? 'Resetting...' : 'Reset Counter'}
               </button>
             </div>
           </div>

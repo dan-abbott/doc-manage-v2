@@ -748,3 +748,180 @@ export async function getDocumentTypes(activeOnly: boolean = true) {
     }
   }
 }
+
+/**
+ * Reset document type counter to 1
+ * Admin only - only allowed if no documents exist for this type
+ */
+export async function resetDocumentTypeCounter(documentTypeId: string) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
+  try {
+    // Validate UUID
+    const validation = uuidSchema.safeParse(documentTypeId)
+    if (!validation.success) {
+      return { 
+        success: false, 
+        error: { message: 'Invalid document type ID' } 
+      }
+    }
+
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.warn('Unauthorized counter reset attempt', { documentTypeId })
+      return { 
+        success: false, 
+        error: { message: 'You must be logged in to reset counters' } 
+      }
+    }
+
+    const userId = user.id
+    const userEmail = user.email
+
+    // Check admin status and get tenant_id
+    const { data: userData, error: adminCheckError } = await supabase
+      .from('users')
+      .select('is_admin, tenant_id')
+      .eq('id', userId)
+      .single()
+
+    if (adminCheckError || !userData?.is_admin) {
+      logger.warn('Non-admin attempted counter reset', { 
+        userId, 
+        userEmail,
+        documentTypeId 
+      })
+      return { 
+        success: false, 
+        error: { message: 'Only administrators can reset counters' } 
+      }
+    }
+
+    if (!userData.tenant_id) {
+      logger.error('User has no tenant_id', { userId, userEmail })
+      return { 
+        success: false, 
+        error: { message: 'User is not associated with a tenant' } 
+      }
+    }
+
+    const tenantId = userData.tenant_id
+
+    // Get document type to verify ownership
+    const { data: docType, error: docTypeError } = await supabase
+      .from('document_types')
+      .select('id, name, prefix, tenant_id')
+      .eq('id', documentTypeId)
+      .eq('tenant_id', tenantId)
+      .single()
+
+    if (docTypeError || !docType) {
+      logger.warn('Document type not found for reset', { 
+        documentTypeId, 
+        tenantId,
+        error: docTypeError 
+      })
+      return { 
+        success: false, 
+        error: { message: 'Document type not found' } 
+      }
+    }
+
+    // Check if any documents exist for this type
+    const { count, error: countError } = await supabase
+      .from('documents')
+      .select('id', { count: 'exact', head: true })
+      .eq('document_type_id', documentTypeId)
+      .eq('tenant_id', tenantId)
+
+    if (countError) {
+      logger.error('Failed to count documents', { 
+        documentTypeId, 
+        error: countError 
+      })
+      return { 
+        success: false, 
+        error: { message: 'Failed to check existing documents' } 
+      }
+    }
+
+    if (count && count > 0) {
+      logger.warn('Cannot reset counter - documents exist', { 
+        documentTypeId, 
+        documentCount: count,
+        typeName: docType.name 
+      })
+      return { 
+        success: false, 
+        error: { 
+          message: `Cannot reset counter. ${count} document(s) exist for this type. Delete all documents first.` 
+        } 
+      }
+    }
+
+    // Reset the counter to 1
+    const { error: updateError } = await supabase
+      .from('document_types')
+      .update({ 
+        next_number: 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', documentTypeId)
+      .eq('tenant_id', tenantId)
+
+    if (updateError) {
+      logger.error('Failed to reset counter', { 
+        documentTypeId, 
+        error: updateError 
+      })
+      return { 
+        success: false, 
+        error: { message: 'Failed to reset counter' } 
+      }
+    }
+
+    // Log the action
+    logger.info('Document type counter reset', {
+      documentTypeId,
+      typeName: docType.name,
+      prefix: docType.prefix,
+      userId,
+      userEmail,
+      tenantId,
+      duration: Date.now() - startTime
+    })
+
+    // Create audit log entry
+    await supabase
+      .from('audit_log')
+      .insert({
+        action: 'document_type_counter_reset',
+        performed_by: userId,
+        performed_by_email: userEmail,
+        details: {
+          document_type_id: documentTypeId,
+          document_type_name: docType.name,
+          prefix: docType.prefix,
+          reset_to: 1
+        },
+        tenant_id: tenantId
+      })
+
+    // Revalidate the page
+    revalidatePath('/admin/document-types')
+    
+    return { success: true }
+  } catch (error) {
+    logger.error('Error in resetDocumentTypeCounter', { 
+      documentTypeId, 
+      error 
+    })
+    return { 
+      success: false, 
+      error: { message: error instanceof Error ? error.message : 'Failed to reset counter' } 
+    }
+  }
+}
