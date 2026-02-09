@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -57,6 +57,24 @@ export default function ScanMonitoringClient({
   const router = useRouter()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [triggeringScans, setTriggeringScans] = useState<Set<string>>(new Set())
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+
+  // Auto-refresh when there are pending or scanning files
+  useEffect(() => {
+    if (!autoRefreshEnabled) return
+
+    const hasActiveScans = statistics.pending > 0 || statistics.scanning > 0
+    
+    if (!hasActiveScans) return
+
+    // Refresh every 5 seconds when there are active scans
+    const interval = setInterval(() => {
+      console.log('Auto-refreshing scan status...')
+      router.refresh()
+    }, 5000)
+
+    return () => clearInterval(interval)
+  }, [statistics.pending, statistics.scanning, autoRefreshEnabled, router])
 
   const handleRefresh = () => {
     setIsRefreshing(true)
@@ -239,7 +257,7 @@ export default function ScanMonitoringClient({
       </div>
 
       {/* Actions */}
-      <div className="flex gap-3">
+      <div className="flex gap-3 items-center">
         <Button
           onClick={handleRefresh}
           disabled={isRefreshing}
@@ -252,6 +270,30 @@ export default function ScanMonitoringClient({
           )}
           Refresh
         </Button>
+
+        {/* Auto-refresh toggle */}
+        <Button
+          onClick={() => setAutoRefreshEnabled(!autoRefreshEnabled)}
+          variant={autoRefreshEnabled ? "default" : "outline"}
+          size="sm"
+        >
+          {autoRefreshEnabled ? (
+            <>
+              <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+              Auto-refresh ON
+            </>
+          ) : (
+            <>Auto-refresh OFF</>
+          )}
+        </Button>
+
+        {/* Auto-refresh indicator */}
+        {autoRefreshEnabled && (statistics.pending > 0 || statistics.scanning > 0) && (
+          <span className="text-sm text-blue-600 flex items-center gap-1">
+            <Loader2 className="h-3 w-3 animate-spin" />
+            Updating every 5s
+          </span>
+        )}
 
         {(statistics.pending > 0 || statistics.error > 0) && (
           <Button

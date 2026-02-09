@@ -19,6 +19,7 @@ interface CompanySettingsFormProps {
     primary_color: string
     secondary_color: string
     auto_rename_files: boolean
+    virus_scan_enabled: boolean
     timezone: string
   }
 }
@@ -31,6 +32,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
   const [primaryColor, setPrimaryColor] = useState(tenant.primary_color)
   const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color)
   const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)
+  const [virusScanEnabled, setVirusScanEnabled] = useState(tenant.virus_scan_enabled)
   const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
@@ -116,6 +118,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         primary_color: primaryColor,
         secondary_color: secondaryColor,
         auto_rename_files: autoRenameFiles,
+        virus_scan_enabled: virusScanEnabled,
         timezone: timezone,
       })
 
@@ -343,6 +346,34 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
           id="auto_rename_files"
           checked={autoRenameFiles}
           onCheckedChange={setAutoRenameFiles}
+        />
+      </div>
+
+      {/* Virus Scanning */}
+      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-yellow-200">
+        <div className="flex-1">
+          <Label htmlFor="virus_scan_enabled" className="text-base font-medium">
+            Enable Virus Scanning (TotalVirus)
+          </Label>
+          <p className="text-sm text-gray-500 mt-1">
+            Scan uploaded files for viruses and malware using TotalVirus API
+          </p>
+          <div className="mt-2 text-xs text-yellow-700 bg-yellow-50 p-2 rounded border border-yellow-200">
+            <p className="font-medium mb-1">⚠️ Privacy Notice:</p>
+            <p>When enabled, file hashes are sent to TotalVirus (a third-party service) for scanning. 
+            TotalVirus may share threat data with security researchers and other organizations. 
+            Disable this if you handle highly sensitive or confidential documents.</p>
+          </div>
+          {!virusScanEnabled && (
+            <p className="mt-2 text-sm text-red-600 font-medium">
+              ⚠️ When disabled, all uploaded files will be marked as "safe" without scanning.
+            </p>
+          )}
+        </div>
+        <Switch
+          id="virus_scan_enabled"
+          checked={virusScanEnabled}
+          onCheckedChange={setVirusScanEnabled}
         />
       </div>
 
