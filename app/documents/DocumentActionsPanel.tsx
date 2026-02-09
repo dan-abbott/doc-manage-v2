@@ -96,7 +96,7 @@ export default function DocumentActionsPanel({
   currentUserEmail
 }: DocumentActionsPanelProps) {
   const searchParams = useSearchParams()
-  const activeTab = (searchParams.get('tab') as 'released' | 'wip') || 'released'
+  const explicitTab = searchParams.get('tab') as 'released' | 'wip' | null
   
   const [mounted, setMounted] = useState(false)
 
@@ -113,12 +113,15 @@ export default function DocumentActionsPanel({
     return <div className="p-6 text-center text-gray-500">No document data available</div>
   }
 
+  // Smart default: Show WIP tab if there's a draft and no explicit tab selected
+  const hasDraft = wipVersions.length > 0
+  const activeTab = explicitTab || (hasDraft ? 'wip' : 'released')
+  
   const isCreator = primaryDocument.created_by === currentUserId
   const approvers = primaryDocument.approvers || []
   const hasApprovers = approvers.length > 0
   
   // Check if there's a draft version (WIP)
-  const hasDraft = wipVersions.length > 0
   const draftDocument = wipVersions[0]
   
   // Determine which buttons to show based on active tab

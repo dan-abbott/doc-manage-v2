@@ -690,11 +690,34 @@ export async function approveDocument(documentId: string, comments?: string) {
         }
       })
 
-    // Check if all approvers have approved
-    const { data: allApproved } = await supabase
-      .rpc('check_all_approvers_approved', { doc_id: documentId })
+    // Check if all approvers have approved by querying directly
+    const { data: approvers, error: approversError } = await supabase
+      .from('approvers')
+      .select('status')
+      .eq('document_id', documentId)
+    
+    if (approversError) {
+      logger.error('Failed to fetch approvers for completion check', {
+        userId,
+        documentId,
+        error: approversError
+      })
+      return { success: false, error: 'Failed to check approval status' }
+    }
 
-    if (allApproved === true) {
+    const totalApprovers = approvers?.length || 0
+    const approvedCount = approvers?.filter(a => a.status === 'Approved').length || 0
+    const allApproved = totalApprovers > 0 && approvedCount === totalApprovers
+
+    logger.info('Approval check', {
+      userId,
+      documentId,
+      totalApprovers,
+      approvedCount,
+      allApproved
+    })
+
+    if (allApproved) {
       logger.info('All approvers approved, releasing document', {
         userId,
         documentId,
