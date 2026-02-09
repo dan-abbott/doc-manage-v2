@@ -1,6 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { fetchDocumentVersions } from '@/lib/document-helpers'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import DocumentDetailPanel from '../DocumentDetailPanel'
 import DocumentActionsPanel from '../DocumentActionsPanel'
 import Link from 'next/link'
@@ -24,7 +25,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   // Check if user is admin
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin, tenant_id')
+    .select('is_admin')
     .eq('id', user.id)
     .single()
 
@@ -33,6 +34,13 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   }
 
   const isAdmin = userData?.is_admin || false
+
+  // Get tenant from CURRENT SUBDOMAIN
+  const subdomainTenantId = await getSubdomainTenantId()
+  
+  if (!subdomainTenantId) {
+    notFound()
+  }
 
   // Fetch the document to get its document_number
   const { data: document } = await supabase
@@ -45,8 +53,8 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Verify tenant access
-  if (document.tenant_id !== userData.tenant_id) {
+  // Verify tenant access - document must belong to CURRENT SUBDOMAIN's tenant
+  if (document.tenant_id !== subdomainTenantId) {
     notFound()
   }
 
@@ -61,7 +69,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   const { data: availableUsers } = await supabase
     .from('users')
     .select('id, email, full_name')
-    .eq('tenant_id', userData.tenant_id)
+    .eq('tenant_id', subdomainTenantId)
     .eq('is_active', true)
     .order('full_name')
 

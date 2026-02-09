@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { notFound, redirect } from 'next/navigation'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import EditDocumentForm from './EditDocumentForm'
 
@@ -18,6 +19,13 @@ export default async function EditDocumentPage({ params }: PageProps) {
     redirect('/auth/login')
   }
 
+  // Get tenant from CURRENT SUBDOMAIN
+  const subdomainTenantId = await getSubdomainTenantId()
+  
+  if (!subdomainTenantId) {
+    notFound()
+  }
+
   // Get document with approvers
   const { data: document, error } = await supabase
     .from('documents')
@@ -31,6 +39,11 @@ export default async function EditDocumentPage({ params }: PageProps) {
     .single()
 
   if (error || !document) {
+    notFound()
+  }
+
+  // Verify tenant access - document must belong to CURRENT SUBDOMAIN's tenant
+  if (document.tenant_id !== subdomainTenantId) {
     notFound()
   }
 
