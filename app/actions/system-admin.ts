@@ -130,17 +130,19 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
       const storageMB = storageBytes / (1024 * 1024)
       const storageGB = storageMB / 1024
 
+      // Count virus scans from audit_log for this tenant
       const { count: virusTotalCalls } = await supabase
-        .from('api_usage')
+        .from('audit_log')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
-        .eq('api_type', 'virustotal')
+        .eq('action', 'file_scan_completed')
 
+      // Count email sends from audit_log for this tenant
       const { count: emailSends } = await supabase
-        .from('api_usage')
+        .from('audit_log')
         .select('*', { count: 'exact', head: true })
         .eq('tenant_id', tenant.id)
-        .eq('api_type', 'resend_email')
+        .eq('action', 'email_sent')
 
       const { data: lastDoc } = await supabase
         .from('documents')
@@ -229,9 +231,11 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     .select('*', { count: 'exact', head: true })
     .eq('action', 'file_scan_completed')
 
-  // Count email sends from audit_log (if we add email tracking)
-  // For now, set to 0 as we don't track this yet
-  const totalEmailSends = 0
+  // Count email sends from audit_log (email_sent actions)
+  const { count: totalEmailSends } = await supabase
+    .from('audit_log')
+    .select('*', { count: 'exact', head: true })
+    .eq('action', 'email_sent')
 
   const virusTotalCost = (totalVirusTotalCalls || 0) * 0.005
   const emailCost = (totalEmailSends || 0) * 0.001

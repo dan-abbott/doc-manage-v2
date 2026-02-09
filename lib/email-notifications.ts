@@ -169,7 +169,7 @@ export async function sendApprovalRequestEmail(
   }
 
   // Always immediate for approval requests
-  const viewUrl = `${siteUrl}/documents?selected=${context.documentNumber}&version=${context.documentVersion}`
+  const viewUrl = `${siteUrl}/documents/${context.documentId}`
 
   try {
     await resend.emails.send({
@@ -180,6 +180,18 @@ export async function sendApprovalRequestEmail(
     })
 
     console.log(`[Email] ✓ Sent approval request to ${check.email}`)
+    
+    // Log email send to audit_log
+    if (check.tenantId) {
+      await logEmailSent(
+        context.documentId,
+        check.email,
+        'approval_requested',
+        check.tenantId,
+        approverId
+      )
+    }
+    
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send approval request:', error)
@@ -201,7 +213,7 @@ export async function sendApprovalCompleteEmail(
     return { success: false, reason: 'disabled' }
   }
 
-  const viewUrl = `${siteUrl}/documents?selected=${context.documentNumber}&version=${context.documentVersion}`
+  const viewUrl = `${siteUrl}/documents/${context.documentId}`
   const subject = `✅ Document Approved: ${context.documentNumber}${context.documentVersion}`
   const htmlBody = generateApprovalCompleteHTML(check.userName, context, viewUrl)
 
@@ -220,6 +232,18 @@ export async function sendApprovalCompleteEmail(
     })
 
     console.log(`[Email] ✓ Sent approval complete to ${check.email}`)
+    
+    // Log email send to audit_log
+    if (check.tenantId) {
+      await logEmailSent(
+        context.documentId,
+        check.email,
+        'approval_completed',
+        check.tenantId,
+        creatorId
+      )
+    }
+    
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send approval complete:', error)
@@ -253,6 +277,18 @@ export async function sendDocumentRejectedEmail(
     })
 
     console.log(`[Email] ✓ Sent rejection email to ${check.email}`)
+    
+    // Log email send to audit_log
+    if (check.tenantId) {
+      await logEmailSent(
+        context.documentId,
+        check.email,
+        'document_rejected',
+        check.tenantId,
+        creatorId
+      )
+    }
+    
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send rejection email:', error)
@@ -274,7 +310,7 @@ export async function sendDocumentReleasedEmail(
     return { success: false, reason: 'disabled' }
   }
 
-  const viewUrl = `${siteUrl}/documents?selected=${context.documentNumber}&version=${context.documentVersion}`
+  const viewUrl = `${siteUrl}/documents/${context.documentId}`
   const subject = `🎉 Document Released: ${context.documentNumber}${context.documentVersion}`
   const htmlBody = generateDocumentReleasedHTML(check.userName, context, viewUrl)
 
@@ -293,6 +329,18 @@ export async function sendDocumentReleasedEmail(
     })
 
     console.log(`[Email] ✓ Sent release notification to ${check.email}`)
+    
+    // Log email send to audit_log
+    if (check.tenantId) {
+      await logEmailSent(
+        context.documentId,
+        check.email,
+        'document_released',
+        check.tenantId,
+        creatorId
+      )
+    }
+    
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send release notification:', error)
@@ -450,4 +498,38 @@ function generateDocumentReleasedHTML(userName: string, context: EmailContext, v
 </body>
 </html>
   `
+}
+
+/**
+ * Log email send to audit_log for tracking and billing
+ */
+async function logEmailSent(
+  documentId: string,
+  recipientEmail: string,
+  emailType: string,
+  tenantId: string,
+  performedBy: string
+) {
+  try {
+    const supabase = await createClient()
+    
+    await supabase
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        action: 'email_sent',
+        performed_by: performedBy,
+        performed_by_email: recipientEmail,
+        tenant_id: tenantId,
+        details: {
+          email_type: emailType,
+          recipient: recipientEmail,
+          timestamp: new Date().toISOString()
+        }
+      })
+    
+    console.log(`[Audit] Logged email send: ${emailType} to ${recipientEmail}`)
+  } catch (error) {
+    console.error('[Audit] Failed to log email send:', error)
+  }
 }
