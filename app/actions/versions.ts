@@ -307,7 +307,7 @@ export async function markPreviousVersionObsolete(
     // Get all versions of this document
     const { data: allVersions, error: fetchError } = await supabase
       .from('documents')
-      .select('id, version, status, is_production')
+      .select('id, version, status, is_production, tenant_id')
       .eq('document_number', documentNumber)
       .order('created_at', { ascending: true })
 
