@@ -66,12 +66,24 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     .order('full_name')
 
   // Fetch audit logs for ALL versions of this document (cross-version history)
-  const { data: auditLogs } = await supabase
+  const { data: auditLogs, error: auditError } = await supabase
     .from('audit_log')
     .select('*')
     .eq('document_number', document.document_number)
+    .eq('tenant_id', document.tenant_id)
     .order('created_at', { ascending: false })
     .limit(50)
+  
+  // Log for debugging
+  if (auditError) {
+    console.error('Audit log query error:', auditError)
+  } else {
+    console.log('Audit logs fetched:', {
+      documentNumber: document.document_number,
+      tenantId: document.tenant_id,
+      count: auditLogs?.length || 0
+    })
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
