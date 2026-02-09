@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError, logDatabaseQuery } from '@/lib/logger'
 import { sanitizeString } from '@/lib/security/sanitize'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import { 
   documentTypeCreateSchema, 
   documentTypeUpdateSchema,
@@ -47,10 +48,10 @@ export async function createDocumentType(data: { name: string; prefix: string; d
     const userId = user.id
     const userEmail = user.email
 
-    // Check admin status and get tenant_id
+    // Check admin status
     const { data: userData, error: adminCheckError } = await supabase
       .from('users')
-      .select('is_admin, tenant_id')
+      .select('is_admin')
       .eq('id', userId)
       .single()
 
@@ -66,15 +67,16 @@ export async function createDocumentType(data: { name: string; prefix: string; d
       }
     }
 
-    if (!userData.tenant_id) {
-      logger.error('User has no tenant_id', { userId, userEmail })
+    // Get tenant from CURRENT SUBDOMAIN (not user's home tenant)
+    const tenantId = await getSubdomainTenantId()
+
+    if (!tenantId) {
+      logger.error('Invalid tenant subdomain', { userId, userEmail })
       return { 
         success: false, 
-        error: { message: 'User is not associated with a tenant' } 
+        error: { message: 'Invalid tenant context' } 
       }
     }
-
-    const tenantId = userData.tenant_id
 
     // Validate input data
     const rawData = {
@@ -721,9 +723,18 @@ export async function getDocumentTypes(activeOnly: boolean = true) {
   const supabase = await createClient()
   
   try {
+    // Get tenant from CURRENT SUBDOMAIN
+    const tenantId = await getSubdomainTenantId()
+    
+    if (!tenantId) {
+      logger.error('Invalid tenant subdomain in getDocumentTypes')
+      return { success: false, error: { message: 'Invalid tenant context' }, data: [] }
+    }
+
     let query = supabase
       .from('document_types')
       .select('*')
+      .eq('tenant_id', tenantId)  // ✅ Filter by subdomain's tenant
       .order('name')
     
     // Filter by active status if requested
@@ -734,7 +745,7 @@ export async function getDocumentTypes(activeOnly: boolean = true) {
     const { data, error } = await query
     
     if (error) {
-      logger.error('Failed to fetch document types', { activeOnly, error })
+      logger.error('Failed to fetch document types', { activeOnly, tenantId, error })
       return { success: false, error: { message: error.message }, data: [] }
     }
     
@@ -781,10 +792,10 @@ export async function resetDocumentTypeCounter(documentTypeId: string) {
     const userId = user.id
     const userEmail = user.email
 
-    // Check admin status and get tenant_id
+    // Check admin status
     const { data: userData, error: adminCheckError } = await supabase
       .from('users')
-      .select('is_admin, tenant_id')
+      .select('is_admin')
       .eq('id', userId)
       .single()
 
@@ -800,15 +811,16 @@ export async function resetDocumentTypeCounter(documentTypeId: string) {
       }
     }
 
-    if (!userData.tenant_id) {
-      logger.error('User has no tenant_id', { userId, userEmail })
+    // Get tenant from CURRENT SUBDOMAIN
+    const tenantId = await getSubdomainTenantId()
+
+    if (!tenantId) {
+      logger.error('Invalid tenant subdomain', { userId, userEmail })
       return { 
         success: false, 
-        error: { message: 'User is not associated with a tenant' } 
+        error: { message: 'Invalid tenant context' } 
       }
     }
-
-    const tenantId = userData.tenant_id
 
     // Get document type to verify ownership
     const { data: docType, error: docTypeError } = await supabase
