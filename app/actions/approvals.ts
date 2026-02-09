@@ -342,6 +342,7 @@ export async function removeApprover(documentId: string, approverId: string) {
         action: 'approver_removed',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: approver.tenant_id,
         details: { 
           approver_email: approver.user_email 
         }

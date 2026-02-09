@@ -312,6 +312,7 @@ export async function createDocument(formData: FormData) {
         action: 'created',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: tenantId,
         details: { 
           document_number: documentNumber,
           version: version,
@@ -565,6 +566,7 @@ export async function updateDocument(
         action: 'updated',
         performed_by: user.id,
         performed_by_email: user.email,
+        tenant_id: document.tenant_id,
         details: { changes: { title, description, project_code } },
       })
 
@@ -835,7 +837,12 @@ export async function deleteFile(documentId: string, fileId: string) {
         action: 'file_deleted',
         performed_by: user.id,
         performed_by_email: user.email,
-        details: { file_name: file.file_name },
+        tenant_id: document.tenant_id,
+        details: { 
+          file_id: fileId,
+          file_name: file.file_name,
+          file_size: file.file_size,
+        },
       })
 
     revalidatePath(`/documents/${documentId}`)

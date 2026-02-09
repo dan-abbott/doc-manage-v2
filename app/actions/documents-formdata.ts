@@ -4,6 +4,7 @@ import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
 import { inngest } from '@/lib/inngest/client'
+import { createDocumentAudit, AuditAction } from '@/lib/audit-helper'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -140,6 +141,22 @@ export async function updateDocumentWithFiles(formData: FormData) {
         }
 
         console.log(`[${i + 1}/${files.length}] ✅ File queued for scanning`)
+
+        // ✅ AUDIT: Log file upload
+        await createDocumentAudit({
+          documentId: documentId,
+          action: AuditAction.FILE_UPLOADED,
+          performedBy: user.id,
+          performedByEmail: user.email!,
+          tenantId: tenantId,
+          details: {
+            file_id: fileRecord.id,
+            file_name: fileRecord.file_name,
+            original_file_name: file.name,
+            file_size: file.size,
+            mime_type: file.type,
+          }
+        })
 
         // ✨ TRIGGER INNGEST BACKGROUND SCAN ✨
         try {

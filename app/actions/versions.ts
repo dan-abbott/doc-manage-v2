@@ -214,6 +214,7 @@ export async function createNewVersion(sourceDocumentId: string) {
         action: 'version_created',
         performed_by: userId,
         performed_by_email: userEmail || '',
+        tenant_id: tenantId,
         details: {
           source_document_id: sourceDocumentId,
           source_version: sourceDoc.version,
@@ -387,6 +388,7 @@ export async function markPreviousVersionObsolete(
         action: 'document_obsoleted',
         performed_by: currentUserId,
         performed_by_email: userEmail,
+        tenant_id: previousVersion.tenant_id,
         details: {
           obsoleted_version: previousVersion.version,
           new_released_version: currentVersion,

@@ -29,7 +29,14 @@ export const scanPendingFiles = inngest.createFunction(
       
       const { data: file, error } = await supabase
         .from('document_files')
-        .select('id, file_path, original_file_name, document_id')
+        .select(`
+          id, 
+          file_path, 
+          original_file_name, 
+          document_id,
+          uploaded_by,
+          documents!inner(tenant_id)
+        `)
         .eq('id', fileId)
         .single()
       
@@ -100,6 +107,22 @@ export const scanPendingFiles = inngest.createFunction(
           })
           .eq('id', fileId)
         
+        // Create audit log for scan failure
+        await supabase
+          .from('audit_log')
+          .insert({
+            document_id: fileData.document_id,
+            action: 'file_scan_failed',
+            performed_by: fileData.uploaded_by,
+            performed_by_email: 'system',
+            tenant_id: (fileData.documents as any).tenant_id,
+            details: {
+              file_id: fileId,
+              file_name: fileData.original_file_name,
+              error: scanResult.error
+            }
+          })
+        
         return { status: 'error' }
       }
       
@@ -118,6 +141,24 @@ export const scanPendingFiles = inngest.createFunction(
             scanned_at: new Date().toISOString(),
           })
           .eq('id', fileId)
+        
+        // Create audit log for malware detection
+        await supabase
+          .from('audit_log')
+          .insert({
+            document_id: fileData.document_id,
+            action: 'file_scan_completed',
+            performed_by: fileData.uploaded_by,
+            performed_by_email: 'system',
+            tenant_id: (fileData.documents as any).tenant_id,
+            details: {
+              file_id: fileId,
+              file_name: fileData.original_file_name,
+              status: 'blocked',
+              malicious: scanResult.malicious,
+              suspicious: scanResult.suspicious
+            }
+          })
         
         // Delete file from storage
         const { error: deleteError } = await supabase.storage
@@ -144,6 +185,22 @@ export const scanPendingFiles = inngest.createFunction(
           scanned_at: new Date().toISOString(),
         })
         .eq('id', fileId)
+      
+      // Create audit log for successful scan
+      await supabase
+        .from('audit_log')
+        .insert({
+          document_id: fileData.document_id,
+          action: 'file_scan_completed',
+          performed_by: fileData.uploaded_by,
+          performed_by_email: 'system',
+          tenant_id: (fileData.documents as any).tenant_id,
+          details: {
+            file_id: fileId,
+            file_name: fileData.original_file_name,
+            status: 'safe'
+          }
+        })
       
       return { status: 'safe' }
     })
