@@ -762,7 +762,7 @@ export async function deleteFile(documentId: string, fileId: string) {
     // Get file and document
     const { data: file, error: fileError } = await supabase
       .from('document_files')
-      .select('*, document:documents(id, status, created_by)')
+      .select('*, document:documents(id, status, created_by, tenant_id)')
       .eq('id', fileId)
       .eq('document_id', documentId)
       .single()
@@ -830,7 +830,7 @@ export async function deleteFile(documentId: string, fileId: string) {
     })
 
     // Create audit log entry
-    await supabase
+    const { error: auditError } = await supabase
       .from('audit_log')
       .insert({
         document_id: documentId,
@@ -844,6 +844,23 @@ export async function deleteFile(documentId: string, fileId: string) {
           file_size: file.file_size,
         },
       })
+    
+    if (auditError) {
+      logger.error('Failed to create audit log for file deletion', {
+        userId,
+        documentId,
+        fileId,
+        error: auditError,
+        tenantId: document.tenant_id
+      })
+    } else {
+      logger.info('Audit log created for file deletion', {
+        userId,
+        documentId,
+        fileId,
+        action: 'file_deleted'
+      })
+    }
 
     revalidatePath(`/documents/${documentId}`)
 

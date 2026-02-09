@@ -26,25 +26,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
   const [files, setFiles] = useState<File[]>([])
   const [existingFiles, setExistingFiles] = useState(document.document_files || [])
 
-  // DEBUG: Log component mount and props
-  useEffect(() => {
-    console.log('🐛 [EditDocumentForm] Component mounted')
-    console.log('🐛 [EditDocumentForm] Document ID:', document.id)
-    console.log('🐛 [EditDocumentForm] Document Number:', document.document_number)
-    console.log('🐛 [EditDocumentForm] Build timestamp:', new Date().toISOString())
-  }, [])
-
-  // DEBUG: Log file changes
-  useEffect(() => {
-    console.log('🐛 [EditDocumentForm] Files changed:', {
-      count: files.length,
-      names: files.map(f => f.name),
-      sizes: files.map(f => f.size)
-    })
-  }, [files])
-
   const handleDeleteFile = async (fileId: string) => {
-    console.log('🐛 [EditDocumentForm] handleDeleteFile called:', fileId)
     try {
       const result = await deleteFile(document.id, fileId)
       
@@ -55,33 +37,26 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
         toast.error(result.error || 'Failed to delete file')
       }
     } catch (error) {
-      console.error('🐛 [EditDocumentForm] Delete file error:', error)
+      console.error('Delete file error:', error)
       toast.error('An error occurred')
     }
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    console.log('🐛 [EditDocumentForm] ========== FORM SUBMIT STARTED ==========')
-    console.log('🐛 [EditDocumentForm] Files to upload:', files.length)
-    console.log('🐛 [EditDocumentForm] Form action: updateDocumentWithFiles')
-    console.log('🐛 [EditDocumentForm] Timestamp:', new Date().toISOString())
 
     // Validate project code format if provided
     if (projectCode && !/^P-\d{5}$/.test(projectCode.toUpperCase())) {
-      console.log('🐛 [EditDocumentForm] Project code validation failed')
       toast.error('Project code must be in format P-##### (e.g., P-12345)')
       return
     }
 
     try {
       setIsSubmitting(true)
-      console.log('🐛 [EditDocumentForm] isSubmitting set to true')
       
       // Show background scanning notice if files present
       if (files.length > 0) {
         const message = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}. Virus scanning will happen in the background.`
-        console.log('🐛 [EditDocumentForm] Showing toast:', message)
         toast.info(message, { duration: 4000 })
       }
 
@@ -95,60 +70,35 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       }
       
       // Append all files
-      files.forEach((file, index) => {
-        console.log(`🐛 [EditDocumentForm] Appending file ${index + 1}:`, file.name, file.size)
+      files.forEach((file) => {
         formData.append('files', file)
       })
-
-      console.log('🐛 [EditDocumentForm] Calling updateDocumentWithFiles...')
-      const startTime = Date.now()
       
       const result = await updateDocumentWithFiles(formData)
-      
-      const duration = Date.now() - startTime
-      console.log('🐛 [EditDocumentForm] updateDocumentWithFiles completed in', duration, 'ms')
-      console.log('🐛 [EditDocumentForm] Result:', result)
 
       if (result.success) {
         const successMessage = files.length > 0
           ? `Document updated! ${result.filesUploaded} file(s) queued for virus scanning.`
           : 'Document updated successfully'
         
-        console.log('🐛 [EditDocumentForm] Success! Message:', successMessage)
         toast.success(successMessage)
         
-        console.log('🐛 [EditDocumentForm] Redirecting to documents page')
-        router.push(`/documents?selected=${result.documentNumber}&version=${result.version}`)
+        // Navigate back to document detail page
+        router.push(`/documents/${document.id}`)
         router.refresh()
       } else {
-        console.error('🐛 [EditDocumentForm] Server returned error:', result.error)
         toast.error(result.error || 'Failed to update document')
       }
     } catch (error: any) {
-      console.error('🐛 [EditDocumentForm] Exception caught:', error)
-      console.error('🐛 [EditDocumentForm] Error stack:', error.stack)
+      console.error('Form submission error:', error)
       toast.error('An unexpected error occurred')
     } finally {
-      console.log('🐛 [EditDocumentForm] Setting isSubmitting to false')
       setIsSubmitting(false)
-      console.log('🐛 [EditDocumentForm] ========== FORM SUBMIT ENDED ==========')
     }
   }
 
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
-      {/* DEBUG INFO */}
-      <div className="bg-yellow-50 border border-yellow-200 rounded p-3 text-xs">
-        <div className="font-bold mb-2">🐛 DEBUG INFO</div>
-        <div>Component: EditDocumentForm.tsx</div>
-        <div>Document ID: {document.id}</div>
-        <div>Files selected: {files.length}</div>
-        <div>Action: updateDocumentWithFiles</div>
-        <div className="mt-2 text-yellow-700">
-          Check browser console (F12) for detailed logs
-        </div>
-      </div>
-
       {/* Document Number (read-only) */}
       <div>
         <Label>Document Number</Label>
