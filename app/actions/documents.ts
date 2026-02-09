@@ -7,7 +7,7 @@ import { logError, logServerAction, logFileOperation, measureTime } from '@/lib/
 import { createDocumentSchema } from '@/lib/validation/schemas'
 import { validateFormData, validateFile } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } from '@/lib/security/sanitize'
-import { getCurrentTenantId } from '@/lib/tenant'
+import { getCurrentTenantId, getSubdomainTenantId } from '@/lib/tenant'
 import { sendDocumentReleasedEmail } from '@/lib/email-notifications'
 
 
@@ -58,19 +58,12 @@ export async function createDocument(formData: FormData) {
     
     userId = user.id
 
-
-    // Get user's tenant_id
-    const { data: userData } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', userId)
-      .single()
-
-    const tenantId = userData?.tenant_id
+    // Get tenant from CURRENT SUBDOMAIN (not user's home tenant)
+    const tenantId = await getSubdomainTenantId()
 
     if (!tenantId) {
-      logger.error('User has no tenant_id', { userId })
-      return { success: false, error: 'User not associated with a tenant' }
+      logger.error('Invalid tenant subdomain', { userId })
+      return { success: false, error: 'Invalid tenant context' }
     }
 
         // Check write permission
@@ -153,11 +146,12 @@ export async function createDocument(formData: FormData) {
       }
     }
 
-    // Get document type for prefix and number
+    // Get document type for prefix and number (verify it's in this tenant)
     const { data: docType, error: typeError } = await supabase
       .from('document_types')
       .select('prefix, next_number')
       .eq('id', data.document_type_id)
+      .eq('tenant_id', tenantId)  // ✅ Verify document type belongs to this tenant
       .single()
 
     if (typeError || !docType) {

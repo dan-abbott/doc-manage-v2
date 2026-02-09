@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import NewDocumentForm from '../../../documents/new/NewDocumentForm'
 
 export const metadata = {
@@ -16,10 +17,27 @@ export default async function NewDocumentPage() {
     redirect('/login')
   }
 
-  // Get active document types
+  // Get tenant from CURRENT SUBDOMAIN
+  const tenantId = await getSubdomainTenantId()
+  
+  if (!tenantId) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-8">
+        <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center py-12">
+            <h3 className="text-sm font-medium text-gray-900">Invalid tenant context</h3>
+            <p className="mt-1 text-sm text-gray-500">Please try refreshing the page.</p>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Get active document types for THIS TENANT
   const { data: documentTypes, error: typesError } = await supabase
     .from('document_types')
     .select('*')
+    .eq('tenant_id', tenantId)  // ✅ Filter by subdomain's tenant
     .eq('is_active', true)
     .order('name', { ascending: true })
 
