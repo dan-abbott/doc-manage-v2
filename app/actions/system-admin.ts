@@ -223,15 +223,15 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
   const totalStorageGB = totalStorageBytes / (1024 * 1024 * 1024)
   console.log(`[System Admin] Total storage: ${totalStorageBytes} bytes (${totalStorageGB.toFixed(2)} GB)`)
 
+  // Count virus scans from audit_log (file_scan_completed actions)
   const { count: totalVirusTotalCalls } = await supabase
-    .from('api_usage')
+    .from('audit_log')
     .select('*', { count: 'exact', head: true })
-    .eq('api_type', 'virustotal')
+    .eq('action', 'file_scan_completed')
 
-  const { count: totalEmailSends } = await supabase
-    .from('api_usage')
-    .select('*', { count: 'exact', head: true })
-    .eq('api_type', 'resend_email')
+  // Count email sends from audit_log (if we add email tracking)
+  // For now, set to 0 as we don't track this yet
+  const totalEmailSends = 0
 
   const virusTotalCost = (totalVirusTotalCalls || 0) * 0.005
   const emailCost = (totalEmailSends || 0) * 0.001

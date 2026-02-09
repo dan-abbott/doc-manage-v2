@@ -19,7 +19,7 @@ export default async function AdminLayout({
   // Check admin status
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin')
+    .select('is_admin, is_master_admin')
     .eq('id', user.id)
     .single()
 
@@ -37,7 +37,7 @@ export default async function AdminLayout({
         </div>
 
         {/* Admin Navigation Tabs */}
-        <AdminNavTabs />
+        <AdminNavTabs isMasterAdmin={userData.is_master_admin || false} />
 
         {/* Content */}
         <div>
