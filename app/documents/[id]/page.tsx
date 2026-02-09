@@ -65,11 +65,11 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     .eq('is_active', true)
     .order('full_name')
 
-  // Fetch audit logs for this document
+  // Fetch audit logs for ALL versions of this document (cross-version history)
   const { data: auditLogs } = await supabase
     .from('audit_log')
     .select('*')
-    .eq('document_id', params.id)
+    .eq('document_number', document.document_number)
     .order('created_at', { ascending: false })
     .limit(50)
 
