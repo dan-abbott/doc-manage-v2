@@ -15,9 +15,10 @@ import { Trash2, FileText, Shield } from 'lucide-react'
 
 interface EditDocumentFormProps {
   document: any
+  virusScanEnabled: boolean
 }
 
-export default function EditDocumentForm({ document }: EditDocumentFormProps) {
+export default function EditDocumentForm({ document, virusScanEnabled }: EditDocumentFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [title, setTitle] = useState(document.title)
@@ -54,10 +55,15 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
     try {
       setIsSubmitting(true)
       
-      // Show background scanning notice if files present
+      // Show appropriate message based on virus scanning setting
       if (files.length > 0) {
-        const message = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}. Virus scanning will happen in the background.`
-        toast.info(message, { duration: 4000 })
+        if (virusScanEnabled) {
+          const message = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}. Virus scanning will happen in the background.`
+          toast.info(message, { duration: 4000 })
+        } else {
+          const message = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`
+          toast.info(message, { duration: 3000 })
+        }
       }
 
       // Create FormData for proper file handling
@@ -77,9 +83,15 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       const result = await updateDocumentWithFiles(formData)
 
       if (result.success) {
-        const successMessage = files.length > 0
-          ? `Document updated! ${result.filesUploaded} file(s) queued for virus scanning.`
-          : 'Document updated successfully'
+        // Show appropriate success message based on virus scanning
+        let successMessage = 'Document updated successfully'
+        if (files.length > 0) {
+          if (virusScanEnabled) {
+            successMessage = `Document updated! ${result.filesUploaded} file(s) queued for virus scanning.`
+          } else {
+            successMessage = `Document updated! ${result.filesUploaded} file(s) uploaded.`
+          }
+        }
         
         toast.success(successMessage)
         
@@ -181,7 +193,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
                         <p className="text-sm font-medium">{file.file_name}</p>
-                        <ScanStatusBadge status={scanStatus} showText={false} />
+                        {virusScanEnabled && <ScanStatusBadge status={scanStatus} showText={false} />}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {(file.file_size / 1024 / 1024).toFixed(2)} MB
@@ -214,8 +226,8 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
         <Label>Add New Files</Label>
         <FileUpload files={files} onFilesChange={setFiles} />
         
-        {/* Background scanning notice */}
-        {files.length > 0 && (
+        {/* Only show virus scanning notice if it's enabled */}
+        {files.length > 0 && virusScanEnabled && (
           <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
             <div className="flex items-start gap-2">
               <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />

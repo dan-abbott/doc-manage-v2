@@ -76,7 +76,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
     try {
       const formData = new FormData()
       formData.append('logo', logoFile)
-      formData.append('tenantId', tenant.id) // Pass tenant ID
+      formData.append('tenantId', tenant.id)
 
       const result = await uploadCompanyLogo(formData)
 
@@ -114,7 +114,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
 
     try {
       const result = await updateCompanySettings({
-        tenantId: tenant.id, // FIXED: Pass the tenant ID being viewed
+        tenantId: tenant.id,
         company_name: companyName,
         logo_url: logoUrl || null,
         primary_color: primaryColor,

@@ -181,7 +181,7 @@ export async function updateCompanySettings(data: {
       return { success: false, error: 'Only administrators can update company settings' }
     }
 
-    // FIXED: Authorization check - regular admins can only update their own tenant
+    // Authorization check - regular admins can only update their own tenant
     // Master admins can update any tenant
     if (!userData.is_master_admin && validation.data.tenantId !== userData.tenant_id) {
       return { 
@@ -190,7 +190,7 @@ export async function updateCompanySettings(data: {
       }
     }
 
-    // FIXED: Update the specified tenant (not user's tenant_id)
+    // Update the specified tenant (not user's tenant_id)
     const { error: updateError } = await supabase
       .from('tenants')
       .update({
@@ -203,7 +203,7 @@ export async function updateCompanySettings(data: {
         timezone: validation.data.timezone,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', validation.data.tenantId) // Use tenantId from form, not userData.tenant_id
+      .eq('id', validation.data.tenantId)
 
     if (updateError) {
       console.error('Update tenant error:', updateError)
