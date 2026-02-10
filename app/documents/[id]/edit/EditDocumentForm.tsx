@@ -34,6 +34,8 @@ export default function EditDocumentForm({ document, virusScanEnabled }: EditDoc
       if (result.success) {
         setExistingFiles(existingFiles.filter((f: any) => f.id !== fileId))
         toast.success('File deleted')
+        // Refresh router cache so document detail page shows updated file list
+        router.refresh()
       } else {
         toast.error(result.error || 'Failed to delete file')
       }

@@ -8,6 +8,10 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
+// Force dynamic rendering to prevent caching issues with file deletions
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 interface PageProps {
   params: { id: string }
 }
