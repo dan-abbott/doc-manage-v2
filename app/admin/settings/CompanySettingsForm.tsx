@@ -76,6 +76,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
     try {
       const formData = new FormData()
       formData.append('logo', logoFile)
+      formData.append('tenantId', tenant.id)
 
       const result = await uploadCompanyLogo(formData)
 
@@ -367,7 +368,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
           </div>
           {!virusScanEnabled && (
             <p className="mt-2 text-sm text-red-600 font-medium">
-              ⚠️ When disabled, all uploaded files will be assumed to be "safe" without scanning.
+              ⚠️ When disabled, all uploaded files will be marked as "safe" without scanning.
             </p>
           )}
         </div>
