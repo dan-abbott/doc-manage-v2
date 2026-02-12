@@ -76,7 +76,6 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
     try {
       const formData = new FormData()
       formData.append('logo', logoFile)
-      formData.append('tenantId', tenant.id)
 
       const result = await uploadCompanyLogo(formData)
 
@@ -114,7 +113,6 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
 
     try {
       const result = await updateCompanySettings({
-        tenantId: tenant.id,
         company_name: companyName,
         logo_url: logoUrl || null,
         primary_color: primaryColor,
@@ -352,7 +350,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
       </div>
 
       {/* Virus Scanning */}
-      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-yellow-200">
+      <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg border-2 border-yellow-200 gap-6">
         <div className="flex-1">
           <Label htmlFor="virus_scan_enabled" className="text-base font-medium">
             Enable Virus Scanning (TotalVirus)
@@ -372,11 +370,13 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
             </p>
           )}
         </div>
-        <Switch
-          id="virus_scan_enabled"
-          checked={virusScanEnabled}
-          onCheckedChange={setVirusScanEnabled}
-        />
+        <div className="flex-shrink-0">
+          <Switch
+            id="virus_scan_enabled"
+            checked={virusScanEnabled}
+            onCheckedChange={setVirusScanEnabled}
+          />
+        </div>
       </div>
 
       {/* Submit Button */}

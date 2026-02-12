@@ -57,7 +57,7 @@ export default function ScanMonitoringClient({
   const router = useRouter()
   const [isRefreshing, setIsRefreshing] = useState(false)
   const [triggeringScans, setTriggeringScans] = useState<Set<string>>(new Set())
-  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(true)
+  const [autoRefreshEnabled, setAutoRefreshEnabled] = useState(false)
 
   // Auto-refresh when there are pending or scanning files
   useEffect(() => {
