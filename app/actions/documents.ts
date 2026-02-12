@@ -295,6 +295,7 @@ export async function createDocument(formData: FormData) {
               file_size: file.size,
               mime_type: file.type,
               uploaded_by: user.id,
+              tenant_id: tenantId,
             })
 
           if (metaError) {
@@ -671,11 +672,22 @@ export async function deleteDocument(documentId: string) {
       return { success: false, error: 'Document not found' }
     }
 
-    if (document.created_by !== user.id) {
+    // Check if user is master admin (for cross-tenant operations)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_master_admin')
+      .eq('id', user.id)
+      .single()
+
+    const isMasterAdmin = userData?.is_master_admin || false
+
+    // Authorization: document creator OR master admin
+    if (document.created_by !== user.id && !isMasterAdmin) {
       logger.warn('Unauthorized document deletion attempt', {
         userId,
         documentId,
         ownerId: document.created_by,
+        isMasterAdmin,
       })
       return { success: false, error: 'Not authorized' }
     }
@@ -691,6 +703,50 @@ export async function deleteDocument(documentId: string) {
         error: 'Only Draft documents can be deleted' 
       }
     }
+
+    // BUSINESS RULE: Document numbers are permanent once created
+    // A draft can only be deleted if there's a Released or Obsolete version
+    const { data: otherVersions, error: versionCheckError } = await supabase
+      .from('documents')
+      .select('id, version, status')
+      .eq('document_number', document.document_number)
+      .eq('tenant_id', document.tenant_id)
+      .neq('id', documentId)
+
+    if (versionCheckError) {
+      logger.error('Error checking for other versions', {
+        documentId,
+        documentNumber: document.document_number,
+        error: versionCheckError,
+      })
+      return { success: false, error: 'Failed to verify document versions' }
+    }
+
+    // Check if there's at least one Released or Obsolete version
+    const hasReleasedVersion = otherVersions?.some(v => 
+      v.status === 'Released' || v.status === 'Obsolete'
+    )
+
+    if (!hasReleasedVersion) {
+      logger.warn('Attempt to delete only version of document', {
+        userId,
+        documentId,
+        documentNumber: document.document_number,
+        version: document.version,
+        otherVersionCount: otherVersions?.length || 0,
+      })
+      return { 
+        success: false, 
+        error: 'Cannot delete the only version of a document. Document numbers are permanent once created. Please release this version first, or create and release a new version before deleting this draft.' 
+      }
+    }
+
+    logger.info('Deleting draft - other versions exist', {
+      documentId,
+      documentNumber: document.document_number,
+      version: document.version,
+      otherVersionCount: otherVersions.length,
+    })
 
     // Delete all files from storage
     if (document.document_files && document.document_files.length > 0) {
@@ -722,8 +778,30 @@ export async function deleteDocument(documentId: string) {
       }
     }
 
-    // Delete document (cascade will remove files)
-    const { error: deleteError } = await supabase
+    // Use service role client for deletion (bypasses RLS for master admins)
+    const supabaseAdmin = createServiceRoleClient()
+
+    // Create audit log for the deletion BEFORE deleting the document
+    await supabaseAdmin
+      .from('audit_log')
+      .insert({
+        document_id: documentId,
+        document_number: document.document_number,
+        action: 'document_deleted',
+        performed_by: user.id,
+        performed_by_email: user.email,
+        tenant_id: document.tenant_id,
+        details: {
+          document_number: document.document_number,
+          version: document.version,
+          title: document.title,
+          file_count: document.document_files?.length || 0,
+        }
+      })
+
+    // Delete document (cascade will remove document_files records)
+    // Note: audit_log entries will have document_id set to NULL (preserved via ON DELETE SET NULL)
+    const { error: deleteError } = await supabaseAdmin
       .from('documents')
       .delete()
       .eq('id', documentId)
