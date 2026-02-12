@@ -3,7 +3,7 @@
  * Handles all audit logging across the application with proper error handling
  */
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
 
 interface BaseAuditParams {
@@ -23,7 +23,9 @@ interface DocumentAuditParams extends BaseAuditParams {
  */
 export async function createDocumentAudit(params: DocumentAuditParams) {
   try {
-    const supabase = await createClient()
+    // Use service role client to bypass RLS for cross-tenant audit logging
+    // This is necessary for master admins creating audit logs in other tenants
+    const supabase = createServiceRoleClient()
     
     const { error } = await supabase
       .from('audit_log')
@@ -115,7 +117,8 @@ export async function safeAuditLog(params: DocumentAuditParams): Promise<void> {
  */
 export async function createBatchAudit(entries: DocumentAuditParams[]) {
   try {
-    const supabase = await createClient()
+    // Use service role client to bypass RLS for cross-tenant audit logging
+    const supabase = createServiceRoleClient()
     
     const records = entries.map(entry => ({
       document_id: entry.documentId,
