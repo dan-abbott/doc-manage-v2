@@ -47,14 +47,14 @@ export default async function EditDocumentPage({ params }: PageProps) {
     notFound()
   }
 
-  // Get company settings for virus scan status
-  const { data: settings } = await supabase
-    .from('company_settings')
+  // Get virus scan status from tenants table
+  const { data: tenant } = await supabase
+    .from('tenants')
     .select('virus_scan_enabled')
-    .eq('tenant_id', document.tenant_id)
+    .eq('id', document.tenant_id)
     .single()
 
-  const virusScanEnabled = settings?.virus_scan_enabled ?? true
+  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
   // Check permissions
   if (document.created_by !== user.id) {

@@ -42,14 +42,25 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Get company settings for virus scan status
-  const { data: settings } = await supabase
-    .from('company_settings')
+  // Get virus scan status from tenants table
+  const { data: tenant, error: tenantError } = await supabase
+    .from('tenants')
     .select('virus_scan_enabled')
-    .eq('tenant_id', subdomainTenantId)
+    .eq('id', subdomainTenantId)
     .single()
 
-  const virusScanEnabled = settings?.virus_scan_enabled ?? true
+  // DEBUG: Log the settings fetch
+  console.log('🔍 Virus scan settings check:', {
+    subdomainTenantId,
+    tenantFound: !!tenant,
+    tenantError: tenantError?.message,
+    virus_scan_enabled: tenant?.virus_scan_enabled,
+    rawTenant: tenant,
+  })
+
+  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
+
+  console.log('✅ Final virusScanEnabled value:', virusScanEnabled)
 
   // Fetch the document to get its document_number
   const { data: document } = await supabase
