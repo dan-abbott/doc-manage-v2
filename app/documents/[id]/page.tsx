@@ -8,10 +8,6 @@ import Link from 'next/link'
 import { ArrowLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
-// Force dynamic rendering to prevent caching issues with file deletions
-export const dynamic = 'force-dynamic'
-export const revalidate = 0
-
 interface PageProps {
   params: { id: string }
 }
@@ -45,6 +41,15 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   if (!subdomainTenantId) {
     notFound()
   }
+
+  // Get company settings for virus scan status
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('virus_scan_enabled')
+    .eq('tenant_id', subdomainTenantId)
+    .single()
+
+  const virusScanEnabled = settings?.virus_scan_enabled ?? true
 
   // Fetch the document to get its document_number
   const { data: document } = await supabase
@@ -126,6 +131,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               isAdmin={isAdmin}
               currentUserId={user.id}
               currentUserEmail={user.email || ''}
+              virusScanEnabled={virusScanEnabled}
             />
           </div>
 

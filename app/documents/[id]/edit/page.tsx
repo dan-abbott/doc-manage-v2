@@ -47,6 +47,15 @@ export default async function EditDocumentPage({ params }: PageProps) {
     notFound()
   }
 
+  // Get company settings for virus scan status
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('virus_scan_enabled')
+    .eq('tenant_id', document.tenant_id)
+    .single()
+
+  const virusScanEnabled = settings?.virus_scan_enabled ?? true
+
   // Check permissions
   if (document.created_by !== user.id) {
     redirect('/documents')
@@ -55,15 +64,6 @@ export default async function EditDocumentPage({ params }: PageProps) {
   if (document.status !== 'Draft') {
     redirect(`/documents/${params.id}`)
   }
-
-  // Get tenant settings for virus scanning
-  const { data: tenant } = await supabase
-    .from('tenants')
-    .select('virus_scan_enabled')
-    .eq('id', subdomainTenantId)
-    .single()
-
-  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
   return (
     <div className="container mx-auto py-8 max-w-4xl">
@@ -76,8 +76,8 @@ export default async function EditDocumentPage({ params }: PageProps) {
         </CardHeader>
         <CardContent>
           <EditDocumentForm 
-            document={document} 
-            virusScanEnabled={virusScanEnabled} 
+            document={document}
+            virusScanEnabled={virusScanEnabled}
           />
         </CardContent>
       </Card>

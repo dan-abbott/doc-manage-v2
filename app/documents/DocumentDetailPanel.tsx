@@ -23,6 +23,7 @@ interface DocumentDetailPanelProps {
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
+  virusScanEnabled?: boolean
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -40,7 +41,7 @@ function formatDate(dateString: string) {
   })
 }
 
-function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, availableUsers, isCollapsible = false }: any) {
+function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, availableUsers, isCollapsible = false, virusScanEnabled = true }: any) {
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
   const files = version.document_files || []
   const approvers = version.approvers || []
@@ -151,7 +152,9 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
                         <div className="flex-1 min-w-0">
                           <div className="flex items-center gap-2">
                             <p className="text-sm font-medium truncate">{file.file_name}</p>
-                            <ScanStatusBadge status={scanStatus} showText={false} />
+                            {virusScanEnabled && (
+                              <ScanStatusBadge status={scanStatus} showText={false} />
+                            )}
                           </div>
                           <p className="text-xs text-gray-500">
                             {(file.file_size / 1024 / 1024).toFixed(2)} MB
@@ -314,7 +317,8 @@ export default function DocumentDetailPanel({
   availableUsers,
   isAdmin,
   currentUserId,
-  currentUserEmail
+  currentUserEmail,
+  virusScanEnabled = true
 }: DocumentDetailPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -407,6 +411,7 @@ export default function DocumentDetailPanel({
               currentUserEmail={currentUserEmail}
               availableUsers={availableUsers}
               isCollapsible={false}
+              virusScanEnabled={virusScanEnabled}
             />
           ) : (
             <Card>
@@ -431,6 +436,7 @@ export default function DocumentDetailPanel({
                 currentUserEmail={currentUserEmail}
                 availableUsers={availableUsers}
                 isCollapsible={false}
+                virusScanEnabled={virusScanEnabled}
               />
             ))
           ) : (

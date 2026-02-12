@@ -1,6 +1,9 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import ScanMonitoringClient from './ScanMonitoringClient'
+import { Button } from '@/components/ui/button'
+import { ShieldOff } from 'lucide-react'
+import Link from 'next/link'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -25,6 +28,49 @@ export default async function AdminScanMonitoringPage() {
   if (!userData?.is_admin) {
     redirect('/documents')
   }
+
+  // Get company settings to check if virus scanning is enabled
+  const { data: settings } = await supabase
+    .from('company_settings')
+    .select('virus_scan_enabled')
+    .eq('tenant_id', userData.tenant_id)
+    .single()
+
+  const virusScanEnabled = settings?.virus_scan_enabled ?? true
+
+  // If virus scanning is disabled, show a disabled state
+  if (!virusScanEnabled) {
+    return (
+      <div className="container mx-auto py-8 px-4">
+        <div className="mb-6">
+          <h1 className="text-3xl font-bold">Scan Monitoring</h1>
+          <p className="text-muted-foreground mt-2">
+            Virus scanning is currently disabled for this tenant
+          </p>
+        </div>
+        
+        <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
+          <div className="max-w-md mx-auto">
+            <ShieldOff className="h-16 w-16 text-gray-400 mx-auto mb-4" />
+            <h3 className="text-lg font-semibold text-gray-900 mb-2">
+              Virus Scanning Disabled
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Virus scanning is currently disabled in company settings. 
+              Enable it to start monitoring file scans.
+            </p>
+            <Button asChild variant="outline">
+              <Link href="/admin/settings">
+                Go to Settings
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </div>
+    )
+  }
+
+  // Continue with normal scan monitoring (only if enabled)
 
   // Get all files with scan issues
   const { data: problemFiles } = await supabase
