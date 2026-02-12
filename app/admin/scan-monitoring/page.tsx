@@ -21,7 +21,7 @@ export default async function AdminScanMonitoringPage() {
   // Check if user is admin
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin')
+    .select('is_admin, tenant_id')
     .eq('id', user.id)
     .single()
 
