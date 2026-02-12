@@ -768,12 +768,23 @@ export async function deleteFile(documentId: string, fileId: string) {
 
     const document = file.document as any
 
-    if (document.created_by !== user.id) {
+    // Check if user is master admin
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_master_admin')
+      .eq('id', user.id)
+      .single()
+
+    const isMasterAdmin = userData?.is_master_admin || false
+
+    // Authorization: document creator OR master admin
+    if (document.created_by !== user.id && !isMasterAdmin) {
       logger.warn('Unauthorized file deletion attempt', {
         userId,
         documentId,
         fileId,
         ownerId: document.created_by,
+        isMasterAdmin,
       })
       return { success: false, error: 'Not authorized' }
     }
@@ -803,8 +814,12 @@ export async function deleteFile(documentId: string, fileId: string) {
       })
     }
 
-    // Delete file record
-    const { error: deleteError } = await supabase
+    // Use service role client for DELETE to bypass RLS
+    // This is necessary for master admins deleting files from other tenants
+    const supabaseAdmin = createServiceRoleClient()
+
+    // Delete file record using service role (bypasses RLS)
+    const { error: deleteError } = await supabaseAdmin
       .from('document_files')
       .delete()
       .eq('id', fileId)
@@ -823,8 +838,8 @@ export async function deleteFile(documentId: string, fileId: string) {
       duration: Date.now() - startTime,
     })
 
-    // Create audit log entry
-    const { error: auditError } = await supabase
+    // Create audit log entry using service role (bypasses RLS)
+    const { error: auditError } = await supabaseAdmin
       .from('audit_log')
       .insert({
         document_id: documentId,
