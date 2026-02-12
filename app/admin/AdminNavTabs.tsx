@@ -19,14 +19,20 @@ interface AdminNavTabsProps {
 export default function AdminNavTabs({ isMasterAdmin, virusScanEnabled = true }: AdminNavTabsProps) {
   const pathname = usePathname()
 
+  // DEBUG: Log the prop
+  console.log('🔍 AdminNavTabs - virusScanEnabled prop:', virusScanEnabled)
+
   // Filter tabs based on virus scan setting
   const tabs = baseTabs.filter(tab => {
     // Hide Scan Monitoring tab if virus scanning is disabled
     if (tab.href === '/admin/scan-monitoring' && !virusScanEnabled) {
+      console.log('🚫 Hiding Scan Monitoring tab (virus scanning disabled)')
       return false
     }
     return true
   })
+
+  console.log('📋 Tabs to render:', tabs.map(t => t.label))
 
   return (
     <div className="mb-6">

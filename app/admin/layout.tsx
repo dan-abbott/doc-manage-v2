@@ -28,13 +28,22 @@ export default async function AdminLayout({
   }
 
   // Get tenant's virus scan setting
-  const { data: tenant } = await supabase
+  const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select('virus_scan_enabled')
     .eq('id', userData.tenant_id)
     .single()
 
   const virusScanEnabled = tenant?.virus_scan_enabled ?? true
+
+  // DEBUG: Log the virus scan setting
+  console.log('🔍 Admin Layout - Virus Scan Check:', {
+    tenantId: userData.tenant_id,
+    tenantFound: !!tenant,
+    tenantError: tenantError?.message,
+    virus_scan_enabled: tenant?.virus_scan_enabled,
+    finalValue: virusScanEnabled,
+  })
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
