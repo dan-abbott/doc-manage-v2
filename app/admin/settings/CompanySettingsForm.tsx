@@ -113,6 +113,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
 
     try {
       const result = await updateCompanySettings({
+        tenantId: tenant.id,
         company_name: companyName,
         logo_url: logoUrl || null,
         primary_color: primaryColor,
