@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import AdminNavTabs from './AdminNavTabs'
 
 export default async function AdminLayout({
@@ -19,7 +20,7 @@ export default async function AdminLayout({
   // Check admin status
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin, is_master_admin, tenant_id')
+    .select('is_admin, is_master_admin')
     .eq('id', user.id)
     .single()
 
@@ -27,18 +28,25 @@ export default async function AdminLayout({
     redirect('/dashboard')
   }
 
+  // Get tenant from CURRENT SUBDOMAIN (not user's home tenant)
+  const subdomainTenantId = await getSubdomainTenantId()
+  
+  if (!subdomainTenantId) {
+    redirect('/dashboard')
+  }
+
   // Get tenant's virus scan setting
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
     .select('virus_scan_enabled')
-    .eq('id', userData.tenant_id)
+    .eq('id', subdomainTenantId)
     .single()
 
   const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
   // DEBUG: Log the virus scan setting
   console.log('🔍 Admin Layout - Virus Scan Check:', {
-    tenantId: userData.tenant_id,
+    subdomainTenantId,
     tenantFound: !!tenant,
     tenantError: tenantError?.message,
     virus_scan_enabled: tenant?.virus_scan_enabled,
