@@ -29,14 +29,14 @@ export default async function AdminScanMonitoringPage() {
     redirect('/documents')
   }
 
-  // Get company settings to check if virus scanning is enabled
-  const { data: settings } = await supabase
-    .from('company_settings')
+  // Get virus scan status from tenants table
+  const { data: tenant } = await supabase
+    .from('tenants')
     .select('virus_scan_enabled')
-    .eq('tenant_id', userData.tenant_id)
+    .eq('id', userData.tenant_id)
     .single()
 
-  const virusScanEnabled = settings?.virus_scan_enabled ?? true
+  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
   // If virus scanning is disabled, show a disabled state
   if (!virusScanEnabled) {
