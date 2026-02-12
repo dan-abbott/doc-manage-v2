@@ -45,7 +45,7 @@ async function checkWritePermission(supabase: any, userId: string): Promise<{ al
 export async function createDocument(formData: FormData) {
   const startTime = Date.now()
   let userId: string | undefined
-  
+
   try {
     const supabase = await createClient()
 
@@ -55,7 +55,7 @@ export async function createDocument(formData: FormData) {
       logger.warn('Create document attempted without authentication', { authError })
       return { success: false, error: 'Not authenticated' }
     }
-    
+
     userId = user.id
 
     // Get tenant from CURRENT SUBDOMAIN (not user's home tenant)
@@ -66,7 +66,7 @@ export async function createDocument(formData: FormData) {
       return { success: false, error: 'Invalid tenant context' }
     }
 
-        // Check write permission
+    // Check write permission
     const { allowed, role } = await checkWritePermission(supabase, userId)
     if (!allowed) {
       logger.warn('User without write permission attempted to create document', {
@@ -74,10 +74,10 @@ export async function createDocument(formData: FormData) {
         role,
         action: 'createDocument'
       })
-      return { 
-        success: false, 
-        error: role === 'Read Only' 
-          ? 'Read-only users cannot create documents' 
+      return {
+        success: false,
+        error: role === 'Read Only'
+          ? 'Read-only users cannot create documents'
           : 'Your account is deactivated. Please contact an administrator.'
       }
     }
@@ -101,23 +101,23 @@ export async function createDocument(formData: FormData) {
     const title = sanitizeHTML(data.title)
     const description = sanitizeHTML(data.description || '')
     const project_code = sanitizeProjectCode(data.project_code)
-    
+
     // Log if HTML was stripped (potential XSS attempt or accidental paste)
     if (data.title !== title) {
-      logger.warn('HTML stripped from title', { 
-        userId, 
+      logger.warn('HTML stripped from title', {
+        userId,
         originalTitle: data.title,
         sanitizedTitle: title,
         action: 'createDocument'
       })
     }
-    
+
     // Validate sanitized title isn't empty after HTML stripping
     if (!title || title.trim().length === 0) {
       logger.warn('Title is empty after sanitization', { userId, originalTitle: data.title })
       return { success: false, error: 'Title cannot be empty or contain only HTML tags' }
     }
-    
+
     // Extract files from FormData
     const files: File[] = []
     formData.forEach((value, key) => {
@@ -165,7 +165,7 @@ export async function createDocument(formData: FormData) {
 
     // Generate document number
     const documentNumber = `${docType.prefix}-${String(docType.next_number).padStart(5, '0')}`
-    
+
     // Determine version based on production flag
     const version = data.is_production ? 'v1' : 'vA'
 
@@ -204,6 +204,20 @@ export async function createDocument(formData: FormData) {
       return { success: false, error: 'Failed to create document' }
     }
 
+    // Check if user is master admin (for cross-tenant file operations)
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_master_admin')
+      .eq('id', user.id)
+      .single()
+
+    const isMasterAdmin = userData?.is_master_admin || false
+
+    // Use service role client for file operations if master admin
+    const fileClient = isMasterAdmin ? createServiceRoleClient() : supabase
+
+
+
     logger.info('Document created successfully', {
       userId,
       documentId: document.id,
@@ -226,7 +240,7 @@ export async function createDocument(formData: FormData) {
 
       const uploadPromises = files.map(async (file) => {
         const fileStartTime = Date.now()
-        
+
         try {
           // Sanitize filename
           const sanitizedName = sanitizeFilename(file.name)
@@ -252,7 +266,7 @@ export async function createDocument(formData: FormData) {
           }
 
           // Save file metadata
-          const { error: metaError } = await supabase
+          const { error: metaError } = await fileClient
             .from('document_files')
             .insert({
               document_id: document.id,
@@ -307,10 +321,10 @@ export async function createDocument(formData: FormData) {
         performed_by: user.id,
         performed_by_email: user.email,
         tenant_id: tenantId,
-        details: { 
+        details: {
           document_number: documentNumber,
           version: version,
-          title: title 
+          title: title
         },
       })
 
@@ -325,8 +339,8 @@ export async function createDocument(formData: FormData) {
       duration,
     })
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       documentId: document.id,
       documentNumber: `${documentNumber}${version}`
     }
@@ -337,9 +351,9 @@ export async function createDocument(formData: FormData) {
       userId,
       duration,
     })
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to create document'
     }
   }
@@ -373,7 +387,7 @@ export async function updateDocument(
 
     userId = user.id
 
-// Check write permission
+    // Check write permission
     const { allowed, role } = await checkWritePermission(supabase, userId)
     if (!allowed) {
       logger.warn('User without write permission attempted to update document', {
@@ -382,10 +396,10 @@ export async function updateDocument(
         documentId,
         action: 'updateDocument'
       })
-      return { 
-        success: false, 
-        error: role === 'Read Only' 
-          ? 'Read-only users cannot edit documents' 
+      return {
+        success: false,
+        error: role === 'Read Only'
+          ? 'Read-only users cannot edit documents'
           : 'Your account is deactivated. Please contact an administrator.'
       }
     }
@@ -399,8 +413,8 @@ export async function updateDocument(
 
     // Log if HTML was stripped
     if (data.title !== title) {
-      logger.warn('HTML stripped from title during update', { 
-        userId, 
+      logger.warn('HTML stripped from title during update', {
+        userId,
         documentId,
         originalTitle: data.title,
         sanitizedTitle: title,
@@ -493,7 +507,7 @@ export async function updateDocument(
 
       const uploadPromises = newFiles.map(async (file) => {
         const fileStartTime = Date.now()
-        
+
         try {
           const sanitizedName = sanitizeFilename(file.name)
           const fileName = `${document.document_number}${document.version}_${sanitizedName}`
@@ -579,9 +593,9 @@ export async function updateDocument(
   } catch (error) {
     const duration = Date.now() - startTime
     logError(error, { action: 'updateDocument', userId, documentId, duration })
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to update document'
     }
   }
@@ -616,10 +630,10 @@ export async function deleteDocument(documentId: string) {
         documentId,
         action: 'deleteDocument'
       })
-      return { 
-        success: false, 
-        error: role === 'Read Only' 
-          ? 'Read-only users cannot delete documents' 
+      return {
+        success: false,
+        error: role === 'Read Only'
+          ? 'Read-only users cannot delete documents'
           : 'Your account is deactivated. Please contact an administrator.'
       }
     }
@@ -664,9 +678,9 @@ export async function deleteDocument(documentId: string) {
         documentId,
         status: document.status,
       })
-      return { 
-        success: false, 
-        error: 'Only Draft documents can be deleted' 
+      return {
+        success: false,
+        error: 'Only Draft documents can be deleted'
       }
     }
 
@@ -689,7 +703,7 @@ export async function deleteDocument(documentId: string) {
     }
 
     // Check if there's at least one Released or Obsolete version
-    const hasReleasedVersion = otherVersions?.some(v => 
+    const hasReleasedVersion = otherVersions?.some(v =>
       v.status === 'Released' || v.status === 'Obsolete'
     )
 
@@ -701,9 +715,9 @@ export async function deleteDocument(documentId: string) {
         version: document.version,
         otherVersionCount: otherVersions?.length || 0,
       })
-      return { 
-        success: false, 
-        error: 'Cannot delete the only version of a document. Document numbers are permanent once created. Please release this version first, or create and release a new version before deleting this draft.' 
+      return {
+        success: false,
+        error: 'Cannot delete the only version of a document. Document numbers are permanent once created. Please release this version first, or create and release a new version before deleting this draft.'
       }
     }
 
@@ -717,7 +731,7 @@ export async function deleteDocument(documentId: string) {
     // Delete all files from storage
     if (document.document_files && document.document_files.length > 0) {
       const filePaths = document.document_files.map((f: any) => f.file_path)
-      
+
       logger.info('Deleting files from storage', {
         userId,
         documentId,
@@ -794,16 +808,16 @@ export async function deleteDocument(documentId: string) {
       duration,
     })
 
-    return { 
-      success: true, 
-      message: 'Document deleted successfully' 
+    return {
+      success: true,
+      message: 'Document deleted successfully'
     }
   } catch (error) {
     const duration = Date.now() - startTime
     logError(error, { action: 'deleteDocument', userId, documentId, duration })
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to delete document'
     }
   }
@@ -924,13 +938,13 @@ export async function deleteFile(documentId: string, fileId: string) {
         performed_by: user.id,
         performed_by_email: user.email,
         tenant_id: document.tenant_id,
-        details: { 
+        details: {
           file_id: fileId,
           file_name: file.file_name,
           file_size: file.file_size,
         },
       })
-    
+
     if (auditError) {
       logger.error('Failed to create audit log for file deletion', {
         userId,
@@ -963,9 +977,9 @@ export async function deleteFile(documentId: string, fileId: string) {
   } catch (error) {
     const duration = Date.now() - startTime
     logError(error, { action: 'deleteFile', userId, documentId, fileId, duration })
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to delete file'
     }
   }
@@ -1027,9 +1041,9 @@ export async function releaseDocument(documentId: string) {
         userId,
         documentId,
       })
-      return { 
-        success: false, 
-        error: 'Production documents require approval workflow' 
+      return {
+        success: false,
+        error: 'Production documents require approval workflow'
       }
     }
 
@@ -1079,7 +1093,7 @@ export async function releaseDocument(documentId: string) {
 
     if (predecessorResult.success && predecessorResult.data) {
       const predecessor = predecessorResult.data
-      
+
       // Only obsolete if predecessor is Released
       if (predecessor.status === 'Released') {
         logger.info('Obsoleting predecessor version', {
@@ -1120,8 +1134,8 @@ export async function releaseDocument(documentId: string) {
         performed_by: user.id,
         performed_by_email: user.email,
         tenant_id: document.tenant_id,
-        details: { 
-          document_number: `${document.document_number}${document.version}` 
+        details: {
+          document_number: `${document.document_number}${document.version}`
         },
       })
 
@@ -1149,14 +1163,14 @@ export async function releaseDocument(documentId: string) {
     } catch (emailError) {
       logger.error('Failed to send release email', { documentId, error: emailError })
     }
-    
+
     return { success: true }
   } catch (error) {
     const duration = Date.now() - startTime
     logError(error, { action: 'releaseDocument', userId, documentId, duration })
-    
-    return { 
-      success: false, 
+
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to release document'
     }
   }

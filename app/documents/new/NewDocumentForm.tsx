@@ -97,10 +97,9 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
         }
       }
 
-      // Show success modal instead of toast + redirect
-      setCreatedDocumentId(result.documentId)
-      setCreatedDocumentNumber(docNumber)
-      setShowSuccessModal(true)
+      // Redirect directly to document detail page
+      router.push(`/documents/${result.documentId}`)
+      toast.success(`Document ${docNumber} created successfully`)
       setIsSubmitting(false)
 
     } catch (err: any) {
