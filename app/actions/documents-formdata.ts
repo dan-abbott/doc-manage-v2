@@ -67,13 +67,12 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Failed to update document' }
     }
 
-    // Handle file uploads
+    // Handle file uploads - NO SCANNING (Inngest will handle it)
     const files = formData.getAll('files') as File[]
     const uploadedFiles: any[] = []
     
     if (files.length > 0) {
       console.log(`Uploading ${files.length} files for document ${documentId}`)
-      console.log(`Virus scanning: ${virusScanEnabled ? 'ENABLED' : 'DISABLED'}`)
       
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
@@ -116,10 +115,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           autoRename
         )
         
-        // Set scan_status based on virus_scan_enabled setting
-        const scanStatus = virusScanEnabled ? 'pending' : 'safe'
-        
-        // Create file record
+        // Create file record with scan_status='pending'
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
@@ -131,8 +127,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
             mime_type: file.type,
             uploaded_by: user.id,
             tenant_id: document.tenant_id,
-            scan_status: scanStatus,
-            scanned_at: virusScanEnabled ? null : new Date().toISOString(),
+            scan_status: 'pending', // Inngest will scan this
           })
           .select()
           .single()
@@ -146,9 +141,9 @@ export async function updateDocumentWithFiles(formData: FormData) {
           }
         }
 
-        console.log(`[${i + 1}/${files.length}] ✅ File ${virusScanEnabled ? 'queued for scanning' : 'marked as safe (scanning disabled)'}`)
+        console.log(`[${i + 1}/${files.length}] ✅ File queued for scanning`)
 
-        // AUDIT: Log file upload
+        // ✅ AUDIT: Log file upload
         await createDocumentAudit({
           documentId: documentId,
           action: AuditAction.FILE_UPLOADED,
@@ -161,11 +156,10 @@ export async function updateDocumentWithFiles(formData: FormData) {
             original_file_name: file.name,
             file_size: file.size,
             mime_type: file.type,
-            virus_scan_enabled: virusScanEnabled,
           }
         })
 
-        // Only trigger Inngest if virus scanning is enabled
+        // ✨ TRIGGER INNGEST BACKGROUND SCAN (only if enabled) ✨
         if (virusScanEnabled) {
           try {
             await inngest.send({
@@ -180,7 +174,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
             // File upload succeeded, just no background scanning
           }
         } else {
-          console.log(`[${i + 1}/${files.length}] ⏭️  Skipping virus scan (disabled by tenant)`)
+          console.log(`[${i + 1}/${files.length}] ⏭️ Virus scanning disabled for this tenant, skipping Inngest`)
         }
 
         uploadedFiles.push(fileRecord)
@@ -194,7 +188,6 @@ export async function updateDocumentWithFiles(formData: FormData) {
       documentNumber: document.document_number,
       version: document.version,
       filesUploaded: uploadedFiles.length,
-      virusScanEnabled,
     }
   } catch (error: any) {
     console.error('Server action error:', error)

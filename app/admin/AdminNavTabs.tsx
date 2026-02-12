@@ -13,15 +13,25 @@ const baseTabs = [
 
 interface AdminNavTabsProps {
   isMasterAdmin: boolean
+  virusScanEnabled?: boolean
 }
 
-export default function AdminNavTabs({ isMasterAdmin }: AdminNavTabsProps) {
+export default function AdminNavTabs({ isMasterAdmin, virusScanEnabled = true }: AdminNavTabsProps) {
   const pathname = usePathname()
+
+  // Filter tabs based on virus scan setting
+  const tabs = baseTabs.filter(tab => {
+    // Hide Scan Monitoring tab if virus scanning is disabled
+    if (tab.href === '/admin/scan-monitoring' && !virusScanEnabled) {
+      return false
+    }
+    return true
+  })
 
   return (
     <div className="mb-6">
       <nav className="flex space-x-4 border-b border-gray-200">
-        {baseTabs.map((tab) => {
+        {tabs.map((tab) => {
           const isActive = pathname.startsWith(tab.href)
           
           return (

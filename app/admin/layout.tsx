@@ -19,13 +19,22 @@ export default async function AdminLayout({
   // Check admin status
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin, is_master_admin')
+    .select('is_admin, is_master_admin, tenant_id')
     .eq('id', user.id)
     .single()
 
   if (!userData?.is_admin) {
     redirect('/dashboard')
   }
+
+  // Get tenant's virus scan setting
+  const { data: tenant } = await supabase
+    .from('tenants')
+    .select('virus_scan_enabled')
+    .eq('id', userData.tenant_id)
+    .single()
+
+  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 py-8">
@@ -37,7 +46,10 @@ export default async function AdminLayout({
         </div>
 
         {/* Admin Navigation Tabs */}
-        <AdminNavTabs isMasterAdmin={userData.is_master_admin || false} />
+        <AdminNavTabs 
+          isMasterAdmin={userData.is_master_admin || false}
+          virusScanEnabled={virusScanEnabled}
+        />
 
         {/* Content */}
         <div>
