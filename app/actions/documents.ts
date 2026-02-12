@@ -638,6 +638,16 @@ export async function deleteDocument(documentId: string) {
       return { success: false, error: 'Document not found' }
     }
 
+    // DEBUG: Log document details before deletion
+    logger.info('Document details before deletion', {
+      documentId,
+      documentNumber: document.document_number,
+      version: document.version,
+      status: document.status,
+      fileCount: document.document_files?.length || 0,
+      tenantId: document.tenant_id,
+    })
+
     if (document.created_by !== user.id) {
       logger.warn('Unauthorized document deletion attempt', {
         userId,
@@ -659,6 +669,20 @@ export async function deleteDocument(documentId: string) {
       }
     }
 
+    // DEBUG: Check for existing audit logs before deletion
+    const { data: existingAuditLogs, error: auditCheckError } = await supabase
+      .from('audit_log')
+      .select('id, action, created_at')
+      .eq('document_id', documentId)
+      .order('created_at', { ascending: false })
+      .limit(5)
+
+    logger.info('Existing audit logs before deletion', {
+      documentId,
+      auditLogCount: existingAuditLogs?.length || 0,
+      recentActions: existingAuditLogs?.map(log => log.action) || [],
+    })
+
     // Delete all files from storage
     if (document.document_files && document.document_files.length > 0) {
       const filePaths = document.document_files.map((f: any) => f.file_path)
@@ -667,6 +691,7 @@ export async function deleteDocument(documentId: string) {
         userId,
         documentId,
         fileCount: filePaths.length,
+        filePaths: filePaths,
       })
 
       const { error: storageError } = await supabase.storage
@@ -689,21 +714,99 @@ export async function deleteDocument(documentId: string) {
       }
     }
 
-    // Delete document (cascade will remove files)
-    const { error: deleteError } = await supabase
+    // DEBUG: Log right before document deletion
+    logger.info('About to delete document from database', {
+      documentId,
+      documentNumber: document.document_number,
+      version: document.version,
+    })
+
+    // Use service role client to bypass RLS and see full error details
+    const supabaseAdmin = createServiceRoleClient()
+
+    // First, create audit log for the deletion BEFORE deleting the document
+    try {
+      await supabaseAdmin
+        .from('audit_log')
+        .insert({
+          document_id: documentId,
+          document_number: document.document_number,
+          action: 'document_deleted',
+          performed_by: user.id,
+          performed_by_email: user.email,
+          tenant_id: document.tenant_id,
+          details: {
+            document_number: document.document_number,
+            version: document.version,
+            title: document.title,
+            status: document.status,
+            file_count: document.document_files?.length || 0,
+          }
+        })
+      
+      logger.info('Audit log created for document deletion', {
+        documentId,
+        documentNumber: document.document_number,
+      })
+    } catch (auditError) {
+      logger.error('Failed to create deletion audit log', {
+        documentId,
+        error: auditError,
+      })
+      // Don't fail the deletion if audit log fails
+    }
+
+    // Delete document (cascade will remove document_files records, but NOT audit logs)
+    const { error: deleteError } = await supabaseAdmin
       .from('documents')
       .delete()
       .eq('id', documentId)
 
     if (deleteError) {
+      logger.error('Database deletion error', {
+        documentId,
+        error: deleteError,
+        errorCode: deleteError.code,
+        errorMessage: deleteError.message,
+        errorDetails: deleteError.details,
+      })
       logError(deleteError, { action: 'deleteDocument', userId, documentId })
       return { success: false, error: 'Failed to delete document' }
     }
 
-    logger.info('Document deleted successfully', {
+    logger.info('Document deleted successfully from database', {
       userId,
       documentId,
       documentNumber: `${document.document_number}${document.version}`,
+    })
+
+    // DEBUG: Verify document is actually deleted
+    const { data: verifyDeleted } = await supabaseAdmin
+      .from('documents')
+      .select('id')
+      .eq('id', documentId)
+      .single()
+
+    logger.info('Verification after deletion', {
+      documentId,
+      stillExists: !!verifyDeleted,
+      verifyResult: verifyDeleted ? 'DOCUMENT STILL EXISTS!' : 'Document confirmed deleted',
+    })
+
+    // DEBUG: Check if audit logs still exist (they should!)
+    const { data: auditLogsAfter, error: auditAfterError } = await supabaseAdmin
+      .from('audit_log')
+      .select('id, action, document_id')
+      .or(`document_id.eq.${documentId},document_number.eq.${document.document_number}`)
+
+    logger.info('Audit logs after deletion', {
+      documentId,
+      documentNumber: document.document_number,
+      auditLogCount: auditLogsAfter?.length || 0,
+      auditLogsPreserved: auditLogsAfter?.map(log => ({
+        action: log.action,
+        documentIdNull: log.document_id === null,
+      })) || [],
     })
 
     revalidatePath('/documents')
@@ -723,6 +826,19 @@ export async function deleteDocument(documentId: string) {
     }
   } catch (error) {
     const duration = Date.now() - startTime
+    
+    // Enhanced error logging
+    logger.error('Unexpected error in deleteDocument', {
+      documentId,
+      userId,
+      duration,
+      error: error instanceof Error ? {
+        message: error.message,
+        stack: error.stack,
+        name: error.name,
+      } : error,
+    })
+    
     logError(error, { action: 'deleteDocument', userId, documentId, duration })
     
     return { 
