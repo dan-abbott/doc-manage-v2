@@ -136,6 +136,7 @@ export async function uploadCompanyLogo(formData: FormData) {
  * Update company settings
  */
 export async function updateCompanySettings(data: {
+  tenantId: string
   company_name: string
   logo_url: string | null
   primary_color: string
@@ -163,10 +164,10 @@ export async function updateCompanySettings(data: {
       }
     }
 
-    // Get user's tenant and verify admin
+    // Get user and verify admin
     const { data: userData } = await supabase
       .from('users')
-      .select('tenant_id, is_admin')
+      .select('is_admin')
       .eq('id', user.id)
       .single()
 
@@ -174,7 +175,7 @@ export async function updateCompanySettings(data: {
       return { success: false, error: 'Only administrators can update company settings' }
     }
 
-    // Update tenant settings
+    // Update tenant settings (using tenantId from data, not user's home tenant)
     const { error: updateError } = await supabase
       .from('tenants')
       .update({
@@ -187,7 +188,7 @@ export async function updateCompanySettings(data: {
         timezone: validation.data.timezone,
         updated_at: new Date().toISOString(),
       })
-      .eq('id', userData.tenant_id)
+      .eq('id', data.tenantId)
 
     if (updateError) {
       console.error('Update tenant error:', updateError)
