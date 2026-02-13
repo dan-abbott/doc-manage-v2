@@ -18,6 +18,8 @@ interface CompanySettingsFormProps {
     logo_url: string | null
     primary_color: string
     secondary_color: string
+    background_start_color: string
+    background_end_color: string
     auto_rename_files: boolean
     virus_scan_enabled: boolean
     timezone: string
@@ -31,6 +33,8 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
   const [logoPreview, setLogoPreview] = useState<string | null>(tenant.logo_url)
   const [primaryColor, setPrimaryColor] = useState(tenant.primary_color)
   const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color)
+  const [backgroundStartColor, setBackgroundStartColor] = useState(tenant.background_start_color || '#F8FAFC')
+  const [backgroundEndColor, setBackgroundEndColor] = useState(tenant.background_end_color || '#E2E8F0')
   const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)
   const [virusScanEnabled, setVirusScanEnabled] = useState(tenant.virus_scan_enabled)
   const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
@@ -119,6 +123,8 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         logo_url: logoUrl || null,
         primary_color: primaryColor,
         secondary_color: secondaryColor,
+        background_start_color: backgroundStartColor,
+        background_end_color: backgroundEndColor,
         auto_rename_files: autoRenameFiles,
         virus_scan_enabled: virusScanEnabled,
         timezone: timezone,
@@ -328,9 +334,72 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
             />
           </div>
           <p className="text-sm text-gray-500 mt-1">
-            Used for headers and backgrounds
+            Used for headers and navigation
           </p>
         </div>
+      </div>
+
+      {/* Background Gradient Colors */}
+      <div className="grid grid-cols-2 gap-4">
+        <div>
+          <Label htmlFor="background_start_color">Background Gradient Start</Label>
+          <div className="flex gap-2 items-center">
+            <Input
+              id="background_start_color"
+              type="color"
+              value={backgroundStartColor}
+              onChange={(e) => setBackgroundStartColor(e.target.value)}
+              className="w-20 h-10"
+            />
+            <Input
+              type="text"
+              value={backgroundStartColor}
+              onChange={(e) => setBackgroundStartColor(e.target.value)}
+              placeholder="#F8FAFC"
+              className="flex-1"
+            />
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Top-left corner of page background
+          </p>
+        </div>
+
+        <div>
+          <Label htmlFor="background_end_color">Background Gradient End</Label>
+          <div className="flex gap-2 items-center">
+            <Input
+              id="background_end_color"
+              type="color"
+              value={backgroundEndColor}
+              onChange={(e) => setBackgroundEndColor(e.target.value)}
+              className="w-20 h-10"
+            />
+            <Input
+              type="text"
+              value={backgroundEndColor}
+              onChange={(e) => setBackgroundEndColor(e.target.value)}
+              placeholder="#E2E8F0"
+              className="flex-1"
+            />
+          </div>
+          <p className="text-sm text-gray-500 mt-1">
+            Bottom-right corner of page background
+          </p>
+        </div>
+      </div>
+
+      {/* Background Preview */}
+      <div>
+        <Label>Background Preview</Label>
+        <div 
+          className="h-32 rounded-lg border-2 border-gray-300"
+          style={{
+            background: `linear-gradient(to bottom right, ${backgroundStartColor}, ${backgroundEndColor})`
+          }}
+        />
+        <p className="text-sm text-gray-500 mt-1">
+          Preview of your custom background gradient
+        </p>
       </div>
 
       {/* Auto-Rename Files */}

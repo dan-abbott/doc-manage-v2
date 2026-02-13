@@ -10,6 +10,8 @@ const companySettingsSchema = z.object({
   logo_url: z.string().url().nullable().optional(),
   primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   secondary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
+  background_start_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
+  background_end_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   auto_rename_files: z.boolean(),
   virus_scan_enabled: z.boolean(),
   timezone: z.string().min(1, 'Timezone is required'),
@@ -141,6 +143,8 @@ export async function updateCompanySettings(data: {
   logo_url: string | null
   primary_color: string
   secondary_color: string
+  background_start_color: string
+  background_end_color: string
   auto_rename_files: boolean
   virus_scan_enabled: boolean
   timezone: string
@@ -183,6 +187,8 @@ export async function updateCompanySettings(data: {
         logo_url: validation.data.logo_url,
         primary_color: validation.data.primary_color,
         secondary_color: validation.data.secondary_color,
+        background_start_color: validation.data.background_start_color,
+        background_end_color: validation.data.background_end_color,
         auto_rename_files: validation.data.auto_rename_files,
         virus_scan_enabled: validation.data.virus_scan_enabled,
         timezone: validation.data.timezone,
