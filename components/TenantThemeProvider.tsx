@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
-import { cookies } from 'next/headers'
+import { getSubdomainTenantId } from '@/lib/tenant'
+import { notFound } from 'next/navigation'
 
 interface TenantThemeProviderProps {
   children: React.ReactNode
@@ -16,10 +17,14 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
   
   const { data: { user } } = await supabase.auth.getUser()
   
-  // Always use subdomain tenant (from cookie), not user's home tenant
-  const cookieStore = await cookies()
-  const tenantSubdomain = cookieStore.get('tenant_subdomain')?.value
   
+  // Get tenant from CURRENT SUBDOMAIN
+  const tenantSubdomain = await getSubdomainTenantId()
+    
+  if (!tenantSubdomain) {
+      notFound()
+    }
+
   if (tenantSubdomain) {
     const { data: tenant } = await supabase
       .from('tenants')
