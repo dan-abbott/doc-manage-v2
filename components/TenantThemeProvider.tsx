@@ -37,6 +37,7 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
       secondaryColor = tenant.secondary_color || secondaryColor
       backgroundStartColor = tenant.background_start_color || backgroundStartColor
       backgroundEndColor = tenant.background_end_color || backgroundEndColor
+      console.log('🎨 Applied tenant theme from subdomain:', tenantSubdomain)
     }
   } else if (user) {
     // Fallback to user's home tenant if no subdomain cookie
@@ -58,6 +59,7 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
         secondaryColor = tenant.secondary_color || secondaryColor
         backgroundStartColor = tenant.background_start_color || backgroundStartColor
         backgroundEndColor = tenant.background_end_color || backgroundEndColor
+        console.log('🎨 Applied tenant theme from user\'s home tenant:', userData.tenant_id)
       }
     }
   }
