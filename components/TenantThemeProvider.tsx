@@ -16,7 +16,25 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
   
   const { data: { user } } = await supabase.auth.getUser()
   
-  if (user) {
+  // Always use subdomain tenant (from cookie), not user's home tenant
+  const cookieStore = await cookies()
+  const tenantSubdomain = cookieStore.get('tenant_subdomain')?.value
+  
+  if (tenantSubdomain) {
+    const { data: tenant } = await supabase
+      .from('tenants')
+      .select('primary_color, secondary_color, background_start_color, background_end_color')
+      .eq('subdomain', tenantSubdomain)
+      .single()
+
+    if (tenant) {
+      primaryColor = tenant.primary_color || primaryColor
+      secondaryColor = tenant.secondary_color || secondaryColor
+      backgroundStartColor = tenant.background_start_color || backgroundStartColor
+      backgroundEndColor = tenant.background_end_color || backgroundEndColor
+    }
+  } else if (user) {
+    // Fallback to user's home tenant if no subdomain cookie
     const { data: userData } = await supabase
       .from('users')
       .select('tenant_id')
@@ -28,25 +46,6 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
         .from('tenants')
         .select('primary_color, secondary_color, background_start_color, background_end_color')
         .eq('id', userData.tenant_id)
-        .single()
-
-      if (tenant) {
-        primaryColor = tenant.primary_color || primaryColor
-        secondaryColor = tenant.secondary_color || secondaryColor
-        backgroundStartColor = tenant.background_start_color || backgroundStartColor
-        backgroundEndColor = tenant.background_end_color || backgroundEndColor
-      }
-    }
-  } else {
-    // If not authenticated, try to get tenant from cookie/subdomain
-    const cookieStore = cookies()
-    const tenantSubdomain = cookieStore.get('tenant_subdomain')?.value
-    
-    if (tenantSubdomain) {
-      const { data: tenant } = await supabase
-        .from('tenants')
-        .select('primary_color, secondary_color, background_start_color, background_end_color')
-        .eq('subdomain', tenantSubdomain)
         .single()
 
       if (tenant) {
