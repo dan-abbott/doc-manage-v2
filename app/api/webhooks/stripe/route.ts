@@ -100,13 +100,10 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   console.log('[Stripe Webhook] Checkout completed for tenant:', tenantId)
 
-  const subscription = await stripe.subscriptions.retrieve(
+  const subscription: any = await stripe.subscriptions.retrieve(
     session.subscription as string,
     { expand: ['default_payment_method'] }
-  ) as Stripe.Subscription & {
-    current_period_end: number
-    default_payment_method?: string | Stripe.PaymentMethod
-  }
+  )
   
   const priceId = subscription.items.data[0].price.id
 
