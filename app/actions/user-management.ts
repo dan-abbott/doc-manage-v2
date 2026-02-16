@@ -265,3 +265,268 @@ export async function updateUserRole(
     }
   }
 }
+
+/**
+ * Add a new user (admin only)
+ */
+export async function addUser(data: {
+  email: string
+  firstName: string
+  lastName: string
+  role: UserRole
+}) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
+  try {
+    // Validate input
+    const schema = z.object({
+      email: z.string().email('Invalid email address'),
+      firstName: z.string().min(1, 'First name is required').max(100),
+      lastName: z.string().min(1, 'Last name is required').max(100),
+      role: z.enum(['Admin', 'Normal', 'Read Only', 'Deactivated'])
+    })
+    
+    const validation = schema.safeParse(data)
+    if (!validation.success) {
+      return {
+        success: false,
+        error: validation.error.errors[0].message
+      }
+    }
+
+    // Get current user and verify admin
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      return { success: false, error: 'You must be logged in' }
+    }
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_admin, tenant_id, is_master_admin')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_admin) {
+      return { success: false, error: 'Only administrators can add users' }
+    }
+
+    // Check if user already exists
+    const { data: existingUser } = await supabase
+      .from('users')
+      .select('id, email')
+      .eq('email', validation.data.email.toLowerCase())
+      .single()
+
+    if (existingUser) {
+      return { 
+        success: false, 
+        error: 'A user with this email address already exists' 
+      }
+    }
+
+    // Create auth user using admin API
+    const { data: authUser, error: createAuthError } = await supabase.auth.admin.createUser({
+      email: validation.data.email.toLowerCase(),
+      email_confirm: true, // Auto-confirm email
+      user_metadata: {
+        full_name: `${validation.data.firstName} ${validation.data.lastName}`,
+        first_name: validation.data.firstName,
+        last_name: validation.data.lastName
+      }
+    })
+
+    if (createAuthError || !authUser.user) {
+      logger.error('Failed to create auth user', { error: createAuthError })
+      return {
+        success: false,
+        error: createAuthError?.message || 'Failed to create user account'
+      }
+    }
+
+    // Create user record in public.users table
+    const { error: insertError } = await supabase
+      .from('users')
+      .insert({
+        id: authUser.user.id,
+        email: validation.data.email.toLowerCase(),
+        full_name: `${validation.data.firstName} ${validation.data.lastName}`,
+        tenant_id: userData.tenant_id,
+        role: validation.data.role,
+        is_admin: validation.data.role === 'Admin',
+        is_active: validation.data.role !== 'Deactivated'
+      })
+
+    if (insertError) {
+      logger.error('Failed to create user record', { error: insertError })
+      // Try to delete the auth user if we failed to create the record
+      await supabase.auth.admin.deleteUser(authUser.user.id)
+      return {
+        success: false,
+        error: 'Failed to create user record'
+      }
+    }
+
+    logger.info('User added successfully', {
+      addedBy: user.email,
+      newUserEmail: validation.data.email,
+      role: validation.data.role,
+      duration: Date.now() - startTime
+    })
+
+    revalidatePath('/admin/users')
+
+    return {
+      success: true,
+      message: `User ${validation.data.email} added successfully`
+    }
+  } catch (error: any) {
+    const duration = Date.now() - startTime
+    logger.error('Failed to add user', {
+      error: error.message,
+      stack: error.stack,
+      duration
+    })
+
+    return {
+      success: false,
+      error: error.message || 'Failed to add user'
+    }
+  }
+}
+
+/**
+ * Import users from CSV (admin only)
+ */
+export async function importUsersFromCSV(csvData: string) {
+  const startTime = Date.now()
+  const supabase = await createClient()
+  
+  try {
+    // Get current user and verify admin
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      return { 
+        success: false, 
+        error: 'You must be logged in',
+        imported: 0,
+        failed: 0,
+        errors: []
+      }
+    }
+
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_admin, tenant_id')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_admin) {
+      return { 
+        success: false, 
+        error: 'Only administrators can import users',
+        imported: 0,
+        failed: 0,
+        errors: []
+      }
+    }
+
+    // Parse CSV
+    const lines = csvData.trim().split('\n')
+    if (lines.length < 2) {
+      return {
+        success: false,
+        error: 'CSV file is empty or has no data rows',
+        imported: 0,
+        failed: 0,
+        errors: []
+      }
+    }
+
+    // Skip header row
+    const dataRows = lines.slice(1)
+    
+    let imported = 0
+    let failed = 0
+    const errors: string[] = []
+
+    for (let i = 0; i < dataRows.length; i++) {
+      const row = dataRows[i].trim()
+      if (!row) continue // Skip empty rows
+
+      const columns = row.split(',').map(col => col.trim().replace(/^["']|["']$/g, ''))
+      
+      if (columns.length < 4) {
+        failed++
+        errors.push(`Row ${i + 2}: Invalid format - expected 4 columns`)
+        continue
+      }
+
+      const [firstName, lastName, email, role] = columns
+
+      // Validate role
+      if (!['Admin', 'Normal', 'Read Only'].includes(role)) {
+        failed++
+        errors.push(`Row ${i + 2}: Invalid role "${role}" - must be Admin, Normal, or Read Only`)
+        continue
+      }
+
+      // Try to add user
+      const result = await addUser({
+        email,
+        firstName,
+        lastName,
+        role: role as UserRole
+      })
+
+      if (result.success) {
+        imported++
+      } else {
+        failed++
+        errors.push(`Row ${i + 2} (${email}): ${result.error}`)
+      }
+    }
+
+    logger.info('CSV import completed', {
+      importedBy: user.email,
+      imported,
+      failed,
+      duration: Date.now() - startTime
+    })
+
+    revalidatePath('/admin/users')
+
+    return {
+      success: true,
+      imported,
+      failed,
+      errors,
+      message: `Import complete: ${imported} users added, ${failed} failed`
+    }
+  } catch (error: any) {
+    const duration = Date.now() - startTime
+    logger.error('Failed to import users from CSV', {
+      error: error.message,
+      stack: error.stack,
+      duration
+    })
+
+    return {
+      success: false,
+      error: error.message || 'Failed to import users',
+      imported: 0,
+      failed: 0,
+      errors: []
+    }
+  }
+}
+
+/**
+ * Generate CSV template for user import
+ */
+export function generateUserImportTemplate(): string {
+  return 'First Name,Last Name,Email,Role\nJohn,Doe,john.doe@example.com,Normal\nJane,Smith,jane.smith@example.com,Admin'
+}
+

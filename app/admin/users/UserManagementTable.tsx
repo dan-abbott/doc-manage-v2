@@ -21,6 +21,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog'
 import { Shield, User, Eye, XCircle } from 'lucide-react'
+import { AddUserDialog, ImportUsersDialog } from './UserDialogs'
 
 interface UserData {
   id: string
@@ -160,6 +161,12 @@ export default function UserManagementTable() {
 
   return (
     <>
+      {/* Action Buttons */}
+      <div className="mb-4 flex gap-2 justify-end">
+        <AddUserDialog onUserAdded={loadUsers} />
+        <ImportUsersDialog onUsersImported={loadUsers} />
+      </div>
+
       <div className="bg-white rounded-lg shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
