@@ -313,7 +313,7 @@ export async function addUser(data: {
       return { success: false, error: 'Only administrators can add users' }
     }
 
-    // Check if user already exists
+    // Check if user already exists in public.users
     const { data: existingUser } = await supabase
       .from('users')
       .select('id, email')
@@ -327,30 +327,60 @@ export async function addUser(data: {
       }
     }
 
-    // Create auth user using admin API
-    const { data: authUser, error: createAuthError } = await supabase.auth.admin.createUser({
-      email: validation.data.email.toLowerCase(),
-      email_confirm: true, // Auto-confirm email
-      user_metadata: {
-        full_name: `${validation.data.firstName} ${validation.data.lastName}`,
-        first_name: validation.data.firstName,
-        last_name: validation.data.lastName
-      }
-    })
+    // Check if user exists in auth.users (may have been deleted from public.users)
+    const { data: authUsers } = await supabase.auth.admin.listUsers()
+    const existingAuthUser = authUsers?.users.find(
+      u => u.email?.toLowerCase() === validation.data.email.toLowerCase()
+    )
 
-    if (createAuthError || !authUser.user) {
-      logger.error('Failed to create auth user', { error: createAuthError })
-      return {
-        success: false,
-        error: createAuthError?.message || 'Failed to create user account'
+    let authUserId: string
+
+    if (existingAuthUser) {
+      // User exists in auth but not in public.users - reuse the auth user
+      authUserId = existingAuthUser.id
+      
+      // Update their metadata
+      await supabase.auth.admin.updateUserById(existingAuthUser.id, {
+        email_confirm: true,
+        user_metadata: {
+          full_name: `${validation.data.firstName} ${validation.data.lastName}`,
+          first_name: validation.data.firstName,
+          last_name: validation.data.lastName
+        }
+      })
+
+      logger.info('Reusing existing auth user', { 
+        email: validation.data.email,
+        authUserId: existingAuthUser.id 
+      })
+    } else {
+      // Create new auth user
+      const { data: authUser, error: createAuthError } = await supabase.auth.admin.createUser({
+        email: validation.data.email.toLowerCase(),
+        email_confirm: true, // Auto-confirm email
+        user_metadata: {
+          full_name: `${validation.data.firstName} ${validation.data.lastName}`,
+          first_name: validation.data.firstName,
+          last_name: validation.data.lastName
+        }
+      })
+
+      if (createAuthError || !authUser.user) {
+        logger.error('Failed to create auth user', { error: createAuthError })
+        return {
+          success: false,
+          error: createAuthError?.message || 'Failed to create user account'
+        }
       }
+
+      authUserId = authUser.user.id
     }
 
     // Create user record in public.users table
     const { error: insertError } = await supabase
       .from('users')
       .insert({
-        id: authUser.user.id,
+        id: authUserId,
         email: validation.data.email.toLowerCase(),
         full_name: `${validation.data.firstName} ${validation.data.lastName}`,
         tenant_id: userData.tenant_id,
@@ -361,8 +391,10 @@ export async function addUser(data: {
 
     if (insertError) {
       logger.error('Failed to create user record', { error: insertError })
-      // Try to delete the auth user if we failed to create the record
-      await supabase.auth.admin.deleteUser(authUser.user.id)
+      // Only try to delete auth user if we just created it (not reusing existing)
+      if (!existingAuthUser) {
+        await supabase.auth.admin.deleteUser(authUserId)
+      }
       return {
         success: false,
         error: 'Failed to create user record'
