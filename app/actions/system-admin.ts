@@ -327,3 +327,86 @@ export async function getTenantDetails(tenantId: string): Promise<{
     invoices: invoices || []  // ✅ ADD THIS
   }
 }
+
+/**
+ * Update tenant billing details (plan and next billing date)
+ * Master admin only
+ */
+export async function updateTenantBilling(data: {
+  tenantId: string
+  plan: string
+  nextBillingDate: string | null
+  reason: string
+}) {
+  await checkMasterAdmin()
+  
+  const supabase = await createClient()
+  
+  try {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    // Validate plan
+    const validPlans = ['trial', 'starter', 'professional', 'enterprise']
+    if (!validPlans.includes(data.plan)) {
+      return { success: false, error: 'Invalid plan' }
+    }
+
+    // Get current billing info
+    const { data: currentBilling } = await supabase
+      .from('tenant_billing')
+      .select('*')
+      .eq('tenant_id', data.tenantId)
+      .single()
+
+    // Prepare update data
+    const updateData: any = {
+      plan: data.plan,
+      updated_at: new Date().toISOString()
+    }
+
+    // Update next billing date if provided
+    if (data.nextBillingDate) {
+      updateData.current_period_end = new Date(data.nextBillingDate).toISOString()
+    }
+
+    // Update billing record
+    const { error: updateError } = await supabase
+      .from('tenant_billing')
+      .update(updateData)
+      .eq('tenant_id', data.tenantId)
+
+    if (updateError) {
+      console.error('Failed to update billing:', updateError)
+      return { success: false, error: 'Failed to update billing' }
+    }
+
+    // Log to billing history
+    await supabase
+      .from('billing_history')
+      .insert({
+        tenant_id: data.tenantId,
+        action: 'manual_adjustment',
+        previous_plan: currentBilling?.plan || null,
+        new_plan: data.plan,
+        previous_billing_date: currentBilling?.current_period_end || null,
+        new_billing_date: data.nextBillingDate,
+        reason: data.reason,
+        performed_by: user.id,
+        performed_by_email: user.email
+      })
+
+    console.log(`[Billing] Updated for tenant ${data.tenantId}: ${data.plan}, next bill: ${data.nextBillingDate}`)
+
+    return { 
+      success: true, 
+      message: `Billing updated: ${data.plan} plan${data.nextBillingDate ? `, next bill: ${new Date(data.nextBillingDate).toLocaleDateString()}` : ''}`
+    }
+  } catch (error: any) {
+    console.error('Failed to update tenant billing:', error)
+    return { success: false, error: error.message || 'Failed to update billing' }
+  }
+}
+

@@ -6,6 +6,7 @@
 import { getTenantDetails } from '@/app/actions/system-admin'
 import { notFound } from 'next/navigation'
 import Link from 'next/link'
+import { EditBillingDialog } from './EditBillingDialog'
 
 export const revalidate = 0
 
@@ -116,8 +117,14 @@ export default async function TenantDetailPage({ params }: PageProps) {
 
       {/* Billing & Payment Section */}
       <div className="bg-white rounded-lg border shadow-sm mb-6">
-        <div className="px-6 py-4 border-b">
+        <div className="px-6 py-4 border-b flex justify-between items-center">
           <h2 className="text-xl font-bold text-gray-900">Billing & Payment</h2>
+          <EditBillingDialog
+            tenantId={tenant.id}
+            currentPlan={billing?.plan || 'trial'}
+            currentNextBillingDate={billing?.current_period_end || null}
+            tenantName={tenant.company_name}
+          />
         </div>
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
