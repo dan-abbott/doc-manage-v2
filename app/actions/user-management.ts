@@ -67,6 +67,29 @@ export async function getAllUsers() {
       isMasterAdmin: userData.is_master_admin 
     })
 
+    // Get subdomain tenant (not user's home tenant)
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const subdomainCookie = cookieStore.get('tenant_subdomain')
+    const subdomain = subdomainCookie?.value
+
+    if (!subdomain) {
+      return { success: false, error: 'Unable to determine tenant context', data: [] }
+    }
+
+    // Get the subdomain's tenant ID
+    const { data: subdomainTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single()
+
+    if (!subdomainTenant) {
+      return { success: false, error: 'Invalid tenant context', data: [] }
+    }
+
+    const targetTenantId = subdomainTenant.id
+
     // Build query - master admin sees all users, regular admin sees only their tenant
     let query = supabase
       .from('users')
@@ -83,11 +106,9 @@ export async function getAllUsers() {
         tenant_id
       `)
 
-    // Regular admins only see users in their tenant
-    // Master admin sees all users
-    if (!userData.is_master_admin) {
-      query = query.eq('tenant_id', userData.tenant_id)
-    }
+    // Regular admins only see users in the current subdomain tenant
+    // Master admin also filters by subdomain tenant when on a specific subdomain
+    query = query.eq('tenant_id', targetTenantId)
 
     const { data: users, error: fetchError } = await query.order('created_at', { ascending: false })
 
