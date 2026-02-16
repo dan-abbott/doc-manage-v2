@@ -1,7 +1,7 @@
 // app/actions/user-management.ts
 'use server'
 
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError } from '@/lib/logger'
@@ -278,6 +278,7 @@ export async function addUser(data: {
 }) {
   const startTime = Date.now()
   const supabase = await createClient()
+  const supabaseAdmin = createServiceRoleClient() // For admin API operations
   
   try {
     // Validate input
@@ -328,7 +329,8 @@ export async function addUser(data: {
     }
 
     // Check if user exists in auth.users (may have been deleted from public.users)
-    const { data: authUsers } = await supabase.auth.admin.listUsers()
+    // Use service role client for admin operations
+    const { data: authUsers } = await supabaseAdmin.auth.admin.listUsers()
     const existingAuthUser = authUsers?.users.find(
       u => u.email?.toLowerCase() === validation.data.email.toLowerCase()
     )
@@ -340,7 +342,7 @@ export async function addUser(data: {
       authUserId = existingAuthUser.id
       
       // Update their metadata
-      await supabase.auth.admin.updateUserById(existingAuthUser.id, {
+      await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, {
         email_confirm: true,
         user_metadata: {
           full_name: `${validation.data.firstName} ${validation.data.lastName}`,
@@ -354,8 +356,8 @@ export async function addUser(data: {
         authUserId: existingAuthUser.id 
       })
     } else {
-      // Create new auth user
-      const { data: authUser, error: createAuthError } = await supabase.auth.admin.createUser({
+      // Create new auth user with service role client
+      const { data: authUser, error: createAuthError } = await supabaseAdmin.auth.admin.createUser({
         email: validation.data.email.toLowerCase(),
         email_confirm: true, // Auto-confirm email
         user_metadata: {
@@ -393,7 +395,7 @@ export async function addUser(data: {
       logger.error('Failed to create user record', { error: insertError })
       // Only try to delete auth user if we just created it (not reusing existing)
       if (!existingAuthUser) {
-        await supabase.auth.admin.deleteUser(authUserId)
+        await supabaseAdmin.auth.admin.deleteUser(authUserId)
       }
       return {
         success: false,
