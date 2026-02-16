@@ -52,8 +52,8 @@ return (
           {/* Show styled navigation only when user is authenticated */}
           {user && <Navigation user={{ email: user.email || '', fullName }} isAdmin={isAdmin} userRole={userRole} />}
           
-          {/* Main content */}
-          <main className="min-h-screen bg-gradient-to-br from-slate-50 to-slate-100">
+          {/* Main content - gradient applied via TenantThemeProvider */}
+          <main className="min-h-screen">
             {children}
           </main>
           
