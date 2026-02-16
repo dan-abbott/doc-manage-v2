@@ -17,23 +17,36 @@ const supabase = createClient(
 )
 
 export async function POST(request: NextRequest) {
+  console.log('🔵 [Webhook] POST request received')
+  
   const body = await request.text()
   const signature = request.headers.get('stripe-signature')
 
+  console.log('🔵 [Webhook] Request details:', {
+    hasBody: !!body,
+    bodyLength: body.length,
+    hasSignature: !!signature,
+    hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+    secretPrefix: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
+  })
+
   if (!signature) {
+    console.error('🔴 [Webhook] No signature in request')
     return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
   }
 
   let event: Stripe.Event
 
   try {
+    console.log('🔵 [Webhook] Attempting to construct event...')
     event = stripe.webhooks.constructEvent(
       body,
       signature,
       process.env.STRIPE_WEBHOOK_SECRET!
     )
+    console.log('🟢 [Webhook] Event constructed successfully')
   } catch (err: any) {
-    console.error('[Webhook] Invalid signature:', err.message)
+    console.error('🔴 [Webhook] Invalid signature:', err.message)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
