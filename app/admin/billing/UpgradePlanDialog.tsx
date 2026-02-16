@@ -102,6 +102,14 @@ export function UpgradePlanDialog({
       })
 
       if (result.success) {
+        // Check if we got a checkout URL (new subscription - needs payment)
+        if (result.checkoutUrl) {
+          // Redirect to Stripe checkout
+          window.location.href = result.checkoutUrl
+          return // Don't close dialog or show toast, just redirect
+        }
+        
+        // Subscription updated directly (already has payment method)
         toast.success('Plan Upgraded!', {
           description: result.message
         })
