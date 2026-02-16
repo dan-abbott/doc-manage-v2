@@ -185,7 +185,7 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 /**
  * Handle subscription updates
  */
-async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
+async function handleSubscriptionUpdated(subscription: any) {
   const tenantId = subscription.metadata?.tenant_id
 
   if (!tenantId) {
@@ -233,7 +233,7 @@ async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
 /**
  * Handle subscription deletion/cancellation
  */
-async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
+async function handleSubscriptionDeleted(subscription: any) {
   const tenantId = subscription.metadata?.tenant_id
 
   if (!tenantId) {
@@ -274,7 +274,7 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
 /**
  * Handle successful payment
  */
-async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentSucceeded(invoice: any) {
   const subscriptionId = invoice.subscription as string
 
   if (!subscriptionId) {
@@ -326,7 +326,7 @@ async function handleInvoicePaymentSucceeded(invoice: Stripe.Invoice) {
 /**
  * Handle failed payment
  */
-async function handleInvoicePaymentFailed(invoice: Stripe.Invoice) {
+async function handleInvoicePaymentFailed(invoice: any) {
   const subscriptionId = invoice.subscription as string
 
   if (!subscriptionId) {
