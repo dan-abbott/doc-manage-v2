@@ -73,22 +73,35 @@ export async function getAllUsers() {
     const subdomainCookie = cookieStore.get('tenant_subdomain')
     const subdomain = subdomainCookie?.value
 
+    logger.info('getAllUsers - Subdomain lookup', { subdomain })
+
     if (!subdomain) {
+      logger.error('getAllUsers - No subdomain cookie found')
       return { success: false, error: 'Unable to determine tenant context', data: [] }
     }
 
     // Get the subdomain's tenant ID
-    const { data: subdomainTenant } = await supabase
+    const { data: subdomainTenant, error: tenantError } = await supabase
       .from('tenants')
       .select('id')
       .eq('subdomain', subdomain)
       .single()
 
+    logger.info('getAllUsers - Tenant lookup result', { 
+      subdomain, 
+      found: !!subdomainTenant, 
+      tenantId: subdomainTenant?.id,
+      error: tenantError?.message 
+    })
+
     if (!subdomainTenant) {
+      logger.error('getAllUsers - Tenant not found for subdomain', { subdomain })
       return { success: false, error: 'Invalid tenant context', data: [] }
     }
 
     const targetTenantId = subdomainTenant.id
+
+    logger.info('getAllUsers - Filtering by tenant', { targetTenantId })
 
     // Build query - master admin sees all users, regular admin sees only their tenant
     let query = supabase
