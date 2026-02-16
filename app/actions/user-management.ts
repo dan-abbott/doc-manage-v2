@@ -314,6 +314,29 @@ export async function addUser(data: {
       return { success: false, error: 'Only administrators can add users' }
     }
 
+    // Get subdomain tenant (not user's home tenant)
+    const { cookies } = await import('next/headers')
+    const cookieStore = await cookies()
+    const subdomainCookie = cookieStore.get('tenant_subdomain')
+    const subdomain = subdomainCookie?.value
+
+    if (!subdomain) {
+      return { success: false, error: 'Unable to determine tenant context' }
+    }
+
+    // Get the subdomain's tenant ID
+    const { data: subdomainTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single()
+
+    if (!subdomainTenant) {
+      return { success: false, error: 'Invalid tenant context' }
+    }
+
+    const targetTenantId = subdomainTenant.id
+
     // Check if user already exists in public.users
     const { data: existingUser } = await supabase
       .from('users')
@@ -386,7 +409,7 @@ export async function addUser(data: {
         id: authUserId,
         email: validation.data.email.toLowerCase(),
         full_name: `${validation.data.firstName} ${validation.data.lastName}`,
-        tenant_id: userData.tenant_id,
+        tenant_id: targetTenantId,
         role: validation.data.role,
         is_admin: validation.data.role === 'Admin',
         is_active: validation.data.role !== 'Deactivated'
@@ -408,7 +431,7 @@ export async function addUser(data: {
     const { data: tenantData } = await supabase
       .from('tenants')
       .select('subdomain, company_name')
-      .eq('id', userData.tenant_id)
+      .eq('id', targetTenantId)
       .single()
 
     // Send welcome email (non-blocking, don't fail if email fails)
