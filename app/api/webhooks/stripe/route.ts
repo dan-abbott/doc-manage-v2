@@ -299,10 +299,10 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
     })
     .eq('tenant_id', tenantId)
 
-  // Store invoice in database
+  // Store invoice in database (upsert to avoid duplicates)
   await supabase
     .from('invoices')
-    .insert({
+    .upsert({
       tenant_id: tenantId,
       stripe_invoice_id: invoice.id,
       invoice_date: new Date(invoice.created * 1000).toISOString(),
@@ -314,8 +314,9 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
       paid_at: invoice.status_transitions?.paid_at 
         ? new Date(invoice.status_transitions.paid_at * 1000).toISOString() 
         : null,
+    }, {
+      onConflict: 'stripe_invoice_id'
     })
-    .onConflict('stripe_invoice_id')
 
   console.log('[Stripe Webhook] ✅ Payment succeeded:', {
     tenantId,
