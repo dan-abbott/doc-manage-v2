@@ -31,6 +31,7 @@ interface UserData {
   role: UserRole | null
   is_active: boolean
   created_at: string
+  last_sign_in_at: string | null
   document_count: number
   approval_count: number
 }
@@ -182,6 +183,9 @@ export default function UserManagementTable() {
                   Status
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  Last Active
+                </th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                   Documents
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -220,6 +224,21 @@ export default function UserManagementTable() {
                       ) : (
                         <span className="px-2 py-1 text-xs rounded-full bg-red-100 text-red-800">
                           Inactive
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      {user.last_sign_in_at ? (
+                        <div className="text-sm text-gray-900">
+                          {new Date(user.last_sign_in_at).toLocaleDateString()}
+                          <div className="text-xs text-gray-500">
+                            {new Date(user.last_sign_in_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </div>
+                        </div>
+                      ) : (
+                        <span className="inline-flex items-center gap-1.5 px-2 py-1 text-xs rounded-full bg-amber-100 text-amber-800">
+                          <span className="w-1.5 h-1.5 rounded-full bg-amber-500 animate-pulse"></span>
+                          Pending
                         </span>
                       )}
                     </td>

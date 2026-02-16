@@ -79,6 +79,7 @@ export async function getAllUsers() {
         is_active,
         created_at,
         updated_at,
+        last_sign_in_at,
         tenant_id
       `)
 
