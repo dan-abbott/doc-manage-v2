@@ -49,10 +49,10 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
       backgroundStartColor = tenant.background_start_color || backgroundStartColor
       backgroundEndColor = tenant.background_end_color || backgroundEndColor
     }
-  } else {
-    console.log('🎨 [TenantThemeProvider] No subdomain cookie, checking user fallback')
   } else if (user) {
     // Fallback to user's home tenant if no subdomain cookie
+    console.log('🎨 [TenantThemeProvider] No subdomain cookie, checking user fallback')
+    
     const { data: userData } = await supabase
       .from('users')
       .select('tenant_id')
