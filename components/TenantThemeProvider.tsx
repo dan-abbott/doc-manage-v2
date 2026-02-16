@@ -16,13 +16,9 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
   
   const { data: { user } } = await supabase.auth.getUser()
   
-  console.log('🎨 [TenantThemeProvider] Component called')
-  
   // Always use subdomain tenant (from cookie), not user's home tenant
   const cookieStore = await cookies()
   const tenantSubdomain = cookieStore.get('tenant_subdomain')?.value
-  
-  console.log('🎨 [TenantThemeProvider] Subdomain from cookie:', tenantSubdomain)
   
   if (tenantSubdomain) {
     const { data: tenant, error } = await supabase
@@ -30,18 +26,6 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
       .select('primary_color, secondary_color, background_start_color, background_end_color')
       .eq('subdomain', tenantSubdomain)
       .single()
-
-    console.log('🎨 [TenantThemeProvider] Tenant query:', {
-      subdomain: tenantSubdomain,
-      found: !!tenant,
-      error: error?.message,
-      colors: tenant ? {
-        primary: tenant.primary_color,
-        secondary: tenant.secondary_color,
-        bgStart: tenant.background_start_color,
-        bgEnd: tenant.background_end_color
-      } : 'none'
-    })
 
     if (tenant) {
       primaryColor = tenant.primary_color || primaryColor
@@ -51,7 +35,6 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
     }
   } else if (user) {
     // Fallback to user's home tenant if no subdomain cookie
-    console.log('🎨 [TenantThemeProvider] No subdomain cookie, checking user fallback')
     
     const { data: userData } = await supabase
       .from('users')

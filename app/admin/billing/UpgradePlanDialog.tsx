@@ -94,21 +94,31 @@ export function UpgradePlanDialog({
     if (!selectedPlan) return
 
     setIsUpgrading(true)
+    console.log('🔵 [UI] Starting upgrade process:', {
+      tenantId,
+      currentPlan,
+      selectedPlan
+    })
 
     try {
+      console.log('🔵 [UI] Calling upgradeTenantPlan...')
       const result = await upgradeTenantPlan({
         tenantId,
         newPlan: selectedPlan
       })
 
+      console.log('🟢 [UI] upgradeTenantPlan result:', result)
+
       if (result.success) {
         // Check if we got a checkout URL (new subscription - needs payment)
         if (result.checkoutUrl) {
+          console.log('🔵 [UI] Redirecting to Stripe checkout:', result.checkoutUrl)
           // Redirect to Stripe checkout
           window.location.href = result.checkoutUrl
           return // Don't close dialog or show toast, just redirect
         }
         
+        console.log('✅ [UI] Subscription updated directly (no checkout needed)')
         // Subscription updated directly (already has payment method)
         toast.success('Plan Upgraded!', {
           description: result.message
@@ -116,11 +126,13 @@ export function UpgradePlanDialog({
         onOpenChange(false)
         router.refresh()
       } else {
+        console.error('🔴 [UI] Upgrade failed:', result.error)
         toast.error('Upgrade Failed', {
           description: result.error
         })
       }
     } catch (error) {
+      console.error('🔴 [UI] Exception during upgrade:', error)
       toast.error('Upgrade Failed', {
         description: 'An unexpected error occurred'
       })

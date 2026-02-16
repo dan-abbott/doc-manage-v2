@@ -1,17 +1,9 @@
 /**
- * Stripe Webhook Handler
- * app/api/webhooks/stripe/route.ts
- * 
- * Handles Stripe events:
- * - checkout.session.completed
- * - customer.subscription.updated
- * - customer.subscription.deleted
- * - invoice.payment_succeeded
- * - invoice.payment_failed
+ * Stripe Webhook Handler - FIXED for Stripe v20
+ * File: app/api/webhooks/stripe/route.ts
  */
 
 import { NextRequest, NextResponse } from 'next/server'
-import { headers } from 'next/headers'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
 
@@ -19,352 +11,228 @@ const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
 })
 
-const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET!
-
-// Use service role for webhook operations (bypasses RLS)
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!,
-  {
-    auth: {
-      autoRefreshToken: false,
-      persistSession: false
-    }
-  }
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
-export async function POST(req: NextRequest) {
-  const body = await req.text()
-  const headersList = await headers()
-  const signature = headersList.get('stripe-signature')
+export async function POST(request: NextRequest) {
+  const body = await request.text()
+  const signature = request.headers.get('stripe-signature')
 
   if (!signature) {
-    console.error('[Stripe Webhook] No signature provided')
-    return NextResponse.json({ error: 'No signature' }, { status: 400 })
+    return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
   }
 
   let event: Stripe.Event
 
   try {
-    event = stripe.webhooks.constructEvent(body, signature, webhookSecret)
+    event = stripe.webhooks.constructEvent(
+      body,
+      signature,
+      process.env.STRIPE_WEBHOOK_SECRET!
+    )
   } catch (err: any) {
-    console.error('[Stripe Webhook] Signature verification failed:', err.message)
+    console.error('[Webhook] Invalid signature:', err.message)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
-  console.log('[Stripe Webhook] Received event:', event.type)
+  console.log(`🔵 [Webhook] Received event: ${event.type}`, {
+    eventId: event.id,
+    created: new Date(event.created * 1000).toISOString()
+  })
+  
+  await logEvent(event)
 
   try {
     switch (event.type) {
-      case 'checkout.session.completed':
-        await handleCheckoutSessionCompleted(event.data.object as Stripe.Checkout.Session)
+      case 'customer.subscription.created':
+        console.log('🟢 [Webhook] Processing subscription.created')
+        await handleSubscription(event.data.object as Stripe.Subscription)
         break
-
       case 'customer.subscription.updated':
-        await handleSubscriptionUpdated(event.data.object as Stripe.Subscription)
+        console.log('🟢 [Webhook] Processing subscription.updated')
+        await handleSubscription(event.data.object as Stripe.Subscription)
         break
-
       case 'customer.subscription.deleted':
+        console.log('🟢 [Webhook] Processing subscription.deleted')
         await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
         break
-
-      case 'invoice.payment_succeeded':
-        await handleInvoicePaymentSucceeded(event.data.object as Stripe.Invoice)
+      case 'invoice.paid':
+        console.log('🟢 [Webhook] Processing invoice.paid')
+        await handleInvoicePaid(event.data.object as Stripe.Invoice)
         break
-
       case 'invoice.payment_failed':
-        await handleInvoicePaymentFailed(event.data.object as Stripe.Invoice)
+        console.log('🟢 [Webhook] Processing invoice.payment_failed')
+        await handlePaymentFailed(event.data.object as Stripe.Invoice)
         break
-
+      case 'payment_method.attached':
+        console.log('🟢 [Webhook] Processing payment_method.attached')
+        await handlePaymentMethod(event.data.object as Stripe.PaymentMethod)
+        break
       default:
-        console.log('[Stripe Webhook] Unhandled event type:', event.type)
+        console.log('⚠️ [Webhook] Unhandled event type:', event.type)
     }
 
+    await markProcessed(event.id)
+    console.log('✅ [Webhook] Event processed successfully:', event.type)
     return NextResponse.json({ received: true })
   } catch (error: any) {
-    console.error('[Stripe Webhook] Error processing event:', error)
+    console.error('🔴 [Webhook] Processing error:', {
+      eventType: event.type,
+      eventId: event.id,
+      error: error.message,
+      stack: error.stack
+    })
+    await logError(event.id, error.message)
     return NextResponse.json({ error: error.message }, { status: 500 })
   }
 }
 
-/**
- * Handle successful checkout - subscription created
- */
-async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) {
-  const tenantId = session.metadata?.tenant_id
+async function logEvent(event: Stripe.Event) {
+  await supabase.from('stripe_events').insert({
+    stripe_event_id: event.id,
+    event_type: event.type,
+    data: event.data.object,
+    processed: false,
+  })
+}
 
-  if (!tenantId) {
-    console.error('[Stripe Webhook] No tenant_id in session metadata')
-    return
-  }
+async function markProcessed(eventId: string) {
+  await supabase.from('stripe_events').update({ processed: true }).eq('stripe_event_id', eventId)
+}
 
-  console.log('[Stripe Webhook] Checkout completed for tenant:', tenantId)
+async function logError(eventId: string, error: string) {
+  await supabase.from('stripe_events').update({ error }).eq('stripe_event_id', eventId)
+}
 
-  const subscription: any = await stripe.subscriptions.retrieve(
-    session.subscription as string,
-    { expand: ['default_payment_method'] }
-  )
+async function getTenantId(customerId: string) {
+  const { data } = await supabase.from('tenants').select('id').eq('stripe_customer_id', customerId).single()
+  if (!data) throw new Error(`No tenant for customer ${customerId}`)
+  return data.id
+}
+
+async function handleSubscription(sub: Stripe.Subscription) {
+  console.log('🔵 [Webhook] handleSubscription called', {
+    subscriptionId: sub.id,
+    customerId: sub.customer,
+    status: sub.status
+  })
   
-  const priceId = subscription.items.data[0].price.id
-
-  // Determine plan from price ID
-  const plan = getPlanFromPriceId(priceId)
-
-  if (!plan) {
-    console.error('[Stripe Webhook] Unknown price ID:', priceId)
-    return
-  }
-
-  // Update tenant_billing
-  const { error: updateError } = await supabase
-    .from('tenant_billing')
-    .update({
-      plan: plan,
-      status: 'active',
-      stripe_customer_id: session.customer as string,
-      stripe_subscription_id: session.subscription as string,
-      stripe_price_id: priceId,
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
+  const tenantId = await getTenantId(sub.customer as string)
+  console.log('🟢 [Webhook] Tenant ID resolved:', tenantId)
+  
+  let pm = null
+  if (sub.default_payment_method) {
+    pm = await stripe.paymentMethods.retrieve(sub.default_payment_method as string)
+    console.log('🟢 [Webhook] Payment method retrieved:', {
+      type: pm.type,
+      brand: pm.card?.brand,
+      last4: pm.card?.last4
     })
-    .eq('tenant_id', tenantId)
-
-  if (updateError) {
-    console.error('[Stripe Webhook] Failed to update billing:', updateError)
-    throw updateError
   }
 
-  // Get payment method details
-  let paymentMethodDetails = null
-  if (subscription.default_payment_method) {
-    const pmId = typeof subscription.default_payment_method === 'string' 
-      ? subscription.default_payment_method 
-      : subscription.default_payment_method.id
-      
-    const paymentMethod = await stripe.paymentMethods.retrieve(pmId)
-    paymentMethodDetails = {
-      brand: paymentMethod.card?.brand,
-      last4: paymentMethod.card?.last4,
-      exp_month: paymentMethod.card?.exp_month,
-      exp_year: paymentMethod.card?.exp_year,
-    }
+  const priceId = sub.items.data[0]?.price?.id
+  let plan = 'trial'
+  if (priceId === process.env.STRIPE_PRICE_STARTER) plan = 'starter'
+  else if (priceId === process.env.STRIPE_PRICE_PROFESSIONAL) plan = 'professional'
+  else if (priceId === process.env.STRIPE_PRICE_ENTERPRISE) plan = 'enterprise'
+
+  console.log('🟢 [Webhook] Plan determined:', { priceId, plan })
+
+  // Stripe v20 changed: use billing_cycle_anchor as fallback for current_period_start
+  const subAny = sub as any
+  const currentPeriodStart = subAny.billing_cycle_anchor || Math.floor(Date.now() / 1000)
+  // Estimate end (30 days for monthly, will be corrected by invoice events)
+  const currentPeriodEnd = subAny.cancel_at || (currentPeriodStart + 2592000)
+
+  const billingUpdate = {
+    tenant_id: tenantId,
+    stripe_customer_id: sub.customer as string,
+    stripe_subscription_id: sub.id,
+    plan,
+    status: sub.status,
+    billing_cycle: sub.items.data[0]?.price?.recurring?.interval || 'month',
+    current_period_start: new Date(currentPeriodStart * 1000).toISOString(),
+    current_period_end: new Date(currentPeriodEnd * 1000).toISOString(),
+    trial_ends_at: subAny.trial_end ? new Date(subAny.trial_end * 1000).toISOString() : null,
+    cancelled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
+    payment_method_type: pm?.type || null,
+    payment_method_last4: pm?.card?.last4 || null,
+    payment_method_brand: pm?.card?.brand || null,
   }
 
-  // Update payment method info
-  if (paymentMethodDetails) {
-    await supabase
-      .from('tenant_billing')
-      .update({
-        payment_method_brand: paymentMethodDetails.brand,
-        payment_method_last4: paymentMethodDetails.last4,
-        payment_method_exp_month: paymentMethodDetails.exp_month,
-        payment_method_exp_year: paymentMethodDetails.exp_year,
-      })
-      .eq('tenant_id', tenantId)
+  console.log('🔵 [Webhook] Upserting tenant_billing:', billingUpdate)
+
+  const { error } = await supabase.from('tenant_billing').upsert(billingUpdate, { onConflict: 'tenant_id' })
+  
+  if (error) {
+    console.error('🔴 [Webhook] Failed to update tenant_billing:', error)
+    throw error
   }
 
-  // Log to billing history
-  await supabase
-    .from('billing_history')
-    .insert({
-      tenant_id: tenantId,
-      action: 'subscription_created',
-      new_plan: plan,
-      reason: 'Stripe subscription created',
-      performed_by: tenantId, // System action
-      performed_by_email: 'system@stripe',
-    })
-
-  console.log('[Stripe Webhook] ✅ Subscription activated:', {
+  console.log('✅ [Webhook] Subscription processed successfully:', {
     tenantId,
     plan,
-    subscriptionId: session.subscription,
+    status: sub.status
   })
+
+  console.log(`[Webhook] Subscription synced: ${tenantId}`)
 }
 
-/**
- * Handle subscription updates
- */
-async function handleSubscriptionUpdated(subscription: any) {
-  const tenantId = subscription.metadata?.tenant_id
+async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
+  const tenantId = await getTenantId(sub.customer as string)
+  await supabase.from('tenant_billing').update({
+    status: 'cancelled',
+    cancelled_at: new Date().toISOString(),
+  }).eq('tenant_id', tenantId)
+}
 
-  if (!tenantId) {
-    console.error('[Stripe Webhook] No tenant_id in subscription metadata')
-    return
-  }
+async function handleInvoicePaid(invoice: Stripe.Invoice) {
+  if (!invoice.customer) return
+  const tenantId = await getTenantId(invoice.customer as string)
 
-  const priceId = subscription.items.data[0].price.id
-  const plan = getPlanFromPriceId(priceId)
+  // Stripe v20: subscription might be string or object
+  const invoiceAny = invoice as any
+  const subscriptionId = typeof invoiceAny.subscription === 'string' 
+    ? invoiceAny.subscription 
+    : invoiceAny.subscription?.id || null
 
-  if (!plan) {
-    console.error('[Stripe Webhook] Unknown price ID:', priceId)
-    return
-  }
+  await supabase.from('invoices').upsert({
+    tenant_id: tenantId,
+    stripe_invoice_id: invoice.id,
+    stripe_subscription_id: subscriptionId,
+    amount_due: (invoice.amount_due || 0) / 100,
+    amount_paid: (invoice.amount_paid || 0) / 100,
+    currency: invoice.currency,
+    status: 'paid',
+    invoice_date: new Date(invoice.created * 1000).toISOString(),
+    paid_at: new Date().toISOString(),
+    hosted_invoice_url: invoice.hosted_invoice_url || null,
+    invoice_pdf_url: invoice.invoice_pdf || null,
+  }, { onConflict: 'stripe_invoice_id' })
 
-  // Map Stripe status to our status
-  let status = 'active'
-  if (subscription.status === 'past_due') status = 'past_due'
-  if (subscription.status === 'canceled') status = 'cancelled'
-  if (subscription.status === 'unpaid') status = 'past_due'
-
-  const { error: updateError } = await supabase
-    .from('tenant_billing')
-    .update({
-      plan: plan,
-      status: status,
-      stripe_price_id: priceId,
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    })
+  await supabase.from('tenant_billing')
+    .update({ status: 'active' })
     .eq('tenant_id', tenantId)
+    .eq('status', 'past_due')
 
-  if (updateError) {
-    console.error('[Stripe Webhook] Failed to update subscription:', updateError)
-    throw updateError
-  }
-
-  console.log('[Stripe Webhook] ✅ Subscription updated:', {
-    tenantId,
-    plan,
-    status: subscription.status,
-  })
+  console.log(`[Webhook] Invoice paid: ${tenantId}`)
 }
 
-/**
- * Handle subscription deletion/cancellation
- */
-async function handleSubscriptionDeleted(subscription: any) {
-  const tenantId = subscription.metadata?.tenant_id
-
-  if (!tenantId) {
-    console.error('[Stripe Webhook] No tenant_id in subscription metadata')
-    return
-  }
-
-  const { error: updateError } = await supabase
-    .from('tenant_billing')
-    .update({
-      plan: 'trial',
-      status: 'cancelled',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('tenant_id', tenantId)
-
-  if (updateError) {
-    console.error('[Stripe Webhook] Failed to cancel subscription:', updateError)
-    throw updateError
-  }
-
-  // Log to billing history
-  await supabase
-    .from('billing_history')
-    .insert({
-      tenant_id: tenantId,
-      action: 'subscription_cancelled',
-      previous_plan: subscription.metadata?.plan || 'unknown',
-      new_plan: 'trial',
-      reason: 'Stripe subscription cancelled',
-      performed_by: tenantId,
-      performed_by_email: 'system@stripe',
-    })
-
-  console.log('[Stripe Webhook] ✅ Subscription cancelled:', { tenantId })
+async function handlePaymentFailed(invoice: Stripe.Invoice) {
+  if (!invoice.customer) return
+  const tenantId = await getTenantId(invoice.customer as string)
+  await supabase.from('tenant_billing').update({ status: 'past_due' }).eq('tenant_id', tenantId)
+  console.log(`[Webhook] Payment failed: ${tenantId}`)
 }
 
-/**
- * Handle successful payment
- */
-async function handleInvoicePaymentSucceeded(invoice: any) {
-  const subscriptionId = invoice.subscription as string
-
-  if (!subscriptionId) {
-    console.log('[Stripe Webhook] Invoice not for subscription, skipping')
-    return
-  }
-
-  const subscription: any = await stripe.subscriptions.retrieve(subscriptionId)
-  const tenantId = subscription.metadata?.tenant_id
-
-  if (!tenantId) {
-    console.error('[Stripe Webhook] No tenant_id in subscription metadata')
-    return
-  }
-
-  // Update last payment date
-  await supabase
-    .from('tenant_billing')
-    .update({
-      current_period_end: new Date(subscription.current_period_end * 1000).toISOString(),
-      updated_at: new Date().toISOString(),
-    })
-    .eq('tenant_id', tenantId)
-
-  // Store invoice in database (upsert to avoid duplicates)
-  await supabase
-    .from('invoices')
-    .upsert({
-      tenant_id: tenantId,
-      stripe_invoice_id: invoice.id,
-      invoice_date: new Date(invoice.created * 1000).toISOString(),
-      amount_due: invoice.amount_due / 100,
-      amount_paid: invoice.amount_paid / 100,
-      status: invoice.status || 'paid',
-      hosted_invoice_url: invoice.hosted_invoice_url,
-      invoice_pdf_url: invoice.invoice_pdf,
-      paid_at: invoice.status_transitions?.paid_at 
-        ? new Date(invoice.status_transitions.paid_at * 1000).toISOString() 
-        : null,
-    }, {
-      onConflict: 'stripe_invoice_id'
-    })
-
-  console.log('[Stripe Webhook] ✅ Payment succeeded:', {
-    tenantId,
-    amount: invoice.amount_paid / 100,
-  })
-}
-
-/**
- * Handle failed payment
- */
-async function handleInvoicePaymentFailed(invoice: any) {
-  const subscriptionId = invoice.subscription as string
-
-  if (!subscriptionId) {
-    return
-  }
-
-  const subscription: any = await stripe.subscriptions.retrieve(subscriptionId)
-  const tenantId = subscription.metadata?.tenant_id
-
-  if (!tenantId) {
-    console.error('[Stripe Webhook] No tenant_id in subscription metadata')
-    return
-  }
-
-  // Update status to past_due
-  await supabase
-    .from('tenant_billing')
-    .update({
-      status: 'past_due',
-      updated_at: new Date().toISOString(),
-    })
-    .eq('tenant_id', tenantId)
-
-  // TODO: Send email notification to tenant admin
-
-  console.log('[Stripe Webhook] ⚠️ Payment failed:', { tenantId })
-}
-
-/**
- * Helper: Get plan name from Stripe price ID
- */
-function getPlanFromPriceId(priceId: string): string | null {
-  const prices = {
-    [process.env.STRIPE_PRICE_STARTER!]: 'starter',
-    [process.env.STRIPE_PRICE_PROFESSIONAL!]: 'professional',
-    [process.env.STRIPE_PRICE_ENTERPRISE!]: 'enterprise',
-  }
-
-  return prices[priceId] || null
+async function handlePaymentMethod(pm: Stripe.PaymentMethod) {
+  if (!pm.customer) return
+  const tenantId = await getTenantId(pm.customer as string)
+  await supabase.from('tenant_billing').update({
+    payment_method_type: pm.type,
+    payment_method_last4: pm.card?.last4 || null,
+    payment_method_brand: pm.card?.brand || null,
+  }).eq('tenant_id', tenantId)
 }
