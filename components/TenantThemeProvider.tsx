@@ -83,9 +83,10 @@ export async function TenantThemeProvider({ children }: TenantThemeProviderProps
       --background-end: ${backgroundEndColor};
     }
     
-    /* Apply gradient to body so it extends behind navigation */
-    body {
+    /* Apply gradient to body with high specificity - fixed attachment keeps it in place */
+    html body {
       background: linear-gradient(to bottom right, ${backgroundStartColor}, ${backgroundEndColor}) !important;
+      background-attachment: fixed !important;
       min-height: 100vh;
     }
   `
