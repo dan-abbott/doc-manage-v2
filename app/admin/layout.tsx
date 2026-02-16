@@ -44,15 +44,6 @@ export default async function AdminLayout({
 
   const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
-  // DEBUG: Log the virus scan setting
-  console.log('🔍 Admin Layout - Virus Scan Check:', {
-    subdomainTenantId,
-    tenantFound: !!tenant,
-    tenantError: tenantError?.message,
-    virus_scan_enabled: tenant?.virus_scan_enabled,
-    finalValue: virusScanEnabled,
-  })
-
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">

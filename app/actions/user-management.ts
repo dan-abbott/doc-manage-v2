@@ -379,7 +379,8 @@ export async function addUser(data: {
     }
 
     // Create user record in public.users table
-    const { error: insertError } = await supabase
+    // Use service role client to bypass RLS policies
+    const { error: insertError } = await supabaseAdmin
       .from('users')
       .insert({
         id: authUserId,
