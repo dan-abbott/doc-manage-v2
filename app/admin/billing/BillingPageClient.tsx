@@ -49,11 +49,6 @@ export default function BillingPageClient({
   const currentPlan = billing?.plan || 'trial'
   const currentPrice = planPrices[currentPlan]
 
-  // Calculate usage costs
-  const vtCost = usage.vtScans * 0.005
-  const emailCost = usage.emailsSent * 0.001
-  const estimatedMonthlyCost = currentPrice + vtCost + emailCost
-
   // Format helpers
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'Not set'
@@ -198,7 +193,7 @@ export default function BillingPageClient({
         </CardContent>
       </Card>
 
-      {/* Usage & Costs */}
+      {/* Usage & Invoice History */}
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-6">
         {/* Current Usage */}
         <Card>
@@ -228,7 +223,7 @@ export default function BillingPageClient({
                   </div>
                   <div>
                     <div className="text-sm font-medium text-gray-900">Virus Scans</div>
-                    <div className="text-xs text-gray-500">${(usage.vtScans * 0.005).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">Files scanned</div>
                   </div>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">{usage.vtScans}</div>
@@ -241,7 +236,7 @@ export default function BillingPageClient({
                   </div>
                   <div>
                     <div className="text-sm font-medium text-gray-900">Emails Sent</div>
-                    <div className="text-xs text-gray-500">${(usage.emailsSent * 0.001).toFixed(2)}</div>
+                    <div className="text-xs text-gray-500">Notifications delivered</div>
                   </div>
                 </div>
                 <div className="text-2xl font-bold text-gray-900">{usage.emailsSent}</div>
@@ -263,43 +258,64 @@ export default function BillingPageClient({
           </CardContent>
         </Card>
 
-        {/* Cost Breakdown */}
+        {/* Invoice History */}
         <Card>
           <CardHeader>
-            <CardTitle>Cost Breakdown</CardTitle>
-            <CardDescription>Estimated monthly charges</CardDescription>
+            <CardTitle>Invoice History</CardTitle>
+            <CardDescription>
+              Account created {formatDate(tenant.created_at)}
+            </CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="space-y-4">
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Base subscription</span>
-                <span className="font-medium text-gray-900">{formatCurrency(currentPrice)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Virus scanning ({usage.vtScans} scans)</span>
-                <span className="font-medium text-gray-900">{formatCurrency(vtCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Email sending ({usage.emailsSent} emails)</span>
-                <span className="font-medium text-gray-900">{formatCurrency(emailCost)}</span>
-              </div>
-              <div className="flex justify-between text-sm">
-                <span className="text-gray-600">Storage ({usage.storageGB} GB)</span>
-                <span className="font-medium text-gray-900">{formatCurrency(0)}</span>
-              </div>
-              
-              <div className="pt-4 border-t">
-                <div className="flex justify-between items-center">
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">Estimated Total</div>
-                    <div className="text-xs text-gray-500">For this billing period</div>
+            {invoices.length > 0 ? (
+              <div className="space-y-3">
+                {invoices.slice(0, 5).map((invoice) => (
+                  <div key={invoice.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {formatDate(invoice.invoice_date)}
+                      </div>
+                      <div className="text-xs text-gray-500">
+                        {formatCurrency(invoice.amount_paid || invoice.amount_due)}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      <Badge 
+                        className={
+                          invoice.status === 'paid' 
+                            ? 'bg-green-100 text-green-800' 
+                            : 'bg-yellow-100 text-yellow-800'
+                        }
+                      >
+                        {invoice.status}
+                      </Badge>
+                      {invoice.hosted_invoice_url && (
+                        <a
+                          href={invoice.hosted_invoice_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1 text-sm"
+                        >
+                          View
+                          <ExternalLink className="h-3 w-3" />
+                        </a>
+                      )}
+                    </div>
                   </div>
-                  <div className="text-3xl font-bold text-gray-900">
-                    {formatCurrency(estimatedMonthlyCost)}
+                ))}
+                {invoices.length > 5 && (
+                  <div className="text-center pt-2">
+                    <span className="text-sm text-gray-500">
+                      {invoices.length - 5} more invoice{invoices.length - 5 !== 1 ? 's' : ''}
+                    </span>
                   </div>
-                </div>
+                )}
               </div>
-            </div>
+            ) : (
+              <div className="text-center py-8 text-gray-500">
+                No invoices yet
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -335,72 +351,6 @@ export default function BillingPageClient({
           </CardContent>
         </Card>
       )}
-
-      {/* Invoice History */}
-      <Card>
-        <CardHeader>
-          <CardTitle>Invoice History</CardTitle>
-          <CardDescription>
-            Account created {formatDate(tenant.created_at)}
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          {invoices.length > 0 ? (
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="border-b">
-                  <tr className="text-left text-sm text-gray-500">
-                    <th className="pb-3 font-medium">Date</th>
-                    <th className="pb-3 font-medium">Amount</th>
-                    <th className="pb-3 font-medium">Status</th>
-                    <th className="pb-3 font-medium">Invoice</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y">
-                  {invoices.map((invoice) => (
-                    <tr key={invoice.id} className="text-sm">
-                      <td className="py-3 text-gray-900">
-                        {formatDate(invoice.invoice_date)}
-                      </td>
-                      <td className="py-3 font-medium text-gray-900">
-                        {formatCurrency(invoice.amount_paid || invoice.amount_due)}
-                      </td>
-                      <td className="py-3">
-                        <Badge 
-                          className={
-                            invoice.status === 'paid' 
-                              ? 'bg-green-100 text-green-800' 
-                              : 'bg-yellow-100 text-yellow-800'
-                          }
-                        >
-                          {invoice.status}
-                        </Badge>
-                      </td>
-                      <td className="py-3">
-                        {invoice.hosted_invoice_url && (
-                          <a
-                            href={invoice.hosted_invoice_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
-                          >
-                            View
-                            <ExternalLink className="h-3 w-3" />
-                          </a>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          ) : (
-            <div className="text-center py-8 text-gray-500">
-              No invoices yet
-            </div>
-          )}
-        </CardContent>
-      </Card>
 
       {/* Upgrade Dialog */}
       <UpgradePlanDialog
