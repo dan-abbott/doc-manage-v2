@@ -6,6 +6,7 @@ import { Shield } from 'lucide-react'
 
 const baseTabs = [
   { href: '/admin/users', label: 'User Management' },
+  { href: '/admin/billing', label: 'Billing' },
   { href: '/admin/settings', label: 'Company Settings' },
   { href: '/admin/document-types', label: 'Document Types' },
   { href: '/admin/scan-monitoring', label: 'Scan Monitoring' },
