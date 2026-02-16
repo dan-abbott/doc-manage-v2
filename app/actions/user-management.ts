@@ -526,7 +526,7 @@ export async function importUsersFromCSV(csvData: string) {
 /**
  * Generate CSV template for user import
  */
-export function generateUserImportTemplate(): string {
+function generateUserImportTemplate(): string {
   return 'First Name,Last Name,Email,Role\nJohn,Doe,john.doe@example.com,Normal\nJane,Smith,jane.smith@example.com,Admin'
 }
 

@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { addUser, importUsersFromCSV, generateUserImportTemplate, type UserRole } from '@/app/actions/user-management'
+import { addUser, importUsersFromCSV, type UserRole } from '@/app/actions/user-management'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -166,7 +166,7 @@ export function ImportUsersDialog({ onUsersImported }: { onUsersImported?: () =>
   const [isImporting, setIsImporting] = useState(false)
 
   const handleDownloadTemplate = () => {
-    const template = generateUserImportTemplate()
+    const template = 'First Name,Last Name,Email,Role\nJohn,Doe,john.doe@example.com,Normal\nJane,Smith,jane.smith@example.com,Admin'
     const blob = new Blob([template], { type: 'text/csv' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
