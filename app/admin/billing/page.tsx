@@ -5,7 +5,7 @@ import BillingPageClient from './BillingPageClient'
 
 export default async function BillingPage() {
   const supabase = await createClient()
-  const cookieStore = cookies()
+  const cookieStore = await cookies()
 
   // Check authentication
   const { data: { user }, error: userError } = await supabase.auth.getUser()
