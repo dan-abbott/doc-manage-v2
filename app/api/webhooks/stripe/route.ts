@@ -100,7 +100,14 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
 
   console.log('[Stripe Webhook] Checkout completed for tenant:', tenantId)
 
-  const subscription = await stripe.subscriptions.retrieve(session.subscription as string)
+  const subscription = await stripe.subscriptions.retrieve(
+    session.subscription as string,
+    { expand: ['default_payment_method'] }
+  ) as Stripe.Subscription & {
+    current_period_end: number
+    default_payment_method?: string | Stripe.PaymentMethod
+  }
+  
   const priceId = subscription.items.data[0].price.id
 
   // Determine plan from price ID
@@ -133,9 +140,11 @@ async function handleCheckoutSessionCompleted(session: Stripe.Checkout.Session) 
   // Get payment method details
   let paymentMethodDetails = null
   if (subscription.default_payment_method) {
-    const paymentMethod = await stripe.paymentMethods.retrieve(
-      subscription.default_payment_method as string
-    )
+    const pmId = typeof subscription.default_payment_method === 'string' 
+      ? subscription.default_payment_method 
+      : subscription.default_payment_method.id
+      
+    const paymentMethod = await stripe.paymentMethods.retrieve(pmId)
     paymentMethodDetails = {
       brand: paymentMethod.card?.brand,
       last4: paymentMethod.card?.last4,
