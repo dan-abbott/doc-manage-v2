@@ -23,6 +23,7 @@ const userUpdateSchema = z.object({
 export async function getAllUsers() {
   const startTime = Date.now()
   const supabase = await createClient()
+  const supabaseAdmin = createServiceRoleClient() // For cross-tenant access
   
   try {
     // Get current user
@@ -103,8 +104,9 @@ export async function getAllUsers() {
 
     logger.info('getAllUsers - Filtering by tenant', { targetTenantId })
 
-    // Build query - master admin sees all users, regular admin sees only their tenant
-    let query = supabase
+    // Use service role client to bypass RLS for cross-tenant access (master admin)
+    // Regular client would be blocked by RLS when accessing other tenants
+    let query = supabaseAdmin
       .from('users')
       .select(`
         id,
@@ -119,8 +121,7 @@ export async function getAllUsers() {
         tenant_id
       `)
 
-    // Regular admins only see users in the current subdomain tenant
-    // Master admin also filters by subdomain tenant when on a specific subdomain
+    // Filter by subdomain tenant
     query = query.eq('tenant_id', targetTenantId)
 
     const { data: users, error: fetchError } = await query.order('created_at', { ascending: false })
