@@ -282,7 +282,7 @@ async function handleInvoicePaymentSucceeded(invoice: any) {
     return
   }
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const subscription: any = await stripe.subscriptions.retrieve(subscriptionId)
   const tenantId = subscription.metadata?.tenant_id
 
   if (!tenantId) {
@@ -333,7 +333,7 @@ async function handleInvoicePaymentFailed(invoice: any) {
     return
   }
 
-  const subscription = await stripe.subscriptions.retrieve(subscriptionId)
+  const subscription: any = await stripe.subscriptions.retrieve(subscriptionId)
   const tenantId = subscription.metadata?.tenant_id
 
   if (!tenantId) {
