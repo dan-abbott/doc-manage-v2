@@ -501,6 +501,135 @@ function generateDocumentReleasedHTML(userName: string, context: EmailContext, v
 }
 
 /**
+ * 5. Welcome Email (for new user accounts)
+ */
+export async function sendWelcomeEmail(
+  userEmail: string,
+  userName: string,
+  tenantSubdomain: string,
+  tenantName: string
+) {
+  const loginUrl = `https://${tenantSubdomain}.baselinedocs.com`
+  const settingsUrl = `${loginUrl}/settings/notifications`
+
+  try {
+    await resend.emails.send({
+      from: fromEmail,
+      to: userEmail,
+      subject: `🎉 Welcome to ${tenantName} on BaselineDocs!`,
+      html: generateWelcomeHTML(userName, tenantName, tenantSubdomain, loginUrl, settingsUrl),
+    })
+
+    console.log(`[Email] ✓ Sent welcome email to ${userEmail}`)
+    return { success: true }
+  } catch (error) {
+    console.error('[Email] ✗ Failed to send welcome email:', error)
+    return { success: false, reason: 'error', error }
+  }
+}
+
+function generateWelcomeHTML(
+  userName: string,
+  tenantName: string,
+  subdomain: string,
+  loginUrl: string,
+  settingsUrl: string
+): string {
+  return `
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+</head>
+<body style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; background: #f5f5f5;">
+  <div style="background: white; border-radius: 10px; overflow: hidden; box-shadow: 0 4px 6px rgba(0,0,0,0.1);">
+    <!-- Header with gradient -->
+    <div style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); padding: 40px 30px; text-align: center;">
+      <div style="font-size: 48px; margin-bottom: 10px;">🎉</div>
+      <h1 style="color: white; margin: 0; font-size: 28px; font-weight: 600;">Welcome to BaselineDocs!</h1>
+      <p style="color: rgba(255,255,255,0.9); margin: 10px 0 0 0; font-size: 16px;">Your document control journey starts here</p>
+    </div>
+    
+    <!-- Main content -->
+    <div style="padding: 40px 30px;">
+      <p style="margin-top: 0; font-size: 18px; color: #333;">Hi ${userName},</p>
+      
+      <p style="font-size: 16px; color: #555;">You've been added to <strong>${tenantName}</strong>'s document control system. You now have access to create, review, and manage controlled documents with your team.</p>
+      
+      <!-- Quick Start Box -->
+      <div style="background: #f8f9ff; border: 2px solid #667eea; border-radius: 8px; padding: 25px; margin: 30px 0;">
+        <h2 style="margin: 0 0 15px 0; font-size: 20px; color: #667eea;">🚀 Quick Start Guide</h2>
+        <ol style="margin: 0; padding-left: 20px; color: #555;">
+          <li style="margin-bottom: 10px;">Click the button below to sign in to your organization</li>
+          <li style="margin-bottom: 10px;">Bookmark your unique login page for easy access</li>
+          <li style="margin-bottom: 10px;">Explore the dashboard and start creating documents</li>
+          <li style="margin-bottom: 0;">Customize your email preferences if needed</li>
+        </ol>
+      </div>
+      
+      <!-- Important Info Box -->
+      <div style="background: #fffbeb; border-left: 4px solid #f59e0b; padding: 20px; margin: 25px 0; border-radius: 5px;">
+        <p style="margin: 0 0 10px 0; color: #92400e; font-weight: 600;">📌 Important: Your Login Page</p>
+        <p style="margin: 0; color: #92400e; font-size: 14px;">Always sign in through your organization's unique subdomain:</p>
+        <p style="margin: 10px 0 0 0; font-family: 'Courier New', monospace; background: white; padding: 12px; border-radius: 4px; color: #667eea; font-weight: 600; font-size: 16px;">
+          ${loginUrl}
+        </p>
+      </div>
+      
+      <!-- CTA Button -->
+      <div style="text-align: center; margin: 35px 0;">
+        <a href="${loginUrl}" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%); color: white; padding: 16px 40px; text-decoration: none; border-radius: 8px; display: inline-block; font-weight: 600; font-size: 18px; box-shadow: 0 4px 6px rgba(102, 126, 234, 0.3);">
+          Sign In to ${tenantName}
+        </a>
+      </div>
+      
+      <!-- What You Can Do -->
+      <div style="margin: 35px 0;">
+        <h3 style="color: #333; font-size: 18px; margin-bottom: 15px;">What you can do:</h3>
+        <div style="display: flex; margin-bottom: 12px;">
+          <span style="color: #667eea; font-size: 20px; margin-right: 10px;">📝</span>
+          <span style="color: #555;">Create and manage controlled documents with version tracking</span>
+        </div>
+        <div style="display: flex; margin-bottom: 12px;">
+          <span style="color: #667eea; font-size: 20px; margin-right: 10px;">✅</span>
+          <span style="color: #555;">Review and approve documents submitted by your colleagues</span>
+        </div>
+        <div style="display: flex; margin-bottom: 12px;">
+          <span style="color: #667eea; font-size: 20px; margin-right: 10px;">📊</span>
+          <span style="color: #555;">Track document status and approval workflows</span>
+        </div>
+        <div style="display: flex; margin-bottom: 12px;">
+          <span style="color: #667eea; font-size: 20px; margin-right: 10px;">🔔</span>
+          <span style="color: #555;">Get notified when documents need your attention</span>
+        </div>
+      </div>
+      
+      <!-- Email Preferences -->
+      <div style="background: #f1f5f9; padding: 20px; border-radius: 8px; margin: 25px 0;">
+        <p style="margin: 0 0 10px 0; color: #475569; font-size: 14px;">
+          <strong>Tip:</strong> You can customize how often you receive email notifications in your 
+          <a href="${settingsUrl}" style="color: #667eea; text-decoration: none; font-weight: 600;">notification settings</a>.
+        </p>
+      </div>
+      
+      <!-- Footer -->
+      <div style="margin-top: 40px; padding-top: 25px; border-top: 1px solid #e5e7eb; text-align: center;">
+        <p style="color: #9ca3af; font-size: 13px; margin: 0 0 10px 0;">
+          Questions? Need help? Contact your system administrator.
+        </p>
+        <p style="color: #9ca3af; font-size: 13px; margin: 0;">
+          This is an automated message from BaselineDocs.
+        </p>
+      </div>
+    </div>
+  </div>
+</body>
+</html>
+  `
+}
+
+/**
  * Log email send to audit_log for tracking and billing
  */
 async function logEmailSent(

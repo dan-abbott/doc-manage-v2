@@ -369,6 +369,32 @@ export async function addUser(data: {
       }
     }
 
+    // Get tenant info for welcome email
+    const { data: tenantData } = await supabase
+      .from('tenants')
+      .select('subdomain, company_name')
+      .eq('id', userData.tenant_id)
+      .single()
+
+    // Send welcome email (non-blocking, don't fail if email fails)
+    if (tenantData) {
+      try {
+        const { sendWelcomeEmail } = await import('@/lib/email-notifications')
+        await sendWelcomeEmail(
+          validation.data.email.toLowerCase(),
+          `${validation.data.firstName} ${validation.data.lastName}`,
+          tenantData.subdomain,
+          tenantData.company_name || tenantData.subdomain
+        )
+      } catch (emailError) {
+        logger.warn('Failed to send welcome email (non-critical)', { 
+          email: validation.data.email,
+          error: emailError 
+        })
+        // Don't fail user creation if email fails
+      }
+    }
+
     logger.info('User added successfully', {
       addedBy: user.email,
       newUserEmail: validation.data.email,
