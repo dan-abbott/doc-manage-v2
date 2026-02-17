@@ -18,6 +18,7 @@ import {
 export async function upgradeTenantPlan(data: {
   tenantId: string
   newPlan: string
+  forceCheckout?: boolean
 }) {
   const supabase = await createClient()
   const cookieStore = await cookies()
@@ -150,16 +151,33 @@ export async function upgradeTenantPlan(data: {
 
     logger.info('🟢 [Billing] Price ID found', { plan: data.newPlan, priceId })
 
-    // Check if they have an existing subscription
-    if (currentBilling?.stripe_subscription_id) {
-      logger.info('🔵 [Billing] Existing subscription found - updating...', {
+    // Check if they have an existing active subscription
+    if (currentBilling?.stripe_subscription_id && !data.forceCheckout) {
+      logger.info('🔵 [Billing] Existing subscription found - checking status...', {
         subscriptionId: currentBilling.stripe_subscription_id
       })
       
-      // Update existing subscription
+      // Retrieve and check subscription status before updating
       const subscription = await stripe.subscriptions.retrieve(
         currentBilling.stripe_subscription_id
       )
+
+      if (subscription.status === 'canceled') {
+        logger.info('🟡 [Billing] Subscription is cancelled - will create new checkout session', {
+          subscriptionId: currentBilling.stripe_subscription_id,
+          status: subscription.status
+        })
+        // Clear the cancelled subscription ID from database so we create a fresh one
+        await supabase
+          .from('tenant_billing')
+          .update({ stripe_subscription_id: null })
+          .eq('tenant_id', data.tenantId)
+        // Fall through to checkout session creation below
+      } else {
+      logger.info('🔵 [Billing] Updating active subscription...', {
+        subscriptionId: currentBilling.stripe_subscription_id,
+        status: subscription.status
+      })
 
       await stripe.subscriptions.update(currentBilling.stripe_subscription_id, {
         items: [{
@@ -211,9 +229,10 @@ export async function upgradeTenantPlan(data: {
         success: true,
         message: 'Plan upgraded successfully!'
       }
+      } // end else (active subscription)
     }
 
-    // No existing subscription - create checkout session
+    // No existing subscription (or cancelled) - create checkout session
     logger.info('🔵 [Billing] No existing subscription - creating checkout session...')
     
     const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://app.baselinedocs.com'

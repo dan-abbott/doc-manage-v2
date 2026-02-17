@@ -358,6 +358,10 @@ export default function BillingPageClient({
         onOpenChange={setShowUpgradeDialog}
         currentPlan={currentPlan}
         tenantId={tenant.id}
+        paymentMethodBrand={billing?.payment_method_brand}
+        paymentMethodLast4={billing?.payment_method_last4}
+        paymentMethodExpMonth={billing?.payment_method_exp_month}
+        paymentMethodExpYear={billing?.payment_method_exp_year}
       />
     </>
   )
