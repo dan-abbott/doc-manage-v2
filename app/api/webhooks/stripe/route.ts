@@ -17,32 +17,28 @@ const supabase = createClient(
 )
 
 export async function POST(request: NextRequest) {
-  // Log IMMEDIATELY when function is called
   console.log('🟣 [Webhook] === WEBHOOK FUNCTION CALLED ===')
   console.log('🟣 [Webhook] Timestamp:', new Date().toISOString())
-  console.log('🟣 [Webhook] URL:', request.url)
-  console.log('🟣 [Webhook] Method:', request.method)
-  
+
+  const body = await request.text()
+  const signature = request.headers.get('stripe-signature')
+
+  console.log('🔵 [Webhook] Request details:', {
+    hasBody: !!body,
+    bodyLength: body.length,
+    hasSignature: !!signature,
+    hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
+    secretPrefix: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
+  })
+
+  if (!signature) {
+    console.error('🔴 [Webhook] No signature in request')
+    return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
+  }
+
+  let event: Stripe.Event
+
   try {
-    console.log('🔵 [Webhook] Reading request body...')
-    const body = await request.text()
-    const signature = request.headers.get('stripe-signature')
-
-    console.log('🔵 [Webhook] Request details:', {
-      hasBody: !!body,
-      bodyLength: body.length,
-      hasSignature: !!signature,
-      hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
-      secretPrefix: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
-    })
-
-    if (!signature) {
-      console.error('🔴 [Webhook] No signature in request')
-      return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
-    }
-
-    let event: Stripe.Event
-
     console.log('🔵 [Webhook] Attempting to construct event...')
     event = stripe.webhooks.constructEvent(
       body,
@@ -51,8 +47,8 @@ export async function POST(request: NextRequest) {
     )
     console.log('🟢 [Webhook] Event constructed successfully')
   } catch (err: any) {
-    console.error('🔴 [Webhook] ERROR in webhook handler:', err)
-    return NextResponse.json({ error: err.message }, { status: 500 })
+    console.error('🔴 [Webhook] Invalid signature:', err.message)
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
   }
 
   console.log(`🔵 [Webhook] Received event: ${event.type}`, {
