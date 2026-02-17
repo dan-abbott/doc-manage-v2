@@ -381,7 +381,7 @@ export async function upgradeTenantPlan(data: {
       let nextBillingDate: string | null = null
       let nextBillingAmount: number | null = null
       try {
-        const upcoming = await stripe.invoices.retrieveUpcoming({
+        const upcoming = await stripe.invoices.upcoming({
           customer: customerId,
         }) as any
         // Find proration line items (amount_due minus the regular charge)
