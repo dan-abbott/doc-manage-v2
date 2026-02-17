@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { cookies } from 'next/headers'
 import { revalidatePath } from 'next/cache'
 import { logger } from '@/lib/logger'
+import { Resend } from 'resend'
 import { 
   stripe, 
   STRIPE_PRICES, 
@@ -11,6 +12,158 @@ import {
   createCheckoutSession,
   createBillingPortalSession 
 } from '@/lib/stripe/client'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FROM_EMAIL = process.env.FROM_EMAIL || 'billing@baselinedocs.com'
+const OWNER_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
+
+const PLAN_NAMES: Record<string, string> = {
+  starter: 'Starter',
+  professional: 'Professional',
+  enterprise: 'Enterprise',
+}
+
+const PLAN_PRICES: Record<string, number> = {
+  starter: 29,
+  professional: 99,
+  enterprise: 299,
+}
+
+/**
+ * Send upgrade confirmation email to tenant admin + owner BCC
+ */
+async function sendUpgradeConfirmation(params: {
+  toEmail: string
+  companyName: string
+  previousPlan: string
+  newPlan: string
+  subscriptionId: string
+  immediateCharge?: number | null  // proration amount in cents, null for new subscriptions
+  nextBillingDate?: string | null
+  nextBillingAmount?: number | null
+}) {
+  const planName = PLAN_NAMES[params.newPlan] || params.newPlan
+  const prevPlanName = PLAN_NAMES[params.previousPlan] || params.previousPlan
+  const monthlyPrice = PLAN_PRICES[params.newPlan] || 0
+
+  const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`
+  const formatDate = (iso: string | null | undefined) => {
+    if (!iso) return 'N/A'
+    return new Date(iso).toLocaleDateString('en-US', { 
+      year: 'numeric', month: 'long', day: 'numeric' 
+    })
+  }
+
+  const proratedSection = params.immediateCharge != null
+    ? `
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Prorated charge today</td>
+        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right; font-weight: 600;">${formatCurrency(params.immediateCharge)}</td>
+      </tr>`
+    : ''
+
+  const nextBillingSection = params.nextBillingDate && params.nextBillingAmount != null
+    ? `
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Next billing date</td>
+        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${formatDate(params.nextBillingDate)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Next billing amount</td>
+        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right; font-weight: 600;">${formatCurrency(params.nextBillingAmount)}</td>
+      </tr>`
+    : ''
+
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; margin: 0; padding: 0;">
+      <div style="max-width: 560px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background: #1e40af; padding: 32px 40px;">
+          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">BaselineDocs</h1>
+          <p style="color: #bfdbfe; margin: 8px 0 0; font-size: 14px;">Document Control System</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 40px;">
+          <h2 style="color: #111827; margin: 0 0 8px; font-size: 20px;">Your plan has been upgraded ✓</h2>
+          <p style="color: #6b7280; margin: 0 0 32px; font-size: 15px;">
+            Thank you for upgrading, <strong>${params.companyName}</strong>! Your account has been updated and the new features are available immediately.
+          </p>
+
+          <!-- Plan Change -->
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="flex: 1;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Previous Plan</p>
+                <p style="margin: 4px 0 0; font-size: 16px; color: #374151; font-weight: 500;">${prevPlanName}</p>
+              </div>
+              <div style="color: #9ca3af; font-size: 20px;">→</div>
+              <div style="flex: 1; text-align: right;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">New Plan</p>
+                <p style="margin: 4px 0 0; font-size: 18px; color: #15803d; font-weight: 700;">${planName}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Billing Summary -->
+          <h3 style="color: #374151; font-size: 15px; font-weight: 600; margin: 0 0 12px;">Billing Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #e5e7eb;">
+            <tbody>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">New monthly rate</td>
+                <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">$${monthlyPrice}/month</td>
+              </tr>
+              ${proratedSection}
+              ${nextBillingSection}
+            </tbody>
+          </table>
+
+          <!-- Subscription ID -->
+          <p style="color: #9ca3af; font-size: 12px; margin: 24px 0 0;">
+            Subscription ID: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${params.subscriptionId}</code>
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+
+          <p style="color: #6b7280; font-size: 13px; margin: 0;">
+            Questions about your billing? Reply to this email or visit your 
+            <a href="https://app.baselinedocs.com/admin/billing" style="color: #1e40af;">billing dashboard</a>.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f9fafb; padding: 24px 40px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            BaselineDocs · Document Control System<br>
+            This is a transactional email regarding your account.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.toEmail,
+      bcc: OWNER_EMAIL,
+      subject: `Your BaselineDocs plan has been upgraded to ${planName}`,
+      html,
+    })
+    logger.info('🟢 [Billing] Upgrade confirmation email sent', { 
+      to: params.toEmail, 
+      plan: params.newPlan 
+    })
+  } catch (err) {
+    // Non-fatal - log but don't fail the upgrade
+    logger.error('🟡 [Billing] Failed to send upgrade email (non-fatal)', { error: err })
+  }
+}
 
 /**
  * Upgrade tenant plan (tenant admin action)
@@ -223,6 +376,38 @@ export async function upgradeTenantPlan(data: {
 
       logger.info('🟢 [Billing] Billing history logged')
 
+      // Fetch upcoming invoice for proration details
+      let immediateCharge: number | null = null
+      let nextBillingDate: string | null = null
+      let nextBillingAmount: number | null = null
+      try {
+        const upcoming = await stripe.invoices.retrieveUpcoming({
+          customer: customerId,
+        }) as any
+        // Find proration line items (amount_due minus the regular charge)
+        const prorationLines = upcoming.lines?.data?.filter((l: any) => l.proration) || []
+        const prorationTotal = prorationLines.reduce((sum: number, l: any) => sum + l.amount, 0)
+        immediateCharge = prorationTotal > 0 ? prorationTotal : null
+        nextBillingDate = upcoming.next_payment_attempt 
+          ? new Date(upcoming.next_payment_attempt * 1000).toISOString() 
+          : null
+        nextBillingAmount = upcoming.amount_due
+      } catch (e) {
+        logger.info('🟡 [Billing] Could not fetch upcoming invoice for email (non-fatal)')
+      }
+
+      // Send confirmation email
+      await sendUpgradeConfirmation({
+        toEmail: user.email!,
+        companyName: tenantData?.company_name || tenantData?.subdomain,
+        previousPlan: currentBilling?.plan || 'trial',
+        newPlan: data.newPlan,
+        subscriptionId: currentBilling.stripe_subscription_id,
+        immediateCharge,
+        nextBillingDate,
+        nextBillingAmount,
+      })
+
       revalidatePath('/admin/billing')
 
       return {
@@ -288,6 +473,29 @@ export async function upgradeTenantPlan(data: {
       }
 
       logger.info('🟢 [Billing] Database updated after direct subscription creation')
+
+      // Fetch next billing info for email
+      let nextBillingDate: string | null = null
+      let nextBillingAmount: number | null = null
+      try {
+        const subAny = newSubscription as any
+        nextBillingDate = subAny.billing_cycle_anchor 
+          ? new Date((subAny.billing_cycle_anchor + 2592000) * 1000).toISOString()
+          : null
+        nextBillingAmount = (PLAN_PRICES[data.newPlan] || 0) * 100
+      } catch (e) {}
+
+      // Send confirmation email
+      await sendUpgradeConfirmation({
+        toEmail: user.email!,
+        companyName: tenantData?.company_name || tenantData?.subdomain,
+        previousPlan: currentBilling?.plan || 'trial',
+        newPlan: data.newPlan,
+        subscriptionId: newSubscription.id,
+        immediateCharge: null,  // New subscription, first full charge
+        nextBillingDate,
+        nextBillingAmount,
+      })
 
       revalidatePath('/admin/billing')
 

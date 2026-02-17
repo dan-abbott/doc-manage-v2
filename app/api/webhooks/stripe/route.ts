@@ -6,6 +6,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { createClient } from '@supabase/supabase-js'
+import { Resend } from 'resend'
+
+const resend = new Resend(process.env.RESEND_API_KEY)
+const FROM_EMAIL = process.env.FROM_EMAIL || 'billing@baselinedocs.com'
+const OWNER_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
+
+const PLAN_NAMES: Record<string, string> = {
+  starter: 'Starter',
+  professional: 'Professional', 
+  enterprise: 'Enterprise',
+  trial: 'Trial',
+}
+
+const PLAN_PRICES: Record<string, number> = {
+  starter: 29,
+  professional: 99,
+  enterprise: 299,
+}
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
   apiVersion: '2026-01-28.clover',
@@ -237,7 +255,119 @@ async function handleSubscription(sub: Stripe.Subscription) {
     status: sub.status
   })
 
+  // Send upgrade confirmation email via webhook (covers Checkout path)
+  // Only send on active subscriptions, not cancellations
+  if (sub.status === 'active' && plan !== 'trial') {
+    try {
+      // Get tenant admin email
+      const { data: tenantData } = await supabase
+        .from('tenants')
+        .select('name, subdomain')
+        .eq('id', tenantId)
+        .single()
+
+      const { data: adminData } = await supabase
+        .from('users')
+        .select('email')
+        .eq('tenant_id', tenantId)
+        .eq('role', 'admin')
+        .limit(1)
+        .single()
+
+      if (adminData?.email) {
+        const subAny = sub as any
+        const nextBillingDate = subAny.billing_cycle_anchor
+          ? new Date((subAny.billing_cycle_anchor + 2592000) * 1000).toISOString()
+          : null
+
+        const html = buildUpgradeEmailHtml({
+          companyName: tenantData?.name || tenantData?.subdomain || 'your company',
+          previousPlan: 'trial',
+          newPlan: plan,
+          subscriptionId: sub.id,
+          nextBillingDate,
+          nextBillingAmount: (PLAN_PRICES[plan] || 0) * 100,
+        })
+
+        await resend.emails.send({
+          from: FROM_EMAIL,
+          to: adminData.email,
+          bcc: OWNER_EMAIL,
+          subject: `Your BaselineDocs plan has been upgraded to ${PLAN_NAMES[plan] || plan}`,
+          html,
+        })
+        console.log('🟢 [Webhook] Upgrade email sent to:', adminData.email)
+      }
+    } catch (emailErr) {
+      console.log('🟡 [Webhook] Email send failed (non-fatal):', emailErr)
+    }
+  }
+
   console.log(`[Webhook] Subscription synced: ${tenantId}`)
+}
+
+function buildUpgradeEmailHtml(params: {
+  companyName: string
+  previousPlan: string
+  newPlan: string
+  subscriptionId: string
+  nextBillingDate?: string | null
+  nextBillingAmount?: number | null
+  immediateCharge?: number | null
+}) {
+  const planName = PLAN_NAMES[params.newPlan] || params.newPlan
+  const prevPlanName = PLAN_NAMES[params.previousPlan] || params.previousPlan
+  const monthlyPrice = PLAN_PRICES[params.newPlan] || 0
+  const formatDate = (iso: string | null | undefined) => {
+    if (!iso) return 'N/A'
+    return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+  }
+  const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`
+
+  const proratedRow = params.immediateCharge != null
+    ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Prorated charge today</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;font-weight:600;">${formatCurrency(params.immediateCharge)}</td></tr>`
+    : ''
+
+  const nextBillingRows = params.nextBillingDate && params.nextBillingAmount != null
+    ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Next billing date</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;">${formatDate(params.nextBillingDate)}</td></tr>
+       <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Next billing amount</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;font-weight:600;">${formatCurrency(params.nextBillingAmount)}</td></tr>`
+    : ''
+
+  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
+  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:0;">
+  <div style="max-width:560px;margin:40px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
+    <div style="background:#1e40af;padding:32px 40px;">
+      <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">BaselineDocs</h1>
+      <p style="color:#bfdbfe;margin:8px 0 0;font-size:14px;">Document Control System</p>
+    </div>
+    <div style="padding:40px;">
+      <h2 style="color:#111827;margin:0 0 8px;font-size:20px;">Your plan has been upgraded ✓</h2>
+      <p style="color:#6b7280;margin:0 0 32px;font-size:15px;">
+        Thank you for upgrading, <strong>${params.companyName}</strong>! Your account has been updated and new features are available immediately.
+      </p>
+      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px;">
+        <table style="width:100%;"><tr>
+          <td><p style="margin:0;font-size:12px;color:#6b7280;text-transform:uppercase;">Previous Plan</p><p style="margin:4px 0 0;font-size:16px;color:#374151;font-weight:500;">${prevPlanName}</p></td>
+          <td style="text-align:center;color:#9ca3af;font-size:20px;">→</td>
+          <td style="text-align:right;"><p style="margin:0;font-size:12px;color:#6b7280;text-transform:uppercase;">New Plan</p><p style="margin:4px 0 0;font-size:18px;color:#15803d;font-weight:700;">${planName}</p></td>
+        </tr></table>
+      </div>
+      <h3 style="color:#374151;font-size:15px;font-weight:600;margin:0 0 12px;">Billing Summary</h3>
+      <table style="width:100%;border-collapse:collapse;border-top:1px solid #e5e7eb;">
+        <tbody>
+          <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">New monthly rate</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;">$${monthlyPrice}/month</td></tr>
+          ${proratedRow}
+          ${nextBillingRows}
+        </tbody>
+      </table>
+      <p style="color:#9ca3af;font-size:12px;margin:24px 0 0;">Subscription ID: <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">${params.subscriptionId}</code></p>
+      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
+      <p style="color:#6b7280;font-size:13px;margin:0;">Questions? Reply to this email or visit your <a href="https://app.baselinedocs.com/admin/billing" style="color:#1e40af;">billing dashboard</a>.</p>
+    </div>
+    <div style="background:#f9fafb;padding:24px 40px;border-top:1px solid #e5e7eb;">
+      <p style="color:#9ca3af;font-size:12px;margin:0;">BaselineDocs · Document Control System<br>This is a transactional email regarding your account.</p>
+    </div>
+  </div></body></html>`
 }
 
 async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
