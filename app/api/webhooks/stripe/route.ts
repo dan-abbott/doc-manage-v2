@@ -64,6 +64,10 @@ export async function POST(request: NextRequest) {
 
   try {
     switch (event.type) {
+      case 'checkout.session.completed':
+        console.log('🟢 [Webhook] Processing checkout.session.completed')
+        await handleCheckoutSessionCompleted(event.data.object)
+        break
       case 'customer.subscription.created':
         console.log('🟢 [Webhook] Processing subscription.created')
         await handleSubscription(event.data.object as Stripe.Subscription)
@@ -125,9 +129,37 @@ async function logError(eventId: string, error: string) {
 }
 
 async function getTenantId(customerId: string) {
-  const { data } = await supabase.from('tenants').select('id').eq('stripe_customer_id', customerId).single()
-  if (!data) throw new Error(`No tenant for customer ${customerId}`)
-  return data.id
+  const { data } = await supabase.from('tenant_billing').select('tenant_id').eq('stripe_customer_id', customerId).single()
+  if (!data) { console.error('🔴 [Webhook] No tenant found for customer:', customerId); throw new Error(`No tenant for customer ${customerId}`) }
+  return data.tenant_id
+}
+
+async function handleCheckoutSessionCompleted(session: any) {
+  console.log('🔵 [Webhook] handleCheckoutSessionCompleted called', {
+    sessionId: session.id,
+    customerId: session.customer,
+    subscriptionId: session.subscription,
+    paymentStatus: session.payment_status
+  })
+
+  if (!session.subscription) {
+    console.log('⚠️ [Webhook] No subscription in session (one-time payment), skipping')
+    return
+  }
+
+  // Retrieve the full subscription
+  const sub: any = await stripe.subscriptions.retrieve(session.subscription, {
+    expand: ['default_payment_method']
+  })
+
+  console.log('🟢 [Webhook] Subscription retrieved from checkout:', {
+    subscriptionId: sub.id,
+    status: sub.status,
+    customerId: sub.customer
+  })
+
+  // Process using the same subscription handler
+  await handleSubscription(sub)
 }
 
 async function handleSubscription(sub: Stripe.Subscription) {
