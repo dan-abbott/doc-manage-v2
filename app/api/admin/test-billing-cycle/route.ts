@@ -479,6 +479,56 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     .eq('status', 'past_due')
 
   console.log(`[Webhook] Invoice paid: ${tenantId}`)
+
+  // Send payment confirmation email
+  sendPaymentConfirmation(tenantId, invoice).catch(err => {
+    console.error('[Webhook] Email error:', err.message)
+  })
+}
+
+async function sendPaymentConfirmation(tenantId: string, invoice: Stripe.Invoice) {
+  const { sendPaymentConfirmationEmail } = await import('@/lib/billing-emails')
+  const { createServiceRoleClient } = await import('@/lib/supabase/server')
+  const adminClient = createServiceRoleClient()
+  
+  const { data: tenant } = await adminClient
+    .from('tenants')
+    .select('company_name, subdomain')
+    .eq('id', tenantId)
+    .single()
+
+  const { data: billing } = await adminClient
+    .from('tenant_billing')
+    .select('plan')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  const { data: adminUsers } = await adminClient
+    .from('users')
+    .select('email')
+    .eq('tenant_id', tenantId)
+    .eq('is_admin', true)
+    .limit(1)
+
+  const adminEmail = adminUsers?.[0]?.email
+
+  if (adminEmail && tenant && billing) {
+    await sendPaymentConfirmationEmail({
+      toEmail: adminEmail,
+      companyName: tenant.company_name || tenant.subdomain,
+      plan: billing.plan,
+      amount: (invoice.amount_paid || 0) / 100,
+      invoiceNumber: invoice.number || invoice.id,
+      paidDate: new Date(invoice.status_transitions?.paid_at ? invoice.status_transitions.paid_at * 1000 : Date.now()).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      invoiceUrl: invoice.hosted_invoice_url || null,
+      receiptUrl: invoice.invoice_pdf || null
+    })
+    console.log(`[Webhook] Payment confirmation sent to: ${adminEmail}`)
+  }
 }
 }
 
