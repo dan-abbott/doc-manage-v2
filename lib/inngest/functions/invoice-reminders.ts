@@ -96,7 +96,7 @@ export const sendInvoiceReminders = inngest.createFunction(
           }
 
           // Get upcoming invoice from Stripe
-          const upcomingInvoice = await stripe.invoices.retrieveUpcoming({
+          const upcomingInvoice = await (stripe.invoices as any).upcoming({
             customer: tenant.stripe_customer_id,
             subscription: subscription.id,
           })
