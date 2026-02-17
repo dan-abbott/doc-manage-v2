@@ -376,24 +376,27 @@ export async function upgradeTenantPlan(data: {
 
       logger.info('🟢 [Billing] Billing history logged')
 
-      // Fetch upcoming invoice for proration details
+      // Fetch upcoming invoice for proration details (optional for email)
       let immediateCharge: number | null = null
       let nextBillingDate: string | null = null
       let nextBillingAmount: number | null = null
       try {
-        const upcoming = await stripe.invoices.upcoming({
-          customer: customerId,
-        }) as any
-        // Find proration line items (amount_due minus the regular charge)
-        const prorationLines = upcoming.lines?.data?.filter((l: any) => l.proration) || []
-        const prorationTotal = prorationLines.reduce((sum: number, l: any) => sum + l.amount, 0)
-        immediateCharge = prorationTotal > 0 ? prorationTotal : null
-        nextBillingDate = upcoming.next_payment_attempt 
-          ? new Date(upcoming.next_payment_attempt * 1000).toISOString() 
-          : null
-        nextBillingAmount = upcoming.amount_due
+        // Try to get upcoming invoice - method name varies by Stripe version
+        const upcoming = await (stripe.invoices as any).retrieveUpcoming?.({ customer: customerId }) 
+          || await (stripe.invoices as any).upcoming?.({ customer: customerId })
+        
+        if (upcoming) {
+          const prorationLines = upcoming.lines?.data?.filter((l: any) => l.proration) || []
+          const prorationTotal = prorationLines.reduce((sum: number, l: any) => sum + l.amount, 0)
+          immediateCharge = prorationTotal > 0 ? prorationTotal : null
+          nextBillingDate = upcoming.next_payment_attempt 
+            ? new Date(upcoming.next_payment_attempt * 1000).toISOString() 
+            : null
+          nextBillingAmount = upcoming.amount_due
+        }
       } catch (e) {
-        logger.info('🟡 [Billing] Could not fetch upcoming invoice for email (non-fatal)')
+        // Non-fatal - email will just not have proration details
+        logger.info('🟡 [Billing] Could not fetch upcoming invoice (non-fatal)', { error: String(e) })
       }
 
       // Send confirmation email
