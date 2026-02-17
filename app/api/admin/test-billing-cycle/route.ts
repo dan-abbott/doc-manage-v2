@@ -67,29 +67,15 @@ export async function POST(request: NextRequest) {
 
     console.log('[Test Billing] Starting test cycle for:', tenant.subdomain)
 
-    // Step 1: Get upcoming invoice (use fallback for API version compatibility)
-    const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming?.({
-      customer: billing.stripe_customer_id,
-      subscription: billing.stripe_subscription_id,
-    }) || await (stripe.invoices as any).upcoming?.({
-      customer: billing.stripe_customer_id,
-      subscription: billing.stripe_subscription_id,
-    })
+    // Get subscription to calculate amount
+    const subscription = await stripe.subscriptions.retrieve(billing.stripe_subscription_id) as any
+    const priceAmount = subscription.items?.data?.[0]?.price?.unit_amount || 0
+    const amount = priceAmount / 100
+    const billingDate = new Date(subscription.current_period_end * 1000)
 
-    if (!upcomingInvoice) {
-      return NextResponse.json({ 
-        error: 'Could not retrieve upcoming invoice from Stripe' 
-      }, { status: 500 })
-    }
+    console.log('[Test Billing] Current plan:', billing.plan, 'Amount:', amount)
 
-    console.log('[Test Billing] Upcoming invoice retrieved, amount:', upcomingInvoice.amount_due)
-
-    // Note: Upcoming invoices don't have a stable ID until finalized
-    // We'll skip creating the pending invoice and go straight to finalization
-    
-    console.log('[Test Billing] Skipping pending invoice creation (will finalize directly)')
-
-    // Step 3: Send reminder email (simulating 5-day advance notice)
+    // Step 1: Send reminder email (simulating 5-day advance notice)
     const { data: adminUser } = await supabase
       .from('users')
       .select('email')
@@ -99,36 +85,31 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (adminUser?.email) {
-      const subscription = await stripe.subscriptions.retrieve(billing.stripe_subscription_id) as any
-      const billingDate = new Date(subscription.current_period_end * 1000)
-      
-      // Import the email function
       const { Resend } = await import('resend')
       const resend = new Resend(process.env.RESEND_API_KEY)
       
       const html = buildReminderEmail({
         companyName: tenant.company_name || tenant.subdomain,
         plan: billing.plan,
-        amount: (upcomingInvoice.amount_due || 0) / 100,
+        amount: amount,
         billingDate: billingDate.toLocaleDateString('en-US', { 
           year: 'numeric', month: 'long', day: 'numeric' 
         }),
-        invoiceUrl: upcomingInvoice.hosted_invoice_url,
+        invoiceUrl: null, // No URL yet
       })
 
       await resend.emails.send({
         from: process.env.FROM_BILLING_EMAIL || 'billing@baselinedocs.com',
         to: adminUser.email,
         bcc: process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com',
-        subject: `[TEST] Upcoming charge: $${((upcomingInvoice.amount_due || 0) / 100).toFixed(2)}`,
+        subject: `[TEST] Upcoming charge: $${amount.toFixed(2)}`,
         html,
       })
 
       console.log('[Test Billing] Reminder email sent to:', adminUser.email)
     }
 
-    // Step 4: Create and finalize a new invoice (this triggers actual payment)
-    // Note: We create a fresh invoice rather than finalizing the upcoming one
+    // Step 2: Create and finalize a new invoice (this triggers actual payment)
     const newInvoice = await stripe.invoices.create({
       customer: billing.stripe_customer_id,
       subscription: billing.stripe_subscription_id,
@@ -157,7 +138,7 @@ export async function POST(request: NextRequest) {
       message: 'Test billing cycle completed',
       tenant: tenant.subdomain,
       steps: {
-        upcomingInvoiceAmount: (upcomingInvoice.amount_due || 0) / 100,
+        subscriptionAmount: amount,
         reminderEmailSent: !!adminUser?.email,
         newInvoiceCreated: newInvoice.id,
         invoiceFinalized: finalizedInvoice.id,
