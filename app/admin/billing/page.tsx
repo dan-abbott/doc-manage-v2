@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import BillingPageClient from './BillingPageClient'
+import { syncInvoicesFromStripe } from './sync-invoices'
 
 export default async function BillingPage() {
   const supabase = await createClient()
@@ -51,13 +52,20 @@ export default async function BillingPage() {
     .eq('tenant_id', tenantData.id)
     .single()
 
-  // Get invoices
-  const { data: invoices } = await supabase
-    .from('invoices')
-    .select('*')
-    .eq('tenant_id', tenantData.id)
-    .order('invoice_date', { ascending: false })
-    .limit(12)
+  // Get invoices - sync from Stripe first to backfill any missing
+  let invoices = []
+  if (billing?.stripe_customer_id) {
+    invoices = await syncInvoicesFromStripe(tenantData.id, billing.stripe_customer_id)
+  } else {
+    // Fallback to database only if no Stripe customer
+    const { data: dbInvoices } = await supabase
+      .from('invoices')
+      .select('*')
+      .eq('tenant_id', tenantData.id)
+      .order('invoice_date', { ascending: false })
+      .limit(12)
+    invoices = dbInvoices || []
+  }
 
   // Get usage stats (last 30 days)
   const thirtyDaysAgo = new Date()
