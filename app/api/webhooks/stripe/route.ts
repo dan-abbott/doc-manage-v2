@@ -170,7 +170,12 @@ async function handleSubscription(sub: Stripe.Subscription) {
   
   let pm = null
   if (sub.default_payment_method) {
-    pm = await stripe.paymentMethods.retrieve(sub.default_payment_method as string)
+    // default_payment_method may already be expanded (object) or just an ID (string)
+    if (typeof sub.default_payment_method === 'string') {
+      pm = await stripe.paymentMethods.retrieve(sub.default_payment_method)
+    } else {
+      pm = sub.default_payment_method as Stripe.PaymentMethod
+    }
     console.log('🟢 [Webhook] Payment method retrieved:', {
       type: pm.type,
       brand: pm.card?.brand,
@@ -210,7 +215,16 @@ async function handleSubscription(sub: Stripe.Subscription) {
 
   console.log('🔵 [Webhook] Upserting tenant_billing:', billingUpdate)
 
-  const { error } = await supabase.from('tenant_billing').upsert(billingUpdate, { onConflict: 'tenant_id' })
+  // Try update first, then insert if no row exists
+  const { data: existing } = await supabase
+    .from('tenant_billing')
+    .select('id')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  const { error } = existing
+    ? await supabase.from('tenant_billing').update(billingUpdate).eq('tenant_id', tenantId)
+    : await supabase.from('tenant_billing').insert(billingUpdate)
   
   if (error) {
     console.error('🔴 [Webhook] Failed to update tenant_billing:', error)
