@@ -67,8 +67,11 @@ export async function POST(request: NextRequest) {
 
     console.log('[Test Billing] Starting test cycle for:', tenant.subdomain)
 
-    // Step 1: Get upcoming invoice
-    const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming({
+    // Step 1: Get upcoming invoice (use fallback for API version compatibility)
+    const upcomingInvoice = await (stripe.invoices as any).retrieveUpcoming?.({
+      customer: billing.stripe_customer_id,
+      subscription: billing.stripe_subscription_id,
+    }) || await (stripe.invoices as any).upcoming?.({
       customer: billing.stripe_customer_id,
       subscription: billing.stripe_subscription_id,
     })
