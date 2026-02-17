@@ -142,6 +142,77 @@ async function logError(eventId: string, error: string) {
   await supabase.from('stripe_events').update({ error }).eq('stripe_event_id', eventId)
 }
 
+
+function buildPaymentConfirmationEmail(params: {
+  companyName: string
+  plan: string
+  amount: number
+  invoiceNumber: string
+  paidDate: string
+  invoiceUrl: string | null
+  receiptUrl: string | null
+}) {
+  return `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; margin: 0; padding: 0;">
+      <div style="max-width: 560px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        <div style="background: #1e40af; padding: 32px 40px;">
+          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">BaselineDocs</h1>
+          <p style="color: #bfdbfe; margin: 8px 0 0; font-size: 14px;">Document Control System</p>
+        </div>
+        <div style="padding: 40px;">
+          <div style="background: #dcfce7; border: 2px solid #86efac; border-radius: 8px; padding: 16px; margin-bottom: 24px; text-align: center;">
+            <h2 style="color: #166534; margin: 0; font-size: 18px;">✓ Payment Received</h2>
+          </div>
+          <p style="color: #6b7280; margin: 0 0 24px; font-size: 15px;">
+            Hi <strong>${params.companyName}</strong>, your payment has been processed successfully.
+          </p>
+          <div style="background: #f9fafb; border: 1px solid #e5e7eb; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+            <table style="width: 100%;">
+              <tr>
+                <td style="padding: 8px 0;">
+                  <p style="margin: 0; font-size: 13px; color: #6b7280;">Plan</p>
+                  <p style="margin: 4px 0 0; font-size: 16px; color: #111827; font-weight: 600;">${params.plan}</p>
+                </td>
+                <td style="padding: 8px 0; text-align: right;">
+                  <p style="margin: 0; font-size: 13px; color: #6b7280;">Amount Paid</p>
+                  <p style="margin: 4px 0 0; font-size: 18px; color: #059669; font-weight: 700;">$${params.amount.toFixed(2)}</p>
+                </td>
+              </tr>
+            </table>
+            <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 16px 0;">
+            <p style="margin: 0; font-size: 14px; color: #374151;">
+              <strong>Invoice:</strong> ${params.invoiceNumber}<br>
+              <strong>Paid on:</strong> ${params.paidDate}
+            </p>
+          </div>
+          ${params.invoiceUrl || params.receiptUrl ? `
+          <div style="text-align: center; margin: 24px 0;">
+            ${params.invoiceUrl ? `<a href="${params.invoiceUrl}" style="display: inline-block; background: #1e40af; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 0 8px;">View Invoice</a>` : ''}
+            ${params.receiptUrl ? `<a href="${params.receiptUrl}" style="display: inline-block; background: #6b7280; color: white; text-decoration: none; padding: 12px 24px; border-radius: 6px; font-weight: 600; font-size: 14px; margin: 0 8px;">Download Receipt</a>` : ''}
+          </div>
+          ` : ''}
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+          <p style="color: #6b7280; font-size: 13px; margin: 0;">
+            Questions about your billing? Visit your 
+            <a href="https://app.baselinedocs.com/admin/billing" style="color: #1e40af;">billing dashboard</a> 
+            or reply to this email.
+          </p>
+        </div>
+        <div style="background: #f9fafb; padding: 24px 40px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            BaselineDocs · Document Control System<br>
+            This is a payment confirmation for your subscription.
+          </p>
+        </div>
+      </div>
+    </body>
+    </html>
+  `
+}
+
 async function getTenantId(customerId: string) {
   const { data } = await supabase.from('tenant_billing').select('tenant_id').eq('stripe_customer_id', customerId).single()
   if (!data) { console.error('🔴 [Webhook] No tenant found for customer:', customerId); throw new Error(`No tenant for customer ${customerId}`) }
@@ -408,6 +479,57 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
     .eq('status', 'past_due')
 
   console.log(`[Webhook] Invoice paid: ${tenantId}`)
+
+  // Send payment confirmation email
+  sendPaymentConfirmation(tenantId, invoice).catch(err => {
+    console.error('[Webhook] Email error:', err.message)
+  })
+}
+
+async function sendPaymentConfirmation(tenantId: string, invoice: Stripe.Invoice) {
+  const { sendPaymentConfirmationEmail } = await import('@/lib/billing-emails')
+  const { createServiceRoleClient } = await import('@/lib/supabase/server')
+  const adminClient = createServiceRoleClient()
+  
+  const { data: tenant } = await adminClient
+    .from('tenants')
+    .select('company_name, subdomain')
+    .eq('id', tenantId)
+    .single()
+
+  const { data: billing } = await adminClient
+    .from('tenant_billing')
+    .select('plan')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  const { data: adminUsers } = await adminClient
+    .from('users')
+    .select('email')
+    .eq('tenant_id', tenantId)
+    .eq('is_admin', true)
+    .limit(1)
+
+  const adminEmail = adminUsers?.[0]?.email
+
+  if (adminEmail && tenant && billing) {
+    await sendPaymentConfirmationEmail({
+      toEmail: adminEmail,
+      companyName: tenant.company_name || tenant.subdomain,
+      plan: billing.plan,
+      amount: (invoice.amount_paid || 0) / 100,
+      invoiceNumber: invoice.number || invoice.id,
+      paidDate: new Date(invoice.status_transitions?.paid_at ? invoice.status_transitions.paid_at * 1000 : Date.now()).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      }),
+      invoiceUrl: invoice.hosted_invoice_url || null,
+      receiptUrl: invoice.invoice_pdf || null
+    })
+    console.log(`[Webhook] Payment confirmation sent to: ${adminEmail}`)
+  }
+}
 }
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
