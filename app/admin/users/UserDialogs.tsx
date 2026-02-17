@@ -16,6 +16,16 @@ import {
   DialogTrigger,
 } from '@/components/ui/dialog'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   Select,
   SelectContent,
   SelectItem,
@@ -31,6 +41,12 @@ export function AddUserDialog({ onUserAdded }: { onUserAdded?: () => void }) {
   const [email, setEmail] = useState('')
   const [role, setRole] = useState<UserRole>('Normal')
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
+  const [upgradeInfo, setUpgradeInfo] = useState<{
+    currentPlan: string
+    userLimit: number
+    currentUsers: number
+  } | null>(null)
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -55,9 +71,20 @@ export function AddUserDialog({ onUserAdded }: { onUserAdded?: () => void }) {
         setRole('Normal')
         onUserAdded?.()
       } else {
-        toast.error('Failed to Add User', {
-          description: result.error
-        })
+        // Check if this is a user limit error
+        if ((result as any).requiresUpgrade) {
+          setOpen(false)
+          setShowUpgradeDialog(true)
+          setUpgradeInfo({
+            currentPlan: (result as any).currentPlan,
+            userLimit: (result as any).userLimit,
+            currentUsers: (result as any).currentUsers,
+          })
+        } else {
+          toast.error('Failed to Add User', {
+            description: result.error
+          })
+        }
       }
     } catch (error) {
       toast.error('Failed to Add User', {
@@ -69,6 +96,7 @@ export function AddUserDialog({ onUserAdded }: { onUserAdded?: () => void }) {
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button>
@@ -157,6 +185,43 @@ export function AddUserDialog({ onUserAdded }: { onUserAdded?: () => void }) {
         </form>
       </DialogContent>
     </Dialog>
+
+    {/* Upgrade Required Dialog */}
+    <AlertDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            User Limit Reached
+          </AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2">
+            <p>
+              Your <span className="font-semibold capitalize">{upgradeInfo?.currentPlan || 'current'}</span> plan 
+              is limited to <span className="font-semibold">{upgradeInfo?.userLimit}</span> users.
+            </p>
+            <p>
+              You currently have <span className="font-semibold">{upgradeInfo?.currentUsers}</span> active users.
+            </p>
+            <p className="text-foreground font-medium pt-2">
+              Upgrade your plan to add more users and unlock additional features.
+            </p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction asChild>
+            <Button
+              onClick={() => {
+                window.location.href = '/admin/billing'
+              }}
+            >
+              Upgrade Plan
+            </Button>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }
 
@@ -236,6 +301,7 @@ export function ImportUsersDialog({ onUsersImported }: { onUsersImported?: () =>
   }
 
   return (
+    <>
     <Dialog open={open} onOpenChange={setOpen}>
       <DialogTrigger asChild>
         <Button variant="outline">
@@ -334,5 +400,42 @@ export function ImportUsersDialog({ onUsersImported }: { onUsersImported?: () =>
         </DialogFooter>
       </DialogContent>
     </Dialog>
+
+    {/* Upgrade Required Dialog */}
+    <AlertDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
+      <AlertDialogContent>
+        <AlertDialogHeader>
+          <AlertDialogTitle className="flex items-center gap-2">
+            <AlertCircle className="h-5 w-5 text-amber-500" />
+            User Limit Reached
+          </AlertDialogTitle>
+          <AlertDialogDescription className="space-y-2">
+            <p>
+              Your <span className="font-semibold capitalize">{upgradeInfo?.currentPlan || 'current'}</span> plan 
+              is limited to <span className="font-semibold">{upgradeInfo?.userLimit}</span> users.
+            </p>
+            <p>
+              You currently have <span className="font-semibold">{upgradeInfo?.currentUsers}</span> active users.
+            </p>
+            <p className="text-foreground font-medium pt-2">
+              Upgrade your plan to add more users and unlock additional features.
+            </p>
+          </AlertDialogDescription>
+        </AlertDialogHeader>
+        <AlertDialogFooter>
+          <AlertDialogCancel>Cancel</AlertDialogCancel>
+          <AlertDialogAction asChild>
+            <Button
+              onClick={() => {
+                window.location.href = '/admin/billing'
+              }}
+            >
+              Upgrade Plan
+            </Button>
+          </AlertDialogAction>
+        </AlertDialogFooter>
+      </AlertDialogContent>
+    </AlertDialog>
+    </>
   )
 }

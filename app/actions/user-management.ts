@@ -20,6 +20,14 @@ const userUpdateSchema = z.object({
 /**
  * Get all users (admin only, filtered by tenant)
  */
+// Plan user limits
+const PLAN_USER_LIMITS: Record<string, number> = {
+  trial: 5,
+  starter: 25,
+  professional: 100,
+  enterprise: 999999, // Effectively unlimited
+}
+
 export async function getAllUsers() {
   const startTime = Date.now()
   const supabase = await createClient()
@@ -371,6 +379,46 @@ export async function addUser(data: {
     }
 
     const targetTenantId = subdomainTenant.id
+
+    // Check user limit for tenant's plan
+    const { data: billingData } = await supabase
+      .from('tenant_billing')
+      .select('plan')
+      .eq('tenant_id', targetTenantId)
+      .single()
+
+    const currentPlan = billingData?.plan || 'trial'
+    const userLimit = PLAN_USER_LIMITS[currentPlan] || PLAN_USER_LIMITS.trial
+
+    // Count active users in tenant (exclude deactivated)
+    const { count: userCount, error: countError } = await supabase
+      .from('users')
+      .select('id', { count: 'exact', head: true })
+      .eq('tenant_id', targetTenantId)
+      .eq('is_active', true)
+
+    if (countError) {
+      logger.error('Failed to count users', { error: countError })
+      return { success: false, error: 'Failed to check user limits' }
+    }
+
+    if (userCount !== null && userCount >= userLimit) {
+      const planNames: Record<string, string> = {
+        trial: 'Trial',
+        starter: 'Starter',
+        professional: 'Professional',
+        enterprise: 'Enterprise'
+      }
+      
+      return {
+        success: false,
+        error: `Your ${planNames[currentPlan] || currentPlan} plan is limited to ${userLimit} users. Please upgrade your plan to add more users.`,
+        requiresUpgrade: true,
+        currentPlan,
+        userLimit,
+        currentUsers: userCount
+      }
+    }
 
     // Check if user already exists in public.users
     const { data: existingUser } = await supabase
