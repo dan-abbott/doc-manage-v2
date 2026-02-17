@@ -76,8 +76,12 @@ export async function POST(request: NextRequest) {
     console.log('[Test Billing] Current plan:', billing.plan, 'Amount:', amount)
 
     // Step 1: Send reminder email (simulating 5-day advance notice)
+    // Use service role client to bypass RLS
+    const { createServiceRoleClient } = await import('@/lib/supabase/server')
+    const supabaseAdmin = createServiceRoleClient()
+    
     // First try to find admin by is_admin flag
-    const { data: adminUsers } = await supabase
+    const { data: adminUsers } = await supabaseAdmin
       .from('users')
       .select('email, role, is_admin')
       .eq('tenant_id', tenant.id)
@@ -85,7 +89,7 @@ export async function POST(request: NextRequest) {
       .limit(1)
 
     // Fallback: find by role='Admin'
-    const { data: adminByRole } = !adminUsers?.length ? await supabase
+    const { data: adminByRole } = !adminUsers?.length ? await supabaseAdmin
       .from('users')
       .select('email, role, is_admin')
       .eq('tenant_id', tenant.id)
@@ -99,7 +103,9 @@ export async function POST(request: NextRequest) {
       email: adminUser?.email,
       role: adminUser?.role,
       is_admin: adminUser?.is_admin,
-      tenant_id: tenant.id
+      tenant_id: tenant.id,
+      adminUsersCount: adminUsers?.length || 0,
+      adminByRoleCount: adminByRole?.length || 0
     })
 
     if (adminUser?.email) {
