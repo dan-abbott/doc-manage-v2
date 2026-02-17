@@ -1,6 +1,7 @@
 import { serve } from 'inngest/next'
 import { inngest } from '@/lib/inngest/client'
 import { scanPendingFiles } from '@/lib/inngest/functions/scan-files'
+import { sendInvoiceReminders } from '@/lib/inngest/functions/invoice-reminders'
 
 /**
  * Inngest API endpoint
@@ -15,6 +16,7 @@ export const { GET, POST, PUT } = serve({
   client: inngest,
   functions: [
     scanPendingFiles, // Register our scan function
+    sendInvoiceReminders, // Send invoice reminders 5 days before billing
   ],
   servePath: '/api/inngest',
 })
