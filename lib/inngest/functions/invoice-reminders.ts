@@ -75,7 +75,7 @@ export const sendInvoiceReminders = inngest.createFunction(
       const result = await step.run(`check-subscription-${tenant.tenant_id}`, async () => {
         try {
           // Get subscription details from Stripe
-          const subscription = await stripe.subscriptions.retrieve(tenant.stripe_subscription_id)
+          const subscription = await stripe.subscriptions.retrieve(tenant.stripe_subscription_id) as any
           
           const currentPeriodEnd = new Date(subscription.current_period_end * 1000)
           const now = new Date()
