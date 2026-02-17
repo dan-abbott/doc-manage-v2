@@ -530,7 +530,6 @@ async function sendPaymentConfirmation(tenantId: string, invoice: Stripe.Invoice
     console.log(`[Webhook] Payment confirmation sent to: ${adminEmail}`)
   }
 }
-}
 
 async function handlePaymentFailed(invoice: Stripe.Invoice) {
   if (!invoice.customer) return
