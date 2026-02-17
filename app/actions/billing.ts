@@ -232,10 +232,74 @@ export async function upgradeTenantPlan(data: {
       } // end else (active subscription)
     }
 
-    // No existing subscription (or cancelled) - create checkout session
-    logger.info('🔵 [Billing] No existing subscription - creating checkout session...')
+    // No existing subscription (or cancelled) - check for saved payment method first
+    logger.info('🔵 [Billing] No active subscription - checking for saved payment method...')
+
+    // Check if the Stripe customer has a default payment method saved
+    const stripeCustomer = await stripe.customers.retrieve(customerId) as any
+    const defaultPaymentMethod = stripeCustomer.invoice_settings?.default_payment_method
+
+    if (defaultPaymentMethod && !data.forceCheckout) {
+      // Customer has a saved card - create subscription directly, no Checkout needed
+      logger.info('🔵 [Billing] Saved payment method found - creating subscription directly', {
+        customerId,
+        paymentMethod: typeof defaultPaymentMethod === 'string' ? defaultPaymentMethod : defaultPaymentMethod.id
+      })
+
+      const paymentMethodId = typeof defaultPaymentMethod === 'string' 
+        ? defaultPaymentMethod 
+        : defaultPaymentMethod.id
+
+      const newSubscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: priceId }],
+        default_payment_method: paymentMethodId,
+        metadata: {
+          tenant_id: data.tenantId,
+          plan: data.newPlan,
+        },
+      })
+
+      logger.info('🟢 [Billing] Subscription created directly', {
+        subscriptionId: newSubscription.id,
+        status: newSubscription.status
+      })
+
+      // Update billing record immediately
+      const { data: existingBilling } = await supabase
+        .from('tenant_billing')
+        .select('id')
+        .eq('tenant_id', data.tenantId)
+        .single()
+
+      const billingData = {
+        tenant_id: data.tenantId,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: newSubscription.id,
+        plan: data.newPlan,
+        status: newSubscription.status,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (existingBilling) {
+        await supabase.from('tenant_billing').update(billingData).eq('tenant_id', data.tenantId)
+      } else {
+        await supabase.from('tenant_billing').insert(billingData)
+      }
+
+      logger.info('🟢 [Billing] Database updated after direct subscription creation')
+
+      revalidatePath('/admin/billing')
+
+      return {
+        success: true,
+        message: 'Plan upgraded successfully!'
+      }
+    }
+
+    // No saved payment method (or forceCheckout) - redirect to Stripe Checkout
+    logger.info('🔵 [Billing] No saved payment method - creating checkout session...')
     
-    const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://app.baselinedocs.com'
     const session = await createCheckoutSession({
       customerId,
       priceId,
