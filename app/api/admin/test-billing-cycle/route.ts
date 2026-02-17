@@ -76,27 +76,18 @@ export async function POST(request: NextRequest) {
       subscription: billing.stripe_subscription_id,
     })
 
-    console.log('[Test Billing] Upcoming invoice:', upcomingInvoice.id)
+    if (!upcomingInvoice) {
+      return NextResponse.json({ 
+        error: 'Could not retrieve upcoming invoice from Stripe' 
+      }, { status: 500 })
+    }
 
-    // Step 2: Create "pending" invoice in database (simulating 5-day reminder)
-    await supabase.from('invoices').upsert({
-      tenant_id: tenant.id,
-      stripe_invoice_id: upcomingInvoice.id,
-      stripe_subscription_id: billing.stripe_subscription_id,
-      amount_due: (upcomingInvoice.amount_due || 0) / 100,
-      amount_paid: 0,
-      currency: upcomingInvoice.currency,
-      status: 'pending',
-      invoice_date: new Date(upcomingInvoice.created * 1000).toISOString(),
-      paid_at: null,
-      hosted_invoice_url: upcomingInvoice.hosted_invoice_url || null,
-      invoice_pdf_url: upcomingInvoice.invoice_pdf || null,
-    }, {
-      onConflict: 'stripe_invoice_id',
-      ignoreDuplicates: false
-    })
+    console.log('[Test Billing] Upcoming invoice retrieved, amount:', upcomingInvoice.amount_due)
 
-    console.log('[Test Billing] Pending invoice created')
+    // Note: Upcoming invoices don't have a stable ID until finalized
+    // We'll skip creating the pending invoice and go straight to finalization
+    
+    console.log('[Test Billing] Skipping pending invoice creation (will finalize directly)')
 
     // Step 3: Send reminder email (simulating 5-day advance notice)
     const { data: adminUser } = await supabase
@@ -136,10 +127,17 @@ export async function POST(request: NextRequest) {
       console.log('[Test Billing] Reminder email sent to:', adminUser.email)
     }
 
-    // Step 4: Finalize the invoice (this triggers actual payment)
-    const finalizedInvoice = await stripe.invoices.finalizeInvoice(upcomingInvoice.id, {
-      auto_advance: true, // Automatically attempt payment
+    // Step 4: Create and finalize a new invoice (this triggers actual payment)
+    // Note: We create a fresh invoice rather than finalizing the upcoming one
+    const newInvoice = await stripe.invoices.create({
+      customer: billing.stripe_customer_id,
+      subscription: billing.stripe_subscription_id,
+      auto_advance: true, // Automatically attempt payment after finalization
     })
+    
+    console.log('[Test Billing] Invoice created:', newInvoice.id)
+    
+    const finalizedInvoice = await stripe.invoices.finalizeInvoice(newInvoice.id)
 
     console.log('[Test Billing] Invoice finalized:', finalizedInvoice.id)
 
@@ -159,9 +157,9 @@ export async function POST(request: NextRequest) {
       message: 'Test billing cycle completed',
       tenant: tenant.subdomain,
       steps: {
-        upcomingInvoiceCreated: upcomingInvoice.id,
-        pendingInvoiceInDatabase: true,
+        upcomingInvoiceAmount: (upcomingInvoice.amount_due || 0) / 100,
         reminderEmailSent: !!adminUser?.email,
+        newInvoiceCreated: newInvoice.id,
         invoiceFinalized: finalizedInvoice.id,
         invoiceStatus: paidInvoice.status,
         webhookNote: 'Webhook should update invoice to paid and send confirmation email'
