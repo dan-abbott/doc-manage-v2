@@ -273,10 +273,10 @@ export default function BillingPageClient({
                   <div key={invoice.id} className="flex items-center justify-between py-2 border-b last:border-b-0">
                     <div>
                       <div className="text-sm font-medium text-gray-900">
-                        {formatDate(invoice.invoice_date)}
+                        {invoice.invoice_number || invoice.stripe_invoice_id}
                       </div>
                       <div className="text-xs text-gray-500">
-                        {formatCurrency(invoice.amount_paid || invoice.amount_due)}
+                        {formatDate(invoice.invoice_date)} · {formatCurrency(invoice.amount_paid || invoice.amount_due)}
                       </div>
                     </div>
                     <div className="flex items-center gap-3">

@@ -45,6 +45,7 @@ export async function syncInvoicesFromStripe(tenantId: string, stripeCustomerId:
       const invoiceData = {
         tenant_id: tenantId,
         stripe_invoice_id: invoice.id,
+        invoice_number: invoice.number || null,
         stripe_subscription_id: subscriptionId,
         amount_due: (invoice.amount_due || 0) / 100,
         amount_paid: (invoice.amount_paid || 0) / 100,
