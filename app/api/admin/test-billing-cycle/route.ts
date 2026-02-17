@@ -22,6 +22,10 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
+  console.log('🟢 [Test Billing Endpoint] POST handler called')
+  console.log('🟢 [Test Billing Endpoint] URL:', request.url)
+  console.log('🟢 [Test Billing Endpoint] Method:', request.method)
+  
   try {
     const supabase = await createClient()
     
