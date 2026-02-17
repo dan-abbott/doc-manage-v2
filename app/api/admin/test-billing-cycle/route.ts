@@ -529,8 +529,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
           month: 'long',
           day: 'numeric'
         }),
-        invoiceUrl: invoice.hosted_invoice_url,
-        receiptUrl: invoice.invoice_pdf
+        invoiceUrl: invoice.hosted_invoice_url || null,
+        receiptUrl: invoice.invoice_pdf || null
       })
 
       await resend.emails.send({
