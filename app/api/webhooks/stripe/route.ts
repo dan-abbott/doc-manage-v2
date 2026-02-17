@@ -1,12 +1,17 @@
-/**
- * Stripe Webhook Handler - FIXED for Stripe v20
- * File: app/api/webhooks/stripe/route.ts
- */
+'use server'
 
-import { NextRequest, NextResponse } from 'next/server'
-import Stripe from 'stripe'
-import { createClient } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
+import { revalidatePath } from 'next/cache'
+import { logger } from '@/lib/logger'
 import { Resend } from 'resend'
+import { 
+  stripe, 
+  STRIPE_PRICES, 
+  getOrCreateStripeCustomer,
+  createCheckoutSession,
+  createBillingPortalSession 
+} from '@/lib/stripe/client'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FROM_EMAIL = process.env.FROM_EMAIL || 'billing@baselinedocs.com'
@@ -14,9 +19,8 @@ const OWNER_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
 
 const PLAN_NAMES: Record<string, string> = {
   starter: 'Starter',
-  professional: 'Professional', 
+  professional: 'Professional',
   enterprise: 'Enterprise',
-  trial: 'Trial',
 }
 
 const PLAN_PRICES: Record<string, number> = {
@@ -25,404 +29,524 @@ const PLAN_PRICES: Record<string, number> = {
   enterprise: 299,
 }
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2026-01-28.clover',
-})
-
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
-
-export async function POST(request: NextRequest) {
-  console.log('🟣 [Webhook] === WEBHOOK FUNCTION CALLED ===')
-  console.log('🟣 [Webhook] Timestamp:', new Date().toISOString())
-
-  const body = await request.text()
-  const signature = request.headers.get('stripe-signature')
-
-  console.log('🔵 [Webhook] Request details:', {
-    hasBody: !!body,
-    bodyLength: body.length,
-    hasSignature: !!signature,
-    hasWebhookSecret: !!process.env.STRIPE_WEBHOOK_SECRET,
-    secretPrefix: process.env.STRIPE_WEBHOOK_SECRET?.substring(0, 10)
-  })
-
-  if (!signature) {
-    console.error('🔴 [Webhook] No signature in request')
-    return NextResponse.json({ error: 'Missing signature' }, { status: 400 })
-  }
-
-  let event: Stripe.Event
-
-  try {
-    console.log('🔵 [Webhook] Attempting to construct event...')
-    event = stripe.webhooks.constructEvent(
-      body,
-      signature,
-      process.env.STRIPE_WEBHOOK_SECRET!
-    )
-    console.log('🟢 [Webhook] Event constructed successfully')
-  } catch (err: any) {
-    console.error('🔴 [Webhook] Invalid signature:', err.message)
-    return NextResponse.json({ error: 'Invalid signature' }, { status: 400 })
-  }
-
-  console.log(`🔵 [Webhook] Received event: ${event.type}`, {
-    eventId: event.id,
-    created: new Date(event.created * 1000).toISOString()
-  })
-  
-  await logEvent(event)
-
-  try {
-    switch (event.type) {
-      case 'checkout.session.completed':
-        console.log('🟢 [Webhook] Processing checkout.session.completed')
-        await handleCheckoutSessionCompleted(event.data.object)
-        break
-      case 'customer.subscription.created':
-        console.log('🟢 [Webhook] Processing subscription.created')
-        await handleSubscription(event.data.object as Stripe.Subscription)
-        break
-      case 'customer.subscription.updated':
-        console.log('🟢 [Webhook] Processing subscription.updated')
-        await handleSubscription(event.data.object as Stripe.Subscription)
-        break
-      case 'customer.subscription.deleted':
-        console.log('🟢 [Webhook] Processing subscription.deleted')
-        await handleSubscriptionDeleted(event.data.object as Stripe.Subscription)
-        break
-      case 'invoice.paid':
-        console.log('🟢 [Webhook] Processing invoice.paid')
-        await handleInvoicePaid(event.data.object as Stripe.Invoice)
-        break
-      case 'invoice.payment_failed':
-        console.log('🟢 [Webhook] Processing invoice.payment_failed')
-        await handlePaymentFailed(event.data.object as Stripe.Invoice)
-        break
-      case 'payment_method.attached':
-        console.log('🟢 [Webhook] Processing payment_method.attached')
-        await handlePaymentMethod(event.data.object as Stripe.PaymentMethod)
-        break
-      default:
-        console.log('⚠️ [Webhook] Unhandled event type:', event.type)
-    }
-
-    await markProcessed(event.id)
-    console.log('✅ [Webhook] Event processed successfully:', event.type)
-    return NextResponse.json({ received: true })
-  } catch (error: any) {
-    console.error('🔴 [Webhook] Processing error:', {
-      eventType: event.type,
-      eventId: event.id,
-      error: error.message,
-      stack: error.stack
-    })
-    await logError(event.id, error.message)
-    return NextResponse.json({ error: error.message }, { status: 500 })
-  }
-}
-
-async function logEvent(event: Stripe.Event) {
-  await supabase.from('stripe_events').insert({
-    stripe_event_id: event.id,
-    event_type: event.type,
-    data: event.data.object,
-    processed: false,
-  })
-}
-
-async function markProcessed(eventId: string) {
-  await supabase.from('stripe_events').update({ processed: true }).eq('stripe_event_id', eventId)
-}
-
-async function logError(eventId: string, error: string) {
-  await supabase.from('stripe_events').update({ error }).eq('stripe_event_id', eventId)
-}
-
-async function getTenantId(customerId: string) {
-  const { data } = await supabase.from('tenant_billing').select('tenant_id').eq('stripe_customer_id', customerId).single()
-  if (!data) { console.error('🔴 [Webhook] No tenant found for customer:', customerId); throw new Error(`No tenant for customer ${customerId}`) }
-  return data.tenant_id
-}
-
-async function handleCheckoutSessionCompleted(session: any) {
-  console.log('🔵 [Webhook] handleCheckoutSessionCompleted called', {
-    sessionId: session.id,
-    customerId: session.customer,
-    subscriptionId: session.subscription,
-    paymentStatus: session.payment_status
-  })
-
-  if (!session.subscription) {
-    console.log('⚠️ [Webhook] No subscription in session (one-time payment), skipping')
-    return
-  }
-
-  // Retrieve the full subscription
-  const sub: any = await stripe.subscriptions.retrieve(session.subscription, {
-    expand: ['default_payment_method']
-  })
-
-  console.log('🟢 [Webhook] Subscription retrieved from checkout:', {
-    subscriptionId: sub.id,
-    status: sub.status,
-    customerId: sub.customer
-  })
-
-  // Process using the same subscription handler
-  await handleSubscription(sub)
-}
-
-async function handleSubscription(sub: Stripe.Subscription) {
-  console.log('🔵 [Webhook] handleSubscription called', {
-    subscriptionId: sub.id,
-    customerId: sub.customer,
-    status: sub.status
-  })
-  
-  const tenantId = await getTenantId(sub.customer as string)
-  console.log('🟢 [Webhook] Tenant ID resolved:', tenantId)
-  
-  let pm = null
-  if (sub.default_payment_method) {
-    // default_payment_method may already be expanded (object) or just an ID (string)
-    if (typeof sub.default_payment_method === 'string') {
-      pm = await stripe.paymentMethods.retrieve(sub.default_payment_method)
-    } else {
-      pm = sub.default_payment_method as Stripe.PaymentMethod
-    }
-    console.log('🟢 [Webhook] Payment method retrieved:', {
-      type: pm.type,
-      brand: pm.card?.brand,
-      last4: pm.card?.last4
-    })
-  }
-
-  const priceId = sub.items.data[0]?.price?.id
-  let plan = 'trial'
-  if (priceId === process.env.STRIPE_PRICE_STARTER) plan = 'starter'
-  else if (priceId === process.env.STRIPE_PRICE_PROFESSIONAL) plan = 'professional'
-  else if (priceId === process.env.STRIPE_PRICE_ENTERPRISE) plan = 'enterprise'
-
-  console.log('🟢 [Webhook] Plan determined:', { priceId, plan })
-
-  // Stripe v20 changed: use billing_cycle_anchor as fallback for current_period_start
-  const subAny = sub as any
-  const currentPeriodStart = subAny.billing_cycle_anchor || Math.floor(Date.now() / 1000)
-  // Estimate end (30 days for monthly, will be corrected by invoice events)
-  const currentPeriodEnd = subAny.cancel_at || (currentPeriodStart + 2592000)
-
-  const billingUpdate = {
-    tenant_id: tenantId,
-    stripe_customer_id: sub.customer as string,
-    stripe_subscription_id: sub.id,
-    plan,
-    status: sub.status,
-    billing_cycle: sub.items.data[0]?.price?.recurring?.interval || 'month',
-    current_period_start: new Date(currentPeriodStart * 1000).toISOString(),
-    current_period_end: new Date(currentPeriodEnd * 1000).toISOString(),
-    trial_ends_at: subAny.trial_end ? new Date(subAny.trial_end * 1000).toISOString() : null,
-    cancelled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
-    payment_method_type: pm?.type || null,
-    payment_method_last4: pm?.card?.last4 || null,
-    payment_method_brand: pm?.card?.brand || null,
-  }
-
-  console.log('🔵 [Webhook] Upserting tenant_billing:', billingUpdate)
-
-  // Try update first, then insert if no row exists
-  const { data: existing } = await supabase
-    .from('tenant_billing')
-    .select('id')
-    .eq('tenant_id', tenantId)
-    .single()
-
-  const { error } = existing
-    ? await supabase.from('tenant_billing').update(billingUpdate).eq('tenant_id', tenantId)
-    : await supabase.from('tenant_billing').insert(billingUpdate)
-  
-  if (error) {
-    console.error('🔴 [Webhook] Failed to update tenant_billing:', error)
-    throw error
-  }
-
-  console.log('✅ [Webhook] Subscription processed successfully:', {
-    tenantId,
-    plan,
-    status: sub.status
-  })
-
-  // Send upgrade confirmation email via webhook (covers Checkout path)
-  // Only send on active subscriptions, not cancellations
-  if (sub.status === 'active' && plan !== 'trial') {
-    try {
-      // Get tenant admin email
-      const { data: tenantData } = await supabase
-        .from('tenants')
-        .select('name, subdomain')
-        .eq('id', tenantId)
-        .single()
-
-      const { data: adminData } = await supabase
-        .from('users')
-        .select('email')
-        .eq('tenant_id', tenantId)
-        .eq('role', 'admin')
-        .limit(1)
-        .single()
-
-      if (adminData?.email) {
-        const subAny = sub as any
-        const nextBillingDate = subAny.billing_cycle_anchor
-          ? new Date((subAny.billing_cycle_anchor + 2592000) * 1000).toISOString()
-          : null
-
-        const html = buildUpgradeEmailHtml({
-          companyName: tenantData?.name || tenantData?.subdomain || 'your company',
-          previousPlan: 'trial',
-          newPlan: plan,
-          subscriptionId: sub.id,
-          nextBillingDate,
-          nextBillingAmount: (PLAN_PRICES[plan] || 0) * 100,
-        })
-
-        await resend.emails.send({
-          from: FROM_EMAIL,
-          to: adminData.email,
-          bcc: OWNER_EMAIL,
-          subject: `Your BaselineDocs plan has been upgraded to ${PLAN_NAMES[plan] || plan}`,
-          html,
-        })
-        console.log('🟢 [Webhook] Upgrade email sent to:', adminData.email)
-      }
-    } catch (emailErr) {
-      console.log('🟡 [Webhook] Email send failed (non-fatal):', emailErr)
-    }
-  }
-
-  console.log(`[Webhook] Subscription synced: ${tenantId}`)
-}
-
-function buildUpgradeEmailHtml(params: {
+/**
+ * Send upgrade confirmation email to tenant admin + owner BCC
+ */
+async function sendUpgradeConfirmation(params: {
+  toEmail: string
   companyName: string
   previousPlan: string
   newPlan: string
   subscriptionId: string
+  immediateCharge?: number | null  // proration amount in cents, null for new subscriptions
   nextBillingDate?: string | null
   nextBillingAmount?: number | null
-  immediateCharge?: number | null
 }) {
   const planName = PLAN_NAMES[params.newPlan] || params.newPlan
   const prevPlanName = PLAN_NAMES[params.previousPlan] || params.previousPlan
   const monthlyPrice = PLAN_PRICES[params.newPlan] || 0
+
+  const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`
   const formatDate = (iso: string | null | undefined) => {
     if (!iso) return 'N/A'
-    return new Date(iso).toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })
+    return new Date(iso).toLocaleDateString('en-US', { 
+      year: 'numeric', month: 'long', day: 'numeric' 
+    })
   }
-  const formatCurrency = (cents: number) => `$${(cents / 100).toFixed(2)}`
 
-  const proratedRow = params.immediateCharge != null
-    ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Prorated charge today</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;font-weight:600;">${formatCurrency(params.immediateCharge)}</td></tr>`
+  const proratedSection = params.immediateCharge != null
+    ? `
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Prorated charge today</td>
+        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right; font-weight: 600;">${formatCurrency(params.immediateCharge)}</td>
+      </tr>`
     : ''
 
-  const nextBillingRows = params.nextBillingDate && params.nextBillingAmount != null
-    ? `<tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Next billing date</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;">${formatDate(params.nextBillingDate)}</td></tr>
-       <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">Next billing amount</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;font-weight:600;">${formatCurrency(params.nextBillingAmount)}</td></tr>`
+  const nextBillingSection = params.nextBillingDate && params.nextBillingAmount != null
+    ? `
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Next billing date</td>
+        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">${formatDate(params.nextBillingDate)}</td>
+      </tr>
+      <tr>
+        <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">Next billing amount</td>
+        <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right; font-weight: 600;">${formatCurrency(params.nextBillingAmount)}</td>
+      </tr>`
     : ''
 
-  return `<!DOCTYPE html><html><head><meta charset="utf-8"></head>
-  <body style="font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',sans-serif;background:#f9fafb;margin:0;padding:0;">
-  <div style="max-width:560px;margin:40px auto;background:white;border-radius:12px;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.1);">
-    <div style="background:#1e40af;padding:32px 40px;">
-      <h1 style="color:white;margin:0;font-size:24px;font-weight:700;">BaselineDocs</h1>
-      <p style="color:#bfdbfe;margin:8px 0 0;font-size:14px;">Document Control System</p>
-    </div>
-    <div style="padding:40px;">
-      <h2 style="color:#111827;margin:0 0 8px;font-size:20px;">Your plan has been upgraded ✓</h2>
-      <p style="color:#6b7280;margin:0 0 32px;font-size:15px;">
-        Thank you for upgrading, <strong>${params.companyName}</strong>! Your account has been updated and new features are available immediately.
-      </p>
-      <div style="background:#f0fdf4;border:1px solid #bbf7d0;border-radius:8px;padding:20px;margin-bottom:24px;">
-        <table style="width:100%;"><tr>
-          <td><p style="margin:0;font-size:12px;color:#6b7280;text-transform:uppercase;">Previous Plan</p><p style="margin:4px 0 0;font-size:16px;color:#374151;font-weight:500;">${prevPlanName}</p></td>
-          <td style="text-align:center;color:#9ca3af;font-size:20px;">→</td>
-          <td style="text-align:right;"><p style="margin:0;font-size:12px;color:#6b7280;text-transform:uppercase;">New Plan</p><p style="margin:4px 0 0;font-size:18px;color:#15803d;font-weight:700;">${planName}</p></td>
-        </tr></table>
+  const html = `
+    <!DOCTYPE html>
+    <html>
+    <head><meta charset="utf-8"></head>
+    <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background: #f9fafb; margin: 0; padding: 0;">
+      <div style="max-width: 560px; margin: 40px auto; background: white; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+        
+        <!-- Header -->
+        <div style="background: #1e40af; padding: 32px 40px;">
+          <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 700;">BaselineDocs</h1>
+          <p style="color: #bfdbfe; margin: 8px 0 0; font-size: 14px;">Document Control System</p>
+        </div>
+
+        <!-- Body -->
+        <div style="padding: 40px;">
+          <h2 style="color: #111827; margin: 0 0 8px; font-size: 20px;">Your plan has been upgraded ✓</h2>
+          <p style="color: #6b7280; margin: 0 0 32px; font-size: 15px;">
+            Thank you for upgrading, <strong>${params.companyName}</strong>! Your account has been updated and the new features are available immediately.
+          </p>
+
+          <!-- Plan Change -->
+          <div style="background: #f0fdf4; border: 1px solid #bbf7d0; border-radius: 8px; padding: 20px; margin-bottom: 24px;">
+            <div style="display: flex; align-items: center; gap: 12px;">
+              <div style="flex: 1;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">Previous Plan</p>
+                <p style="margin: 4px 0 0; font-size: 16px; color: #374151; font-weight: 500;">${prevPlanName}</p>
+              </div>
+              <div style="color: #9ca3af; font-size: 20px;">→</div>
+              <div style="flex: 1; text-align: right;">
+                <p style="margin: 0; font-size: 12px; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em;">New Plan</p>
+                <p style="margin: 4px 0 0; font-size: 18px; color: #15803d; font-weight: 700;">${planName}</p>
+              </div>
+            </div>
+          </div>
+
+          <!-- Billing Summary -->
+          <h3 style="color: #374151; font-size: 15px; font-weight: 600; margin: 0 0 12px;">Billing Summary</h3>
+          <table style="width: 100%; border-collapse: collapse; border-top: 1px solid #e5e7eb;">
+            <tbody>
+              <tr>
+                <td style="padding: 8px 0; color: #6b7280; font-size: 14px;">New monthly rate</td>
+                <td style="padding: 8px 0; color: #111827; font-size: 14px; text-align: right;">$${monthlyPrice}/month</td>
+              </tr>
+              ${proratedSection}
+              ${nextBillingSection}
+            </tbody>
+          </table>
+
+          <!-- Subscription ID -->
+          <p style="color: #9ca3af; font-size: 12px; margin: 24px 0 0;">
+            Subscription ID: <code style="background: #f3f4f6; padding: 2px 6px; border-radius: 4px;">${params.subscriptionId}</code>
+          </p>
+
+          <hr style="border: none; border-top: 1px solid #e5e7eb; margin: 24px 0;">
+
+          <p style="color: #6b7280; font-size: 13px; margin: 0;">
+            Questions about your billing? Reply to this email or visit your 
+            <a href="https://app.baselinedocs.com/admin/billing" style="color: #1e40af;">billing dashboard</a>.
+          </p>
+        </div>
+
+        <!-- Footer -->
+        <div style="background: #f9fafb; padding: 24px 40px; border-top: 1px solid #e5e7eb;">
+          <p style="color: #9ca3af; font-size: 12px; margin: 0;">
+            BaselineDocs · Document Control System<br>
+            This is a transactional email regarding your account.
+          </p>
+        </div>
       </div>
-      <h3 style="color:#374151;font-size:15px;font-weight:600;margin:0 0 12px;">Billing Summary</h3>
-      <table style="width:100%;border-collapse:collapse;border-top:1px solid #e5e7eb;">
-        <tbody>
-          <tr><td style="padding:8px 0;color:#6b7280;font-size:14px;">New monthly rate</td><td style="padding:8px 0;color:#111827;font-size:14px;text-align:right;">$${monthlyPrice}/month</td></tr>
-          ${proratedRow}
-          ${nextBillingRows}
-        </tbody>
-      </table>
-      <p style="color:#9ca3af;font-size:12px;margin:24px 0 0;">Subscription ID: <code style="background:#f3f4f6;padding:2px 6px;border-radius:4px;">${params.subscriptionId}</code></p>
-      <hr style="border:none;border-top:1px solid #e5e7eb;margin:24px 0;">
-      <p style="color:#6b7280;font-size:13px;margin:0;">Questions? Reply to this email or visit your <a href="https://app.baselinedocs.com/admin/billing" style="color:#1e40af;">billing dashboard</a>.</p>
-    </div>
-    <div style="background:#f9fafb;padding:24px 40px;border-top:1px solid #e5e7eb;">
-      <p style="color:#9ca3af;font-size:12px;margin:0;">BaselineDocs · Document Control System<br>This is a transactional email regarding your account.</p>
-    </div>
-  </div></body></html>`
+    </body>
+    </html>
+  `
+
+  try {
+    await resend.emails.send({
+      from: FROM_EMAIL,
+      to: params.toEmail,
+      bcc: OWNER_EMAIL,
+      subject: `Your BaselineDocs plan has been upgraded to ${planName}`,
+      html,
+    })
+    logger.info('🟢 [Billing] Upgrade confirmation email sent', { 
+      to: params.toEmail, 
+      plan: params.newPlan 
+    })
+  } catch (err) {
+    // Non-fatal - log but don't fail the upgrade
+    logger.error('🟡 [Billing] Failed to send upgrade email (non-fatal)', { error: err })
+  }
 }
 
-async function handleSubscriptionDeleted(sub: Stripe.Subscription) {
-  const tenantId = await getTenantId(sub.customer as string)
-  await supabase.from('tenant_billing').update({
-    status: 'cancelled',
-    cancelled_at: new Date().toISOString(),
-  }).eq('tenant_id', tenantId)
-}
+/**
+ * Upgrade tenant plan (tenant admin action)
+ */
+export async function upgradeTenantPlan(data: {
+  tenantId: string
+  newPlan: string
+  forceCheckout?: boolean
+}) {
+  const supabase = await createClient()
+  const cookieStore = await cookies()
+  
+  logger.info('🔵 [Billing] upgradeTenantPlan called', {
+    tenantId: data.tenantId,
+    newPlan: data.newPlan
+  })
+  
+  try {
+    // Get current user
+    const { data: { user }, error: userError } = await supabase.auth.getUser()
+    
+    if (userError || !user) {
+      logger.error('🔴 [Billing] User authentication failed', { error: userError })
+      return { success: false, error: 'You must be logged in' }
+    }
 
-async function handleInvoicePaid(invoice: Stripe.Invoice) {
-  if (!invoice.customer) return
-  const tenantId = await getTenantId(invoice.customer as string)
+    logger.info('🟢 [Billing] User authenticated', { userId: user.id, email: user.email })
 
-  // Stripe v20: subscription might be string or object
-  const invoiceAny = invoice as any
-  const subscriptionId = typeof invoiceAny.subscription === 'string' 
-    ? invoiceAny.subscription 
-    : invoiceAny.subscription?.id || null
+    // Validate plan
+    const validPlans = ['starter', 'professional', 'enterprise'] as const
+    if (!validPlans.includes(data.newPlan as any)) {
+      logger.error('🔴 [Billing] Invalid plan', { plan: data.newPlan })
+      return { success: false, error: 'Invalid plan selected' }
+    }
 
-  await supabase.from('invoices').upsert({
-    tenant_id: tenantId,
-    stripe_invoice_id: invoice.id,
-    stripe_subscription_id: subscriptionId,
-    amount_due: (invoice.amount_due || 0) / 100,
-    amount_paid: (invoice.amount_paid || 0) / 100,
-    currency: invoice.currency,
-    status: 'paid',
-    invoice_date: new Date(invoice.created * 1000).toISOString(),
-    paid_at: new Date().toISOString(),
-    hosted_invoice_url: invoice.hosted_invoice_url || null,
-    invoice_pdf_url: invoice.invoice_pdf || null,
-  }, { onConflict: 'stripe_invoice_id' })
+    // Get subdomain to verify tenant context
+    const subdomainCookie = cookieStore.get('tenant_subdomain')
+    const subdomain = subdomainCookie?.value
 
-  await supabase.from('tenant_billing')
-    .update({ status: 'active' })
-    .eq('tenant_id', tenantId)
-    .eq('status', 'past_due')
+    if (!subdomain) {
+      logger.error('🔴 [Billing] No subdomain cookie found')
+      return { success: false, error: 'Tenant context not found' }
+    }
 
-  console.log(`[Webhook] Invoice paid: ${tenantId}`)
-}
+    logger.info('🟢 [Billing] Subdomain found', { subdomain })
 
-async function handlePaymentFailed(invoice: Stripe.Invoice) {
-  if (!invoice.customer) return
-  const tenantId = await getTenantId(invoice.customer as string)
-  await supabase.from('tenant_billing').update({ status: 'past_due' }).eq('tenant_id', tenantId)
-  console.log(`[Webhook] Payment failed: ${tenantId}`)
-}
+    // Verify tenant exists and matches subdomain
+    const { data: tenantData } = await supabase
+      .from('tenants')
+      .select('id, subdomain, company_name')
+      .eq('subdomain', subdomain)
+      .single()
 
-async function handlePaymentMethod(pm: Stripe.PaymentMethod) {
-  if (!pm.customer) return
-  const tenantId = await getTenantId(pm.customer as string)
-  await supabase.from('tenant_billing').update({
-    payment_method_type: pm.type,
-    payment_method_last4: pm.card?.last4 || null,
-    payment_method_brand: pm.card?.brand || null,
-  }).eq('tenant_id', tenantId)
+    if (!tenantData || tenantData.id !== data.tenantId) {
+      logger.error('🔴 [Billing] Tenant mismatch', { 
+        tenantData: tenantData?.id, 
+        requestedTenant: data.tenantId 
+      })
+      return { success: false, error: 'Tenant mismatch' }
+    }
+
+    logger.info('🟢 [Billing] Tenant verified', { 
+      tenantId: tenantData.id, 
+      companyName: tenantData.company_name 
+    })
+
+    // Check admin status
+    const { data: userData } = await supabase
+      .from('users')
+      .select('is_admin, tenant_id, email')
+      .eq('id', user.id)
+      .single()
+
+    if (!userData?.is_admin || userData.tenant_id !== data.tenantId) {
+      logger.error('🔴 [Billing] Permission denied', { 
+        isAdmin: userData?.is_admin, 
+        userTenant: userData?.tenant_id,
+        requestedTenant: data.tenantId
+      })
+      return { success: false, error: 'Only tenant administrators can upgrade plans' }
+    }
+
+    logger.info('🟢 [Billing] Admin permissions verified')
+
+    // Get current billing info
+    const { data: currentBilling } = await supabase
+      .from('tenant_billing')
+      .select('*')
+      .eq('tenant_id', data.tenantId)
+      .single()
+
+    logger.info('🟢 [Billing] Current billing retrieved', {
+      currentPlan: currentBilling?.plan,
+      stripeCustomerId: currentBilling?.stripe_customer_id,
+      stripeSubscriptionId: currentBilling?.stripe_subscription_id
+    })
+
+    // Validate upgrade (can only go up, not down)
+    const planOrder = ['trial', 'starter', 'professional', 'enterprise']
+    const currentIndex = planOrder.indexOf(currentBilling?.plan || 'trial')
+    const newIndex = planOrder.indexOf(data.newPlan)
+
+    if (newIndex <= currentIndex) {
+      logger.error('🔴 [Billing] Cannot downgrade', { 
+        currentPlan: currentBilling?.plan, 
+        newPlan: data.newPlan 
+      })
+      return { 
+        success: false, 
+        error: 'You can only upgrade to a higher plan. Contact support for downgrades.' 
+      }
+    }
+
+    logger.info('🟢 [Billing] Upgrade validation passed', {
+      from: currentBilling?.plan,
+      to: data.newPlan
+    })
+
+    // Get or create Stripe customer
+    logger.info('🔵 [Billing] Getting/creating Stripe customer...')
+    
+    const customerId = await getOrCreateStripeCustomer({
+      tenantId: data.tenantId,
+      email: userData.email || '',
+      companyName: tenantData.company_name || tenantData.subdomain,
+      existingCustomerId: currentBilling?.stripe_customer_id,
+    })
+
+    logger.info('🟢 [Billing] Stripe customer ready', { customerId })
+
+    // Get price ID for the new plan
+    const priceId = STRIPE_PRICES[data.newPlan as keyof typeof STRIPE_PRICES]
+
+    if (!priceId) {
+      logger.error('🔴 [Billing] Price ID not configured', { plan: data.newPlan })
+      return { success: false, error: 'Invalid plan configuration' }
+    }
+
+    logger.info('🟢 [Billing] Price ID found', { plan: data.newPlan, priceId })
+
+    // Check if they have an existing active subscription
+    if (currentBilling?.stripe_subscription_id && !data.forceCheckout) {
+      logger.info('🔵 [Billing] Existing subscription found - checking status...', {
+        subscriptionId: currentBilling.stripe_subscription_id
+      })
+      
+      // Retrieve and check subscription status before updating
+      const subscription = await stripe.subscriptions.retrieve(
+        currentBilling.stripe_subscription_id
+      )
+
+      if (subscription.status === 'canceled') {
+        logger.info('🟡 [Billing] Subscription is cancelled - will create new checkout session', {
+          subscriptionId: currentBilling.stripe_subscription_id,
+          status: subscription.status
+        })
+        // Clear the cancelled subscription ID from database so we create a fresh one
+        await supabase
+          .from('tenant_billing')
+          .update({ stripe_subscription_id: null })
+          .eq('tenant_id', data.tenantId)
+        // Fall through to checkout session creation below
+      } else {
+      logger.info('🔵 [Billing] Updating active subscription...', {
+        subscriptionId: currentBilling.stripe_subscription_id,
+        status: subscription.status
+      })
+
+      await stripe.subscriptions.update(currentBilling.stripe_subscription_id, {
+        items: [{
+          id: subscription.items.data[0].id,
+          price: priceId,
+        }],
+        proration_behavior: 'create_prorations',
+        metadata: {
+          tenant_id: data.tenantId,
+          plan: data.newPlan,
+        },
+      })
+
+      logger.info('🟢 [Billing] Subscription updated in Stripe', {
+        subscriptionId: currentBilling.stripe_subscription_id,
+        newPlan: data.newPlan
+      })
+
+      // Update billing record
+      await supabase
+        .from('tenant_billing')
+        .update({
+          plan: data.newPlan,
+          stripe_price_id: priceId,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('tenant_id', data.tenantId)
+
+      logger.info('🟢 [Billing] Database updated')
+
+      // Log to billing history
+      await supabase
+        .from('billing_history')
+        .insert({
+          tenant_id: data.tenantId,
+          action: 'plan_upgrade',
+          previous_plan: currentBilling?.plan || 'trial',
+          new_plan: data.newPlan,
+          reason: 'Tenant admin upgrade via billing page',
+          performed_by: user.id,
+          performed_by_email: user.email || '',
+        })
+
+      logger.info('🟢 [Billing] Billing history logged')
+
+      // Fetch upcoming invoice for proration details
+      let immediateCharge: number | null = null
+      let nextBillingDate: string | null = null
+      let nextBillingAmount: number | null = null
+      try {
+        const upcoming = await stripe.invoices.upcoming({
+          customer: customerId,
+        }) as any
+        // Find proration line items (amount_due minus the regular charge)
+        const prorationLines = upcoming.lines?.data?.filter((l: any) => l.proration) || []
+        const prorationTotal = prorationLines.reduce((sum: number, l: any) => sum + l.amount, 0)
+        immediateCharge = prorationTotal > 0 ? prorationTotal : null
+        nextBillingDate = upcoming.next_payment_attempt 
+          ? new Date(upcoming.next_payment_attempt * 1000).toISOString() 
+          : null
+        nextBillingAmount = upcoming.amount_due
+      } catch (e) {
+        logger.info('🟡 [Billing] Could not fetch upcoming invoice for email (non-fatal)')
+      }
+
+      // Send confirmation email
+      await sendUpgradeConfirmation({
+        toEmail: user.email!,
+        companyName: tenantData?.company_name || tenantData?.subdomain,
+        previousPlan: currentBilling?.plan || 'trial',
+        newPlan: data.newPlan,
+        subscriptionId: currentBilling.stripe_subscription_id,
+        immediateCharge,
+        nextBillingDate,
+        nextBillingAmount,
+      })
+
+      revalidatePath('/admin/billing')
+
+      return {
+        success: true,
+        message: 'Plan upgraded successfully!'
+      }
+      } // end else (active subscription)
+    }
+
+    // No existing subscription (or cancelled) - check for saved payment method first
+    logger.info('🔵 [Billing] No active subscription - checking for saved payment method...')
+
+    // Check if the Stripe customer has a default payment method saved
+    const stripeCustomer = await stripe.customers.retrieve(customerId) as any
+    const defaultPaymentMethod = stripeCustomer.invoice_settings?.default_payment_method
+
+    if (defaultPaymentMethod && !data.forceCheckout) {
+      // Customer has a saved card - create subscription directly, no Checkout needed
+      logger.info('🔵 [Billing] Saved payment method found - creating subscription directly', {
+        customerId,
+        paymentMethod: typeof defaultPaymentMethod === 'string' ? defaultPaymentMethod : defaultPaymentMethod.id
+      })
+
+      const paymentMethodId = typeof defaultPaymentMethod === 'string' 
+        ? defaultPaymentMethod 
+        : defaultPaymentMethod.id
+
+      const newSubscription = await stripe.subscriptions.create({
+        customer: customerId,
+        items: [{ price: priceId }],
+        default_payment_method: paymentMethodId,
+        metadata: {
+          tenant_id: data.tenantId,
+          plan: data.newPlan,
+        },
+      })
+
+      logger.info('🟢 [Billing] Subscription created directly', {
+        subscriptionId: newSubscription.id,
+        status: newSubscription.status
+      })
+
+      // Update billing record immediately
+      const { data: existingBilling } = await supabase
+        .from('tenant_billing')
+        .select('id')
+        .eq('tenant_id', data.tenantId)
+        .single()
+
+      const billingData = {
+        tenant_id: data.tenantId,
+        stripe_customer_id: customerId,
+        stripe_subscription_id: newSubscription.id,
+        plan: data.newPlan,
+        status: newSubscription.status,
+        updated_at: new Date().toISOString(),
+      }
+
+      if (existingBilling) {
+        await supabase.from('tenant_billing').update(billingData).eq('tenant_id', data.tenantId)
+      } else {
+        await supabase.from('tenant_billing').insert(billingData)
+      }
+
+      logger.info('🟢 [Billing] Database updated after direct subscription creation')
+
+      // Fetch next billing info for email
+      let nextBillingDate: string | null = null
+      let nextBillingAmount: number | null = null
+      try {
+        const subAny = newSubscription as any
+        nextBillingDate = subAny.billing_cycle_anchor 
+          ? new Date((subAny.billing_cycle_anchor + 2592000) * 1000).toISOString()
+          : null
+        nextBillingAmount = (PLAN_PRICES[data.newPlan] || 0) * 100
+      } catch (e) {}
+
+      // Send confirmation email
+      await sendUpgradeConfirmation({
+        toEmail: user.email!,
+        companyName: tenantData?.company_name || tenantData?.subdomain,
+        previousPlan: currentBilling?.plan || 'trial',
+        newPlan: data.newPlan,
+        subscriptionId: newSubscription.id,
+        immediateCharge: null,  // New subscription, first full charge
+        nextBillingDate,
+        nextBillingAmount,
+      })
+
+      revalidatePath('/admin/billing')
+
+      return {
+        success: true,
+        message: 'Plan upgraded successfully!'
+      }
+    }
+
+    // No saved payment method (or forceCheckout) - redirect to Stripe Checkout
+    logger.info('🔵 [Billing] No saved payment method - creating checkout session...')
+    
+    const session = await createCheckoutSession({
+      customerId,
+      priceId,
+      tenantId: data.tenantId,
+      successUrl: `https://${subdomain}.baselinedocs.com/admin/billing?success=true`,
+      cancelUrl: `https://${subdomain}.baselinedocs.com/admin/billing?canceled=true`,
+    })
+
+    logger.info('🟢 [Billing] Checkout session created', {
+      sessionId: session.id,
+      url: session.url,
+      successUrl: `https://${subdomain}.baselinedocs.com/admin/billing?success=true`
+    })
+
+    // Update customer ID in database
+    await supabase
+      .from('tenant_billing')
+      .update({
+        stripe_customer_id: customerId,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('tenant_id', data.tenantId)
+
+    logger.info('🟢 [Billing] Customer ID saved to database')
+
+    // Return checkout URL for redirect
+    return {
+      success: true,
+      checkoutUrl: session.url,
+    }
+  } catch (error: any) {
+    logger.error('🔴 [Billing] FATAL ERROR', { 
+      error: error.message,
+      stack: error.stack,
+      tenantId: data.tenantId 
+    })
+    return {
+      success: false,
+      error: error.message || 'Failed to upgrade plan'
+    }
+  }
 }
