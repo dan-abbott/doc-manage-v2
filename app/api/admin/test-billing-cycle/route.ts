@@ -76,18 +76,30 @@ export async function POST(request: NextRequest) {
     console.log('[Test Billing] Current plan:', billing.plan, 'Amount:', amount)
 
     // Step 1: Send reminder email (simulating 5-day advance notice)
-    const { data: adminUser, error: userError } = await supabase
+    // First try to find admin by is_admin flag
+    const { data: adminUsers } = await supabase
       .from('users')
-      .select('email')
+      .select('email, role, is_admin')
+      .eq('tenant_id', tenant.id)
+      .eq('is_admin', true)
+      .limit(1)
+
+    // Fallback: find by role='Admin'
+    const { data: adminByRole } = !adminUsers?.length ? await supabase
+      .from('users')
+      .select('email, role, is_admin')
       .eq('tenant_id', tenant.id)
       .eq('role', 'Admin')
-      .limit(1)
-      .single()
+      .limit(1) : { data: null }
+
+    const adminUser = adminUsers?.[0] || adminByRole?.[0]
 
     console.log('[Test Billing] Admin user lookup:', { 
       found: !!adminUser, 
       email: adminUser?.email,
-      error: userError 
+      role: adminUser?.role,
+      is_admin: adminUser?.is_admin,
+      tenant_id: tenant.id
     })
 
     if (adminUser?.email) {
