@@ -401,41 +401,5 @@ export function ImportUsersDialog({ onUsersImported }: { onUsersImported?: () =>
       </DialogContent>
     </Dialog>
 
-    {/* Upgrade Required Dialog */}
-    <AlertDialog open={showUpgradeDialog} onOpenChange={setShowUpgradeDialog}>
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle className="flex items-center gap-2">
-            <AlertCircle className="h-5 w-5 text-amber-500" />
-            User Limit Reached
-          </AlertDialogTitle>
-          <AlertDialogDescription className="space-y-2">
-            <p>
-              Your <span className="font-semibold capitalize">{upgradeInfo?.currentPlan || 'current'}</span> plan 
-              is limited to <span className="font-semibold">{upgradeInfo?.userLimit}</span> users.
-            </p>
-            <p>
-              You currently have <span className="font-semibold">{upgradeInfo?.currentUsers}</span> active users.
-            </p>
-            <p className="text-foreground font-medium pt-2">
-              Upgrade your plan to add more users and unlock additional features.
-            </p>
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel>Cancel</AlertDialogCancel>
-          <AlertDialogAction asChild>
-            <Button
-              onClick={() => {
-                window.location.href = '/admin/billing'
-              }}
-            >
-              Upgrade Plan
-            </Button>
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
-    </>
   )
 }
