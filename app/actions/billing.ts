@@ -423,20 +423,39 @@ export async function upgradeTenantPlan(data: {
     // No existing subscription (or cancelled) - check for saved payment method first
     logger.info('🔵 [Billing] No active subscription - checking for saved payment method...')
 
-    // Check if the Stripe customer has a default payment method saved
-    const stripeCustomer = await stripe.customers.retrieve(customerId) as any
-    const defaultPaymentMethod = stripeCustomer.invoice_settings?.default_payment_method
+    // Check if the Stripe customer has a payment method saved
+    const stripeCustomer = await stripe.customers.retrieve(customerId, {
+      expand: ['invoice_settings.default_payment_method']
+    }) as any
+    
+    let paymentMethodId: string | null = null
+    
+    // First check invoice_settings.default_payment_method
+    if (stripeCustomer.invoice_settings?.default_payment_method) {
+      const pm = stripeCustomer.invoice_settings.default_payment_method
+      paymentMethodId = typeof pm === 'string' ? pm : pm.id
+      logger.info('🔵 [Billing] Found default payment method', { paymentMethodId })
+    }
+    
+    // If no default, check if customer has any payment methods attached
+    if (!paymentMethodId) {
+      const paymentMethods = await stripe.paymentMethods.list({
+        customer: customerId,
+        type: 'card',
+        limit: 1
+      })
+      if (paymentMethods.data.length > 0) {
+        paymentMethodId = paymentMethods.data[0].id
+        logger.info('🔵 [Billing] Found attached payment method (not set as default)', { paymentMethodId })
+      }
+    }
 
-    if (defaultPaymentMethod && !data.forceCheckout) {
+    if (paymentMethodId && !data.forceCheckout) {
       // Customer has a saved card - create subscription directly, no Checkout needed
       logger.info('🔵 [Billing] Saved payment method found - creating subscription directly', {
         customerId,
-        paymentMethod: typeof defaultPaymentMethod === 'string' ? defaultPaymentMethod : defaultPaymentMethod.id
+        paymentMethod: paymentMethodId
       })
-
-      const paymentMethodId = typeof defaultPaymentMethod === 'string' 
-        ? defaultPaymentMethod 
-        : defaultPaymentMethod.id
 
       const newSubscription = await stripe.subscriptions.create({
         customer: customerId,
