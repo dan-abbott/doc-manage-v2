@@ -7,7 +7,7 @@ import { z } from 'zod'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const SUPPORT_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
-const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev'
+const FROM_FEEDBACK_EMAIL = process.env.FROM_FEEDBACK_EMAIL || 'support@baselinedocs.com'
 
 // Validation schema
 const contactFormSchema = z.object({
@@ -234,13 +234,13 @@ export async function submitContactForm(data: ContactFormData) {
       category: validatedData.category,
       priority: validatedData.priority,
       subject: validatedData.subject,
-      fromEmail: FROM_EMAIL,
+      fromEmail: FROM_FEEDBACK_EMAIL,
       toEmail: SUPPORT_EMAIL
     })
 
     // Send email via Resend
     const emailResult = await resend.emails.send({
-      from: FROM_EMAIL,
+      from: FROM_FEEDBACK_EMAIL,
       to: SUPPORT_EMAIL,
       replyTo: userData?.email || user.email || undefined,
       subject: `[${tenantData?.subdomain || 'UNKNOWN'}] [${priorityLabels[validatedData.priority]}] ${categoryLabels[validatedData.category]} - ${validatedData.subject}`,

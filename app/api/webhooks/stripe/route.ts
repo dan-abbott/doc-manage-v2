@@ -9,7 +9,7 @@ import { createClient } from '@supabase/supabase-js'
 import { Resend } from 'resend'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
-const FROM_EMAIL = process.env.FROM_EMAIL || 'billing@baselinedocs.com'
+const FROM_BILLING_EMAIL = process.env.FROM_BILLING_EMAIL || 'billing@baselinedocs.com'
 const OWNER_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
 
 const PLAN_NAMES: Record<string, string> = {
@@ -290,7 +290,7 @@ async function handleSubscription(sub: Stripe.Subscription) {
         })
 
         await resend.emails.send({
-          from: FROM_EMAIL,
+          from: FROM_BILLING_EMAIL,
           to: adminData.email,
           bcc: OWNER_EMAIL,
           subject: `Your BaselineDocs plan has been upgraded to ${PLAN_NAMES[plan] || plan}`,

@@ -7,7 +7,7 @@ import { logger } from '@/lib/logger'
 // Initialize Resend directly here
 const resend = new Resend(process.env.RESEND_API_KEY)
 const FEEDBACK_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
-const FROM_EMAIL = process.env.FROM_EMAIL || 'onboarding@resend.dev'
+const FROM_FEEDBACK_EMAIL = process.env.FROM_FEEDBACK_EMAIL || 'feedback@baselinedocs.com'
 
 export type FeedbackType = 'bug' | 'feature' | 'general'
 
@@ -56,7 +56,7 @@ export async function submitFeedback(data: FeedbackData) {
       description: data.description,
       url: data.url,
       userAgent: data.userAgent,
-      fromEmail: FROM_EMAIL,
+      fromEmail: FROM_FEEDBACK_EMAIL,
       toEmail: FEEDBACK_EMAIL,
       hasApiKey: !!process.env.RESEND_API_KEY,
       apiKeyLength: process.env.RESEND_API_KEY?.length || 0,
@@ -184,7 +184,7 @@ export async function submitFeedback(data: FeedbackData) {
     // Send email via Resend
     try {
       const emailResult = await resend.emails.send({
-        from: FROM_EMAIL,
+        from: FROM_FEEDBACK_EMAIL,
         to: FEEDBACK_EMAIL,
         subject: `${typeLabel} - ${userData?.full_name || 'User'}`,
         html: emailHtml,
