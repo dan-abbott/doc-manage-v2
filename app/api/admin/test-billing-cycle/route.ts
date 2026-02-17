@@ -76,37 +76,54 @@ export async function POST(request: NextRequest) {
     console.log('[Test Billing] Current plan:', billing.plan, 'Amount:', amount)
 
     // Step 1: Send reminder email (simulating 5-day advance notice)
-    const { data: adminUser } = await supabase
+    const { data: adminUser, error: userError } = await supabase
       .from('users')
       .select('email')
       .eq('tenant_id', tenant.id)
-      .eq('role', 'admin')
+      .eq('role', 'Admin')
       .limit(1)
       .single()
 
+    console.log('[Test Billing] Admin user lookup:', { 
+      found: !!adminUser, 
+      email: adminUser?.email,
+      error: userError 
+    })
+
     if (adminUser?.email) {
-      const { Resend } = await import('resend')
-      const resend = new Resend(process.env.RESEND_API_KEY)
-      
-      const html = buildReminderEmail({
-        companyName: tenant.company_name || tenant.subdomain,
-        plan: billing.plan,
-        amount: amount,
-        billingDate: billingDate.toLocaleDateString('en-US', { 
-          year: 'numeric', month: 'long', day: 'numeric' 
-        }),
-        invoiceUrl: null, // No URL yet
-      })
+      try {
+        const { Resend } = await import('resend')
+        const resend = new Resend(process.env.RESEND_API_KEY)
+        
+        const html = buildReminderEmail({
+          companyName: tenant.company_name || tenant.subdomain,
+          plan: billing.plan,
+          amount: amount,
+          billingDate: billingDate.toLocaleDateString('en-US', { 
+            year: 'numeric', month: 'long', day: 'numeric' 
+          }),
+          invoiceUrl: null, // No URL yet
+        })
 
-      await resend.emails.send({
-        from: process.env.FROM_BILLING_EMAIL || 'billing@baselinedocs.com',
-        to: adminUser.email,
-        bcc: process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com',
-        subject: `[TEST] Upcoming charge: $${amount.toFixed(2)}`,
-        html,
-      })
+        console.log('[Test Billing] Attempting to send email to:', adminUser.email)
 
-      console.log('[Test Billing] Reminder email sent to:', adminUser.email)
+        const result = await resend.emails.send({
+          from: process.env.FROM_BILLING_EMAIL || 'billing@baselinedocs.com',
+          to: adminUser.email,
+          bcc: process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com',
+          subject: `[TEST] Upcoming charge: $${amount.toFixed(2)}`,
+          html,
+        })
+
+        console.log('[Test Billing] Reminder email sent successfully:', result)
+      } catch (emailError: any) {
+        console.error('[Test Billing] Failed to send reminder email:', {
+          error: emailError.message,
+          stack: emailError.stack
+        })
+      }
+    } else {
+      console.log('[Test Billing] No admin user found for tenant', tenant.id)
     }
 
     // Step 2: Create and finalize a new invoice (this triggers actual payment)
