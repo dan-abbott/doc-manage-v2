@@ -1,5 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
+import { cookies } from 'next/headers'
 import ScanMonitoringClient from './ScanMonitoringClient'
 import { Button } from '@/components/ui/button'
 import { ShieldOff } from 'lucide-react'
@@ -10,6 +11,7 @@ export const revalidate = 0
 
 export default async function AdminScanMonitoringPage() {
   const supabase = await createClient()
+  const cookieStore = await cookies()
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
@@ -29,11 +31,29 @@ export default async function AdminScanMonitoringPage() {
     redirect('/documents')
   }
 
+  // ⭐ GET TENANT FROM SUBDOMAIN (not user's home tenant)
+  const subdomainCookie = cookieStore.get('tenant_subdomain')
+  const subdomain = subdomainCookie?.value
+
+  let tenantId = userData.tenant_id
+
+  if (subdomain) {
+    const { data: subdomainTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single()
+    
+    if (subdomainTenant) {
+      tenantId = subdomainTenant.id
+    }
+  }
+
   // Get virus scan status from tenants table
   const { data: tenant } = await supabase
     .from('tenants')
     .select('virus_scan_enabled')
-    .eq('id', userData.tenant_id)
+    .eq('id', tenantId)
     .single()
 
   const virusScanEnabled = tenant?.virus_scan_enabled ?? true
@@ -70,10 +90,11 @@ export default async function AdminScanMonitoringPage() {
     )
   }
 
-  // Continue with normal scan monitoring (only if enabled)
+  // ⭐ FIX 2: Use service role client and filter by tenant
+  const supabaseAdmin = createServiceRoleClient()
 
-  // Get all files with scan issues
-  const { data: problemFiles } = await supabase
+  // Get all files with scan issues FOR THIS TENANT
+  const { data: problemFiles } = await supabaseAdmin
     .from('document_files')
     .select(`
       id,
@@ -90,15 +111,17 @@ export default async function AdminScanMonitoringPage() {
         id,
         document_number,
         version,
-        title
+        title,
+        tenant_id
       )
     `)
+    .eq('documents.tenant_id', tenantId)
     .in('scan_status', ['pending', 'scanning', 'error'])
     .order('uploaded_at', { ascending: false })
     .limit(100)
 
-  // Get recent blocked files
-  const { data: blockedFiles } = await supabase
+  // Get recent blocked files FOR THIS TENANT
+  const { data: blockedFiles } = await supabaseAdmin
     .from('document_files')
     .select(`
       id,
@@ -115,9 +138,11 @@ export default async function AdminScanMonitoringPage() {
         id,
         document_number,
         version,
-        title
+        title,
+        tenant_id
       )
     `)
+    .eq('documents.tenant_id', tenantId)
     .eq('scan_status', 'blocked')
     .order('scanned_at', { ascending: false })
     .limit(50)
@@ -133,10 +158,11 @@ export default async function AdminScanMonitoringPage() {
     document: Array.isArray(file.documents) ? file.documents[0] : file.documents
   })) || []
 
-  // Get scan statistics
-  const { data: stats } = await supabase
+  // Get scan statistics FOR THIS TENANT ONLY
+  const { data: stats } = await supabaseAdmin
     .from('document_files')
-    .select('scan_status')
+    .select('scan_status, documents!inner(tenant_id)')
+    .eq('documents.tenant_id', tenantId)
 
   const statistics = {
     total: stats?.length || 0,

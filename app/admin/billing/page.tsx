@@ -71,7 +71,10 @@ export default async function BillingPage() {
   const thirtyDaysAgo = new Date()
   thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30)
 
-  const { data: apiUsage } = await supabase
+  // ⭐ FIX 1: Use service role client to bypass RLS for api_usage
+  const supabaseAdmin = createServiceRoleClient()
+  
+  const { data: apiUsage } = await supabaseAdmin
     .from('api_usage')
     .select('api_type, created_at')
     .eq('tenant_id', tenantData.id)
@@ -81,23 +84,21 @@ export default async function BillingPage() {
   const vtScans = apiUsage?.filter(u => u.api_type === 'virustotal').length || 0
   const emailsSent = apiUsage?.filter(u => u.api_type === 'resend_email').length || 0
 
-  // Get storage usage
-  const { data: storageData } = await supabase
+  // Get storage usage (use admin client to bypass RLS)
+  const { data: storageData } = await supabaseAdmin
     .from('document_files')
-    .select('file_size')
-    .eq('tenant_id', tenantData.id)
+    .select('file_size, documents!inner(tenant_id)')
+    .eq('documents.tenant_id', tenantData.id)
 
   const totalStorage = storageData?.reduce((sum, file) => sum + (file.file_size || 0), 0) || 0
   const storageGB = (totalStorage / (1024 * 1024 * 1024)).toFixed(2)
 
-  // Get user count
-  const supabaseAdmin = createServiceRoleClient()
-const { count: userCount } = await supabaseAdmin
-  .from('users')
-  .select('id', { count: 'exact', head: true })
-  .eq('tenant_id', tenantData.id)
-  .neq('role', 'Deactivated')  // Exclude deactivated users
-
+  // Get user count (use admin client to bypass RLS)
+  const { count: userCount } = await supabaseAdmin
+    .from('users')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantData.id)
+    .neq('role', 'Deactivated')
 
   return (
     <div className="min-h-screen py-8">
