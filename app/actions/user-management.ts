@@ -603,7 +603,8 @@ export async function addUser(data: {
           validation.data.email.toLowerCase(),
           `${validation.data.firstName} ${validation.data.lastName}`,
           tenantData.subdomain,
-          tenantData.company_name || tenantData.subdomain
+          tenantData.company_name || tenantData.subdomain,
+          tenantData.id  
         )
       } catch (emailError) {
         logger.warn('Failed to send welcome email (non-critical)', { 
