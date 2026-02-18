@@ -133,7 +133,7 @@ export default function DocumentsFilters({
           <Label htmlFor="project">Project Code</Label>
           <Input
             id="project"
-            placeholder="P-12345"
+            placeholder="Project Identifier (e.g. PROJ123)"
             value={project}
             onChange={(e) => setProject(e.target.value.toUpperCase())}
             onKeyDown={(e) => e.key === 'Enter' && applyFilters()}

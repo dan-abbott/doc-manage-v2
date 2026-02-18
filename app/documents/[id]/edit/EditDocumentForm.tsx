@@ -47,8 +47,8 @@ export default function EditDocumentForm({ document, virusScanEnabled = true }: 
     e.preventDefault()
 
     // Validate project code format if provided
-    if (projectCode && !/^P-\d{5}$/.test(projectCode.toUpperCase())) {
-      toast.error('Project code must be in format P-##### (e.g., P-12345)')
+    if (projectCode && projectCode.trim().length < 3) {
+      toast.error('Project code must be at least 3 characters')
       return
     }
 
@@ -153,11 +153,11 @@ export default function EditDocumentForm({ document, virusScanEnabled = true }: 
           id="projectCode"
           value={projectCode}
           onChange={(e) => setProjectCode(e.target.value)}
-          placeholder="P-##### (e.g., P-12345)"
+          placeholder="Project Identifier"
           disabled={isSubmitting}
         />
         <p className="text-sm text-muted-foreground mt-1">
-          Format: P-##### (e.g., P-12345)
+          Optional project identifier (e.g. PROJ123)
         </p>
       </div>
 

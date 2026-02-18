@@ -128,8 +128,8 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
       }
 
       // Validate project code format if provided
-      if (projectCode && !/^P-\d{5}$/.test(projectCode)) {
-        toast.error('Project code must be in format P-##### (e.g., P-12345)')
+      if (projectCode && projectCode.trim().length < 3) {
+        toast.error('Project code must be at least 3 characters')
         setIsSubmitting(false)
         return
       }
@@ -220,14 +220,14 @@ export default function NewDocumentForm({ documentTypes }: NewDocumentFormProps)
           <Input
             id="projectCode"
             type="text"
-            placeholder="P-12345"
+            placeholder="Project Identifier"
             value={projectCode}
             onChange={(e) => setProjectCode(e.target.value.toUpperCase())}
             disabled={isSubmitting}
             className="mt-1"
           />
           <p className="mt-1 text-xs text-gray-500">
-            Format: P-##### (e.g., P-12345)
+            Optional project identifier (e.g. PROJ123)
           </p>
         </div>
 
