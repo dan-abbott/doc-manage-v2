@@ -1,4 +1,4 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
 import { cookies } from 'next/headers'
 import BillingPageClient from './BillingPageClient'
@@ -91,10 +91,13 @@ export default async function BillingPage() {
   const storageGB = (totalStorage / (1024 * 1024 * 1024)).toFixed(2)
 
   // Get user count
-  const { count: userCount } = await supabase
-    .from('users')
-    .select('id', { count: 'exact', head: true })
-    .eq('tenant_id', tenantData.id)
+  const supabaseAdmin = createServiceRoleClient()
+const { count: userCount } = await supabaseAdmin
+  .from('users')
+  .select('id', { count: 'exact', head: true })
+  .eq('tenant_id', tenantData.id)
+  .neq('role', 'Deactivated')  // Exclude deactivated users
+
 
   return (
     <div className="min-h-screen py-8">
