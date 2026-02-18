@@ -291,15 +291,16 @@ async function handleSubscription(sub: Stripe.Subscription) {
     stripe_customer_id: sub.customer as string,
     stripe_subscription_id: sub.id,
     plan,
-    user_limit: plan === 'starter' ? 25 :
-                plan === 'professional' ? 100 :
+    user_limit: plan === 'starter' ? 25 : 
+                plan === 'professional' ? 100 : 
                 plan === 'enterprise' ? 999999 : 5,
-    document_limit: plan === 'starter' ? 3000 :
-                    plan === 'professional' ? 25000 :
+    document_limit: plan === 'starter' ? 3000 : 
+                    plan === 'professional' ? 25000 : 
                     plan === 'enterprise' ? 999999 : 150,
-    storage_limit_gb: plan === 'starter' ? 10 :
-                      plan === 'professional' ? 100 :
+    storage_limit_gb: plan === 'starter' ? 10 : 
+                      plan === 'professional' ? 100 : 
                       plan === 'enterprise' ? 1000 : 1,
+
 
     status: sub.status,
     billing_cycle: sub.items.data[0]?.price?.recurring?.interval || 'month',
@@ -486,7 +487,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   await supabase.from('tenant_billing')
     .update({
-      status: 'active'})
+      status: 'active'
+    })
     .eq('tenant_id', tenantId)
     .eq('status', 'past_due')
 
