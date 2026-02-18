@@ -242,40 +242,47 @@ export default function BillingPageClient({
                 <div className="text-2xl font-bold text-gray-900">{usage.emailsSent}</div>
               </div>
 
-              <div className="flex items-center justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="p-2 bg-green-100 rounded-lg">
-                    <HardDrive className="h-5 w-5 text-green-600" />
+              {/* Storage Section - Fixed Layout */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="p-2 bg-green-100 rounded-lg">
+                      <HardDrive className="h-5 w-5 text-green-600" />
+                    </div>
+                    <div>
+                      <div className="text-sm font-medium text-gray-900">Storage</div>
+                      <div className="text-xs text-gray-500">Total used</div>
+                    </div>
                   </div>
-                  <div>
-                    <div className="text-sm font-medium text-gray-900">Storage</div>
-                    <div className="text-xs text-gray-500">Total used</div>
+                  <div className="text-right">
+                    <div className="text-2xl font-bold text-gray-900">
+                      {usage.storageGB} / {billing.storage_limit_gb || 1} GB
+                    </div>
+                    {billing.storage_limit_gb && (
+                      <div className="text-xs text-gray-500">
+                        {((parseFloat(usage.storageGB) / billing.storage_limit_gb) * 100).toFixed(0)}% used
+                      </div>
+                    )}
                   </div>
                 </div>
 
-                <div className="text-2xl font-bold text-gray-900">
-                  {usage.storageGB} / {billing.storage_limit_gb || 1} GB
-                </div>
+                {/* Storage Progress Bar - Full Width Below */}
                 {billing.storage_limit_gb && (
-                  <div className="text-sm text-gray-500 mt-1">
-                    {((parseFloat(usage.storageGB) / billing.storage_limit_gb) * 100).toFixed(0)}% used
+                  <div className="w-full bg-gray-200 rounded-full h-2 overflow-hidden">
+                    <div
+                      className={`h-full transition-all duration-300 ${
+                        parseFloat(usage.storageGB) >= billing.storage_limit_gb
+                          ? 'bg-red-500'
+                          : parseFloat(usage.storageGB) / billing.storage_limit_gb >= 0.9
+                            ? 'bg-amber-500'
+                            : 'bg-green-500'
+                      }`}
+                      style={{
+                        width: `${Math.min((parseFloat(usage.storageGB) / (billing.storage_limit_gb || 1)) * 100, 100)}%`
+                      }}
+                    />
                   </div>
                 )}
-
-
-                <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
-                  <div
-                    className={`h-full transition-all duration-300 ${parseFloat(usage.storageGB) >= billing.storage_limit_gb
-                      ? 'bg-red-500'
-                      : parseFloat(usage.storageGB) / billing.storage_limit_gb >= 0.9
-                        ? 'bg-amber-500'
-                        : 'bg-blue-500'
-                      }`}
-                    style={{
-                      width: `${Math.min((parseFloat(usage.storageGB) / (billing.storage_limit_gb || 1)) * 100, 100)}%`
-                    }}
-                  />
-                </div>
               </div>
             </div>
           </CardContent>
