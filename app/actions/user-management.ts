@@ -591,7 +591,7 @@ export async function addUser(data: {
     // Get tenant info for welcome email
     const { data: tenantData } = await supabase
       .from('tenants')
-      .select('subdomain, company_name')
+      .select('id, subdomain, company_name')
       .eq('id', targetTenantId)
       .single()
 
