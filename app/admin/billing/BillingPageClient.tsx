@@ -262,6 +262,7 @@ export default function BillingPageClient({
                   </div>
                 )}
 
+
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
                   <div
                     className={`h-full transition-all duration-300 ${parseFloat(usage.storageGB) >= billing.storage_limit_gb
