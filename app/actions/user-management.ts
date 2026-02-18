@@ -406,6 +406,9 @@ export async function addUser(data: {
       userLimitType: typeof userLimit
     })
 
+    // Enhanced debug - shows EACH user being counted
+// Replace the user count query section (around lines 413-424)
+
     // Count users in tenant (include all except Deactivated role)
     console.log('🔍 [User Limit Check] Counting existing users...')
     console.log('🔍 [User Limit Check] Query: tenant_id =', targetTenantId, ', role !=', 'Deactivated')
@@ -416,11 +419,22 @@ export async function addUser(data: {
       .eq('tenant_id', targetTenantId)
       .neq('role', 'Deactivated')
 
+    // LOG EVERY SINGLE USER
     console.log('🔍 [User Limit Check] User count result:', {
       userCount,
       countError: countError?.message,
-      actualUsers: debugUsers?.length,
-      users: debugUsers?.map(u => ({ email: u.email, role: u.role, is_active: u.is_active }))
+      actualUsers: debugUsers?.length
+    })
+    
+    console.log('🔍 [User Limit Check] FULL USER LIST:')
+    debugUsers?.forEach((u, index) => {
+      console.log(`  ${index + 1}. ${u.email} | Role: ${u.role} | Active: ${u.is_active}`)
+    })
+    
+    console.log('🔍 [User Limit Check] Summary:', {
+      totalFound: debugUsers?.length,
+      countReturned: userCount,
+      shouldMatch: debugUsers?.length === userCount
     })
 
     if (countError) {
@@ -482,7 +496,7 @@ export async function addUser(data: {
 
     console.log('✅ [User Limit Check] PASSED - User count within limit')
     console.log('✅ [User Limit Check] Proceeding with user creation...')
-    
+
 
     // Check if user already exists in public.users
     const { data: existingUser } = await supabase
