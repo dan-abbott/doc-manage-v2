@@ -16,6 +16,29 @@ export const scanPendingFiles = inngest.createFunction(
     id: 'scan-pending-files',
     name: 'Scan Pending Files for Viruses',
     retries: 3, // Retry up to 3 times on failure
+    // ⭐ ADD: Global error handler for function-level failures
+    onFailure: async ({ error, event }) => {
+      console.error('[Inngest] Function failed:', error)
+      const { fileId } = event.data
+      
+      try {
+        const supabase = createServiceRoleClient()
+        
+        // Mark file as error if function fails
+        await supabase
+          .from('document_files')
+          .update({
+            scan_status: 'error',
+            scan_result: { error: error.message || 'Function execution failed' },
+            scanned_at: new Date().toISOString(),
+          })
+          .eq('id', fileId)
+        
+        console.log('[Inngest] File marked as error due to function failure')
+      } catch (updateError) {
+        console.error('[Inngest] Failed to update file status on error:', updateError)
+      }
+    }
   },
   { event: 'file/uploaded' },
   async ({ event, step }) => {
@@ -45,7 +68,15 @@ export const scanPendingFiles = inngest.createFunction(
       }
 
       console.log('[Inngest] File data retrieved:', file.original_file_name)
-      return file
+      // ⭐ FIX: Return minimal data to avoid size limits
+      return {
+        id: file.id,
+        file_path: file.file_path,
+        original_file_name: file.original_file_name,
+        document_id: file.document_id,
+        uploaded_by: file.uploaded_by,
+        tenant_id: (file.documents as any).tenant_id
+      }
     })
 
     // Step 2: Update status to 'scanning'
@@ -61,7 +92,7 @@ export const scanPendingFiles = inngest.createFunction(
     })
 
     // Step 3: Download file from storage
-    const fileBlob = await step.run('download-file', async () => {
+    const fileSize = await step.run('download-file', async () => {
       const supabase = createServiceRoleClient()
       
       const { data, error } = await supabase.storage
@@ -72,37 +103,69 @@ export const scanPendingFiles = inngest.createFunction(
         throw new Error(`Failed to download file: ${error?.message}`)
       }
       
-      // Convert Blob to base64 string for serialization
       const buffer = await data.arrayBuffer()
-      const base64 = Buffer.from(buffer).toString('base64')
-      console.log('[Inngest] File downloaded, size:', buffer.byteLength)
-      return base64
+      const size = buffer.byteLength
+      console.log('[Inngest] File downloaded, size:', size)
+      
+      // ⭐ FIX: Don't return the base64 data - store it and just return size
+      // We'll re-download in the next step
+      return size
     })
 
     // Step 4: Scan with VirusTotal
-    const scanResult = await step.run('scan-with-virustotal', async () => {
+    const scanSummary = await step.run('scan-with-virustotal', async () => {
       console.log('[Inngest] Scanning with VirusTotal...')
-      // Convert base64 back to Buffer for scanFile function
-      const fileBuffer = Buffer.from(fileBlob, 'base64')
+      
+      // Re-download file (necessary since we can't pass large data between steps)
+      const supabase = createServiceRoleClient()
+      const { data: fileBlob, error: downloadError } = await supabase.storage
+        .from('documents')
+        .download(fileData.file_path)
+      
+      if (downloadError || !fileBlob) {
+        throw new Error(`Failed to download file for scanning: ${downloadError?.message}`)
+      }
+      
+      const fileBuffer = Buffer.from(await fileBlob.arrayBuffer())
       const result = await scanFile(fileBuffer, fileData.original_file_name)
+      
       console.log('[Inngest] Scan complete:', 
         'error' in result ? 'ERROR' : result.safe ? 'SAFE' : 'MALWARE')
-      return result
+      
+      // ⭐ FIX: Return only summary data, not full scan result
+      if ('error' in result) {
+        return { 
+          status: 'error' as const, 
+          error: result.error,
+          errorType: result.errorType 
+        }
+      }
+      
+      return {
+        status: result.safe ? 'safe' as const : 'blocked' as const,
+        safe: result.safe,
+        malicious: result.malicious,
+        suspicious: result.suspicious,
+        // Don't include: vendors, permalink, analysis_date, etc.
+      }
     })
 
     // Step 5: Update database based on results
     await step.run('update-scan-results', async () => {
       const supabase = createServiceRoleClient()
       
-      if ('error' in scanResult) {
+      if (scanSummary.status === 'error') {
         // Scan error - mark as error, keep file
-        console.log('[Inngest] Scan error:', scanResult.error)
+        console.log('[Inngest] Scan error:', scanSummary.error)
         
         await supabase
           .from('document_files')
           .update({
             scan_status: 'error',
-            scan_result: scanResult,
+            scan_result: { 
+              error: scanSummary.error,
+              errorType: scanSummary.errorType 
+            },
             scanned_at: new Date().toISOString(),
           })
           .eq('id', fileId)
@@ -115,29 +178,33 @@ export const scanPendingFiles = inngest.createFunction(
             action: 'file_scan_failed',
             performed_by: fileData.uploaded_by,
             performed_by_email: 'system',
-            tenant_id: (fileData.documents as any).tenant_id,
+            tenant_id: fileData.tenant_id,
             details: {
               file_id: fileId,
               file_name: fileData.original_file_name,
-              error: scanResult.error
+              error: scanSummary.error
             }
           })
         
         return { status: 'error' }
       }
       
-      if (!scanResult.safe) {
+      if (scanSummary.status === 'blocked') {
         // Malware detected - mark as blocked, delete file
         console.log('[Inngest] ⚠️ MALWARE DETECTED:', {
-          malicious: scanResult.malicious,
-          suspicious: scanResult.suspicious,
+          malicious: scanSummary.malicious,
+          suspicious: scanSummary.suspicious,
         })
         
         await supabase
           .from('document_files')
           .update({
             scan_status: 'blocked',
-            scan_result: scanResult,
+            scan_result: {
+              safe: false,
+              malicious: scanSummary.malicious,
+              suspicious: scanSummary.suspicious
+            },
             scanned_at: new Date().toISOString(),
           })
           .eq('id', fileId)
@@ -150,13 +217,13 @@ export const scanPendingFiles = inngest.createFunction(
             action: 'file_scan_completed',
             performed_by: fileData.uploaded_by,
             performed_by_email: 'system',
-            tenant_id: (fileData.documents as any).tenant_id,
+            tenant_id: fileData.tenant_id,
             details: {
               file_id: fileId,
               file_name: fileData.original_file_name,
               status: 'blocked',
-              malicious: scanResult.malicious,
-              suspicious: scanResult.suspicious
+              malicious: scanSummary.malicious,
+              suspicious: scanSummary.suspicious
             }
           })
         
@@ -181,7 +248,11 @@ export const scanPendingFiles = inngest.createFunction(
         .from('document_files')
         .update({
           scan_status: 'safe',
-          scan_result: scanResult,
+          scan_result: {
+            safe: true,
+            malicious: 0,
+            suspicious: 0
+          },
           scanned_at: new Date().toISOString(),
         })
         .eq('id', fileId)
@@ -194,7 +265,7 @@ export const scanPendingFiles = inngest.createFunction(
           action: 'file_scan_completed',
           performed_by: fileData.uploaded_by,
           performed_by_email: 'system',
-          tenant_id: (fileData.documents as any).tenant_id,
+          tenant_id: fileData.tenant_id,
           details: {
             file_id: fileId,
             file_name: fileData.original_file_name,
@@ -207,10 +278,10 @@ export const scanPendingFiles = inngest.createFunction(
 
     console.log('[Inngest] Scan job complete for file:', fileId)
 
+    // ⭐ FIX: Return minimal data
     return { 
       fileId,
-      fileName: fileData.original_file_name,
-      status: 'error' in scanResult ? 'error' : scanResult.safe ? 'safe' : 'blocked',
+      status: scanSummary.status,
     }
   }
 )
