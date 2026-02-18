@@ -1,6 +1,6 @@
 /**
  * Google OAuth Sign In Button
- * app/(auth)/GoogleSignInButton.tsx
+ * components/auth/GoogleSignInButton.tsx
  */
 
 'use client'
@@ -15,10 +15,25 @@ export default function GoogleSignInButton() {
     setIsLoading(true)
     const supabase = createClient()
 
+    // ⭐ FIX: Store subdomain before OAuth redirect
+    const host = window.location.host
+    const subdomain = host.split('.')[0]
+    
+    console.log('[GoogleSignIn] Storing subdomain before OAuth:', subdomain)
+    
+    // Set OAuth origin cookie (expires in 10 minutes - enough for OAuth flow)
+    document.cookie = `oauth_origin_subdomain=${subdomain}; path=/; domain=.baselinedocs.com; max-age=600; secure; samesite=lax`
+
     const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
+        // ⭐ FIX: Always redirect to app.baselinedocs.com (not window.location.origin)
+        // The callback will read the cookie and redirect back to the correct subdomain
+        redirectTo: 'https://app.baselinedocs.com/auth/callback',
+        queryParams: {
+          access_type: 'offline',
+          prompt: 'consent',
+        },
       },
     })
 
