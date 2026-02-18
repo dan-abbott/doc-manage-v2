@@ -390,17 +390,28 @@ export async function addUser(data: {
     const currentPlan = billingData?.plan || 'trial'
     const userLimit = PLAN_USER_LIMITS[currentPlan] || PLAN_USER_LIMITS.trial
 
-    // Count active users in tenant (exclude deactivated)
+    // Fix for user limit check
+// Replace lines 393-403 in app/actions/user-management.ts
+
+    // Count users in tenant (include all except Deactivated role)
     const { count: userCount, error: countError } = await supabase
       .from('users')
       .select('id', { count: 'exact', head: true })
       .eq('tenant_id', targetTenantId)
-      .eq('is_active', true)
+      .neq('role', 'Deactivated') // Exclude only fully deactivated users
 
     if (countError) {
       logger.error('Failed to count users', { error: countError })
       return { success: false, error: 'Failed to check user limits' }
     }
+
+    // Log the check for debugging
+    logger.info('User limit check', {
+      currentPlan,
+      userLimit,
+      userCount,
+      targetTenantId
+    })
 
     if (userCount !== null && userCount >= userLimit) {
       const planNames: Record<string, string> = {
@@ -409,6 +420,13 @@ export async function addUser(data: {
         professional: 'Professional',
         enterprise: 'Enterprise'
       }
+      
+      logger.warn('User limit reached', {
+        plan: currentPlan,
+        limit: userLimit,
+        current: userCount,
+        attemptedBy: user.email
+      })
       
       return {
         success: false,

@@ -1,12 +1,24 @@
+/**
+ * Auth Error Page with Sign Out
+ * app/auth/error/page.tsx
+ */
+
 import Link from 'next/link'
 import { Button } from '@/components/ui/button'
+import { createClient } from '@/lib/supabase/server'
+import { redirect } from 'next/navigation'
+import SignOutButton from './SignOutButton'
 
-export default function AuthError({
+export default async function AuthError({
   searchParams,
 }: {
   searchParams: { message?: string }
 }) {
   const message = searchParams.message || 'Authentication error occurred'
+
+  // Check if user is signed in
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center px-4">
@@ -43,11 +55,17 @@ export default function AuthError({
 
           {/* Actions */}
           <div className="space-y-3">
-            <Link href="/" className="block">
-              <Button className="w-full" variant="default">
-                Return to Sign In
-              </Button>
-            </Link>
+            {user ? (
+              // User is signed in - show sign out button
+              <SignOutButton />
+            ) : (
+              // User is not signed in - show return to sign in link
+              <Link href="/" className="block">
+                <Button className="w-full" variant="default">
+                  Return to Sign In
+                </Button>
+              </Link>
+            )}
             
             <p className="text-center text-sm text-gray-500">
               If you believe this is an error, please contact your administrator.
