@@ -4,13 +4,13 @@ import { useState } from 'react'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
-import { 
-  CreditCard, 
-  Calendar, 
-  TrendingUp, 
-  Users, 
-  Mail, 
-  Shield, 
+import {
+  CreditCard,
+  Calendar,
+  TrendingUp,
+  Users,
+  Mail,
+  Shield,
   HardDrive,
   ArrowUpCircle,
   CheckCircle,
@@ -30,11 +30,11 @@ interface BillingPageClientProps {
   }
 }
 
-export default function BillingPageClient({ 
-  tenant, 
-  billing, 
+export default function BillingPageClient({
+  tenant,
+  billing,
   invoices,
-  usage 
+  usage
 }: BillingPageClientProps) {
   const [showUpgradeDialog, setShowUpgradeDialog] = useState(false)
 
@@ -252,7 +252,31 @@ export default function BillingPageClient({
                     <div className="text-xs text-gray-500">Total used</div>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">{usage.storageGB} GB</div>
+
+                <div className="text-2xl font-bold text-gray-900">
+                  {usage.storageGB} / {billing.storage_limit_gb || 1} GB
+                </div>
+                <div className="text-xs text-gray-500 mt-1">
+                  {billing.storage_limit_gb
+                    ? `${((parseFloat(usage.storageGB) / billing.storage_limit_gb) * 100).toFixed(0)}% used`
+                    : '0% used'
+                  }
+                </div>
+
+// Also add a progress bar (optional but recommended):
+                <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
+                  <div
+                    className={`h-full transition-all duration-300 ${parseFloat(usage.storageGB) >= billing.storage_limit_gb
+                        ? 'bg-red-500'
+                        : parseFloat(usage.storageGB) / billing.storage_limit_gb >= 0.9
+                          ? 'bg-amber-500'
+                          : 'bg-blue-500'
+                      }`}
+                    style={{
+                      width: `${Math.min((parseFloat(usage.storageGB) / (billing.storage_limit_gb || 1)) * 100, 100)}%`
+                    }}
+                  />
+                </div>
               </div>
             </div>
           </CardContent>
@@ -280,10 +304,10 @@ export default function BillingPageClient({
                       </div>
                     </div>
                     <div className="flex items-center gap-3">
-                      <Badge 
+                      <Badge
                         className={
-                          invoice.status === 'paid' 
-                            ? 'bg-green-100 text-green-800' 
+                          invoice.status === 'paid'
+                            ? 'bg-green-100 text-green-800'
                             : 'bg-yellow-100 text-yellow-800'
                         }
                       >

@@ -293,7 +293,14 @@ async function handleSubscription(sub: Stripe.Subscription) {
     plan,
     user_limit: plan === 'starter' ? 25 :
                 plan === 'professional' ? 100 :
-                plan === 'enterprise' ? 999999 : 5,  // ← ADD THIS LINE
+                plan === 'enterprise' ? 999999 : 5,
+    document_limit: plan === 'starter' ? 3000 :
+                    plan === 'professional' ? 25000 :
+                    plan === 'enterprise' ? 999999 : 150,
+    storage_limit_gb: plan === 'starter' ? 10 :
+                      plan === 'professional' ? 100 :
+                      plan === 'enterprise' ? 1000 : 1,
+
     status: sub.status,
     billing_cycle: sub.items.data[0]?.price?.recurring?.interval || 'month',
     current_period_start: new Date(currentPeriodStart * 1000).toISOString(),

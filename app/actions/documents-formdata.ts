@@ -5,6 +5,7 @@ import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
 import { inngest } from '@/lib/inngest/client'
 import { createDocumentAudit, AuditAction } from '@/lib/audit-helper'
+import { checkStorageLimit, getTotalFileSize } from '@/lib/storage-limit'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -67,8 +68,40 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Failed to update document' }
     }
 
-    // Handle file uploads - NO SCANNING (Inngest will handle it)
+    // Handle file uploads
     const files = formData.getAll('files') as File[]
+    
+    // ⭐ CHECK STORAGE LIMIT BEFORE UPLOADING ⭐
+    if (files.length > 0 && files.some(f => f.size > 0)) {
+      const totalFileSize = getTotalFileSize(files.filter(f => f.size > 0))
+      
+      console.log(`🔍 [Storage Check] Checking storage limit before upload...`)
+      console.log(`🔍 [Storage Check] Tenant: ${tenantId}`)
+      console.log(`🔍 [Storage Check] Files to upload: ${(totalFileSize / (1024 * 1024)).toFixed(2)} MB`)
+      
+      const storageCheck = await checkStorageLimit(tenantId, totalFileSize)
+      
+      console.log(`🔍 [Storage Check] Result:`, {
+        allowed: storageCheck.allowed,
+        currentGB: storageCheck.currentStorageGB.toFixed(2),
+        limitGB: storageCheck.storageLimitGB,
+        percentUsed: storageCheck.percentUsed.toFixed(1)
+      })
+      
+      if (!storageCheck.allowed) {
+        console.log(`🚫 [Storage Check] BLOCKED - Storage limit exceeded`)
+        return { 
+          success: false, 
+          error: storageCheck.error || 'Storage limit exceeded',
+          requiresUpgrade: true,
+          currentStorageGB: storageCheck.currentStorageGB,
+          storageLimitGB: storageCheck.storageLimitGB
+        }
+      }
+      
+      console.log(`✅ [Storage Check] PASSED - Upload allowed`)
+    }
+    
     const uploadedFiles: any[] = []
     
     if (files.length > 0) {

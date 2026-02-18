@@ -1,4 +1,6 @@
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
+import StorageLimitBanner from '@/components/admin/StorageLimitBanner'
 import { redirect } from 'next/navigation'
 import DocumentsSearchPage from './DocumentsSearchPage'
 import {
@@ -39,21 +41,62 @@ interface PageProps {
 export default async function DocumentsPage({ searchParams }: PageProps) {
   const supabase = await createClient()
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
-
-  if (!user) {
-    redirect('/auth/login')
+  // Check authentication
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
+  
+  if (userError || !user) {
+    redirect('/')
   }
 
-  // Check if user is admin
+  // Get user's tenant and admin status (single query)
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin')
+    .select('tenant_id, is_admin')
     .eq('id', user.id)
     .single()
 
   const isAdmin = userData?.is_admin || false
+
+  // Get subdomain tenant (for multi-tenant support)
+  const cookieStore = await cookies()
+  const subdomainCookie = cookieStore.get('tenant_subdomain')
+  const subdomain = subdomainCookie?.value
+
+  let tenantId = userData?.tenant_id
+
+  if (subdomain) {
+    const { data: subdomainTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single()
+    
+    if (subdomainTenant) {
+      tenantId = subdomainTenant.id
+    }
+  }
+
+  // ⭐ GET STORAGE INFO FOR BANNER ⭐
+  const supabaseAdmin = createServiceRoleClient()
+
+  // Get billing info
+  const { data: billingData } = await supabase
+    .from('tenant_billing')
+    .select('plan, storage_limit_gb')
+    .eq('tenant_id', tenantId)
+    .single()
+
+  // Calculate current storage (use admin to bypass RLS)
+  const { data: files } = await supabaseAdmin
+    .from('document_files')
+    .select('file_size, documents!inner(tenant_id)')
+    .eq('documents.tenant_id', tenantId)
+
+  const currentStorageBytes = files?.reduce((sum, f) => sum + (f.file_size || 0), 0) || 0
+  const currentStorageGB = currentStorageBytes / (1024 * 1024 * 1024)
+
+  const plan = billingData?.plan || 'trial'
+  const storageLimitGB = billingData?.storage_limit_gb || 1
 
   // Parse search params into filters
   const filters: AdvancedSearchFilters = {
@@ -87,14 +130,23 @@ export default async function DocumentsPage({ searchParams }: PageProps) {
   ])
 
   return (
-    <DocumentsSearchPage
-      initialFilters={filters}
-      initialResults={searchResults}
-      documentTypes={documentTypes}
-      users={users}
-      projectCodes={projectCodes}
-      isAdmin={isAdmin}
-      currentUserId={user.id}
-    />
+    <>
+      {/* ⭐ STORAGE BANNER ⭐ */}
+      <StorageLimitBanner 
+        currentStorageGB={currentStorageGB}
+        storageLimitGB={storageLimitGB}
+        plan={plan}
+      />
+
+      <DocumentsSearchPage
+        initialFilters={filters}
+        initialResults={searchResults}
+        documentTypes={documentTypes}
+        users={users}
+        projectCodes={projectCodes}
+        isAdmin={isAdmin}
+        currentUserId={user.id}
+      />
+    </>
   )
 }
