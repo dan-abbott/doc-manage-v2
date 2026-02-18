@@ -4,5 +4,12 @@
       "path": "/api/cron/send-digests",
       "schedule": "0 1 * * *"
     }
-  ]
+  ],
+  "functions": {
+    "app/**/*.{ts,tsx}": {
+      "maxDuration": 60,
+      "memory": 1024
+    }
+  },
+  "maxDuration": 60
 }
