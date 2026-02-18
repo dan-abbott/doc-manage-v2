@@ -20,10 +20,10 @@ export const scanPendingFiles = inngest.createFunction(
     onFailure: async ({ error, event }) => {
       console.error('[Inngest] Function failed:', error)
       const { fileId } = event.data
-      
+
       try {
         const supabase = createServiceRoleClient()
-        
+
         // Mark file as error if function fails
         await supabase
           .from('document_files')
@@ -33,7 +33,7 @@ export const scanPendingFiles = inngest.createFunction(
             scanned_at: new Date().toISOString(),
           })
           .eq('id', fileId)
-        
+
         console.log('[Inngest] File marked as error due to function failure')
       } catch (updateError) {
         console.error('[Inngest] Failed to update file status on error:', updateError)
@@ -49,7 +49,7 @@ export const scanPendingFiles = inngest.createFunction(
     // Step 1: Get file metadata from database
     const fileData = await step.run('get-file-data', async () => {
       const supabase = createServiceRoleClient()
-      
+
       const { data: file, error } = await supabase
         .from('document_files')
         .select(`
@@ -62,7 +62,7 @@ export const scanPendingFiles = inngest.createFunction(
         `)
         .eq('id', fileId)
         .single()
-      
+
       if (error || !file) {
         throw new Error(`File not found: ${fileId}`)
       }
@@ -82,31 +82,31 @@ export const scanPendingFiles = inngest.createFunction(
     // Step 2: Update status to 'scanning'
     await step.run('update-status-scanning', async () => {
       const supabase = createServiceRoleClient()
-      
+
       await supabase
         .from('document_files')
         .update({ scan_status: 'scanning' })
         .eq('id', fileId)
-      
+
       console.log('[Inngest] Status updated to scanning')
     })
 
     // Step 3: Download file from storage
     const fileSize = await step.run('download-file', async () => {
       const supabase = createServiceRoleClient()
-      
+
       const { data, error } = await supabase.storage
         .from('documents')
         .download(fileData.file_path)
-      
+
       if (error || !data) {
         throw new Error(`Failed to download file: ${error?.message}`)
       }
-      
+
       const buffer = await data.arrayBuffer()
       const size = buffer.byteLength
       console.log('[Inngest] File downloaded, size:', size)
-      
+
       // ⭐ FIX: Don't return the base64 data - store it and just return size
       // We'll re-download in the next step
       return size
@@ -115,32 +115,32 @@ export const scanPendingFiles = inngest.createFunction(
     // Step 4: Scan with VirusTotal
     const scanSummary = await step.run('scan-with-virustotal', async () => {
       console.log('[Inngest] Scanning with VirusTotal...')
-      
+
       // Re-download file (necessary since we can't pass large data between steps)
       const supabase = createServiceRoleClient()
       const { data: fileBlob, error: downloadError } = await supabase.storage
         .from('documents')
         .download(fileData.file_path)
-      
+
       if (downloadError || !fileBlob) {
         throw new Error(`Failed to download file for scanning: ${downloadError?.message}`)
       }
-      
+
       const fileBuffer = Buffer.from(await fileBlob.arrayBuffer())
       const result = await scanFile(fileBuffer, fileData.original_file_name)
-      
-      console.log('[Inngest] Scan complete:', 
+
+      console.log('[Inngest] Scan complete:',
         'error' in result ? 'ERROR' : result.safe ? 'SAFE' : 'MALWARE')
-      
+
       // ⭐ FIX: Return only summary data, not full scan result
       if ('error' in result) {
-        return { 
-          status: 'error' as const, 
+        return {
+          status: 'error' as const,
           error: result.error,
-          errorType: result.errorType 
+          errorType: result.errorType
         }
       }
-      
+
       return {
         status: result.safe ? 'safe' as const : 'blocked' as const,
         safe: result.safe,
@@ -150,26 +150,48 @@ export const scanPendingFiles = inngest.createFunction(
       }
     })
 
+    //Step 4.5: Log scan 
+    // Track API usage
+    await step.run('track-virustotal-usage', async () => {
+      const { trackApiUsage } = await import('@/lib/track-api-usage')
+
+      await trackApiUsage({
+        tenantId: fileData.tenant_id,
+        apiType: 'virustotal',
+        endpoint: 'file/scan',
+        status: scanSummary.status === 'error' ? 'error' : 'success',
+        requestData: {
+          file_name: fileData.original_file_name,
+          file_size: fileSize
+        },
+        responseData: {
+          safe: scanSummary.safe,
+          malicious: scanSummary.malicious,
+          suspicious: scanSummary.suspicious
+        }
+      })
+    })
+
     // Step 5: Update database based on results
     await step.run('update-scan-results', async () => {
       const supabase = createServiceRoleClient()
-      
+
       if (scanSummary.status === 'error') {
         // Scan error - mark as error, keep file
         console.log('[Inngest] Scan error:', scanSummary.error)
-        
+
         await supabase
           .from('document_files')
           .update({
             scan_status: 'error',
-            scan_result: { 
+            scan_result: {
               error: scanSummary.error,
-              errorType: scanSummary.errorType 
+              errorType: scanSummary.errorType
             },
             scanned_at: new Date().toISOString(),
           })
           .eq('id', fileId)
-        
+
         // Create audit log for scan failure
         await supabase
           .from('audit_log')
@@ -185,17 +207,17 @@ export const scanPendingFiles = inngest.createFunction(
               error: scanSummary.error
             }
           })
-        
+
         return { status: 'error' }
       }
-      
+
       if (scanSummary.status === 'blocked') {
         // Malware detected - mark as blocked, delete file
         console.log('[Inngest] ⚠️ MALWARE DETECTED:', {
           malicious: scanSummary.malicious,
           suspicious: scanSummary.suspicious,
         })
-        
+
         await supabase
           .from('document_files')
           .update({
@@ -208,7 +230,7 @@ export const scanPendingFiles = inngest.createFunction(
             scanned_at: new Date().toISOString(),
           })
           .eq('id', fileId)
-        
+
         // Create audit log for malware detection
         await supabase
           .from('audit_log')
@@ -226,24 +248,24 @@ export const scanPendingFiles = inngest.createFunction(
               suspicious: scanSummary.suspicious
             }
           })
-        
+
         // Delete file from storage
         const { error: deleteError } = await supabase.storage
           .from('documents')
           .remove([fileData.file_path])
-        
+
         if (deleteError) {
           console.error('[Inngest] Failed to delete blocked file:', deleteError)
         } else {
           console.log('[Inngest] Blocked file deleted from storage')
         }
-        
+
         return { status: 'blocked' }
       }
-      
+
       // File is safe
       console.log('[Inngest] ✅ File is safe')
-      
+
       await supabase
         .from('document_files')
         .update({
@@ -256,7 +278,7 @@ export const scanPendingFiles = inngest.createFunction(
           scanned_at: new Date().toISOString(),
         })
         .eq('id', fileId)
-      
+
       // Create audit log for successful scan
       await supabase
         .from('audit_log')
@@ -272,14 +294,14 @@ export const scanPendingFiles = inngest.createFunction(
             status: 'safe'
           }
         })
-      
+
       return { status: 'safe' }
     })
 
     console.log('[Inngest] Scan job complete for file:', fileId)
 
     // ⭐ FIX: Return minimal data
-    return { 
+    return {
       fileId,
       status: scanSummary.status,
     }

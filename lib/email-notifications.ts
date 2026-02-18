@@ -3,10 +3,12 @@
  * 
  * Sends immediate or queued email notifications using Resend
  * Critical notifications always immediate, others respect user delivery mode
+ * 
+ * Now includes API usage tracking for billing
  */
 
 import { Resend } from 'resend'
-import { createClient } from '@/lib/supabase/server'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 
 const resend = new Resend(process.env.RESEND_API_KEY)
 const fromEmail = process.env.EMAIL_FROM || 'notifications@baselinedocs.com'
@@ -20,6 +22,38 @@ interface EmailContext {
   submittedBy?: string
   rejectedBy?: string
   rejectionReason?: string
+}
+
+/**
+ * ⭐ NEW: Track email usage for billing
+ */
+async function trackEmailUsage(
+  tenantId: string,
+  recipientEmail: string,
+  subject: string,
+  status: 'success' | 'error'
+) {
+  try {
+    const supabaseAdmin = createServiceRoleClient()
+    
+    await supabaseAdmin
+      .from('api_usage')
+      .insert({
+        tenant_id: tenantId,
+        api_type: 'resend_email',
+        endpoint: 'emails/send',
+        status,
+        request_data: {
+          to: recipientEmail,
+          subject: subject.substring(0, 100) // Truncate for storage
+        },
+        response_data: status === 'success' ? { sent: true } : null
+      })
+    
+    console.log(`[API Usage] Tracked email: ${status}`)
+  } catch (error) {
+    console.error('[API Usage] Failed to track email usage:', error)
+  }
 }
 
 /**
@@ -170,19 +204,23 @@ export async function sendApprovalRequestEmail(
 
   // Always immediate for approval requests
   const viewUrl = `${siteUrl}/documents/${context.documentId}`
+  const subject = `⏳ Approval Needed: ${context.documentNumber}${context.documentVersion}`
 
   try {
     await resend.emails.send({
       from: fromEmail,
       to: check.email,
-      subject: `⏳ Approval Needed: ${context.documentNumber}${context.documentVersion}`,
+      subject,
       html: generateApprovalRequestHTML(check.userName, context, viewUrl),
     })
 
     console.log(`[Email] ✓ Sent approval request to ${check.email}`)
     
-    // Log email send to audit_log
+    // ⭐ Track email usage
     if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'success')
+      
+      // Also log to audit_log
       await logEmailSent(
         context.documentId,
         check.email,
@@ -195,6 +233,12 @@ export async function sendApprovalRequestEmail(
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send approval request:', error)
+    
+    // Track failed email
+    if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'error')
+    }
+    
     return { success: false, reason: 'error', error }
   }
 }
@@ -217,9 +261,17 @@ export async function sendApprovalCompleteEmail(
   const subject = `✅ Document Approved: ${context.documentNumber}${context.documentVersion}`
   const htmlBody = generateApprovalCompleteHTML(check.userName, context, viewUrl)
 
-  // Queue if digest mode
+  // Queue if user prefers digest
   if (check.action === 'queue' && check.tenantId && check.digestTime) {
-    return await queueEmail(creatorId, check.tenantId, 'approval_completed', subject, htmlBody, context, check.digestTime)
+    return await queueEmail(
+      creatorId,
+      check.tenantId,
+      'approval_completed',
+      subject,
+      htmlBody,
+      context,
+      check.digestTime
+    )
   }
 
   // Send immediately
@@ -227,14 +279,16 @@ export async function sendApprovalCompleteEmail(
     await resend.emails.send({
       from: fromEmail,
       to: check.email,
-      subject: subject,
+      subject,
       html: htmlBody,
     })
 
     console.log(`[Email] ✓ Sent approval complete to ${check.email}`)
     
-    // Log email send to audit_log
+    // ⭐ Track email usage
     if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'success')
+      
       await logEmailSent(
         context.documentId,
         check.email,
@@ -247,6 +301,11 @@ export async function sendApprovalCompleteEmail(
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send approval complete:', error)
+    
+    if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'error')
+    }
+    
     return { success: false, reason: 'error', error }
   }
 }
@@ -261,25 +320,27 @@ export async function sendDocumentRejectedEmail(
   const check = await shouldNotifyOrQueue(creatorId, 'document_rejected')
   
   if (check.action === 'disabled' || !check.email) {
-    console.log(`[Email] Skipping rejection for ${creatorId} (disabled)`)
+    console.log(`[Email] Skipping rejection notice for ${creatorId} (disabled)`)
     return { success: false, reason: 'disabled' }
   }
 
-  // Always immediate for rejections
-  const editUrl = `${siteUrl}/documents/${context.documentId}/edit`
+  const editUrl = `${siteUrl}/documents/${context.documentId}`
+  const subject = `❌ Document Rejected: ${context.documentNumber}${context.documentVersion}`
 
   try {
     await resend.emails.send({
       from: fromEmail,
       to: check.email,
-      subject: `❌ Document Rejected: ${context.documentNumber}${context.documentVersion}`,
+      subject,
       html: generateDocumentRejectedHTML(check.userName, context, editUrl),
     })
 
-    console.log(`[Email] ✓ Sent rejection email to ${check.email}`)
+    console.log(`[Email] ✓ Sent rejection notice to ${check.email}`)
     
-    // Log email send to audit_log
+    // ⭐ Track email usage
     if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'success')
+      
       await logEmailSent(
         context.documentId,
         check.email,
@@ -291,7 +352,12 @@ export async function sendDocumentRejectedEmail(
     
     return { success: true }
   } catch (error) {
-    console.error('[Email] ✗ Failed to send rejection email:', error)
+    console.error('[Email] ✗ Failed to send rejection notice:', error)
+    
+    if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'error')
+    }
+    
     return { success: false, reason: 'error', error }
   }
 }
@@ -306,7 +372,7 @@ export async function sendDocumentReleasedEmail(
   const check = await shouldNotifyOrQueue(creatorId, 'document_released')
   
   if (check.action === 'disabled' || !check.email) {
-    console.log(`[Email] Skipping release notification for ${creatorId} (disabled)`)
+    console.log(`[Email] Skipping release notice for ${creatorId} (disabled)`)
     return { success: false, reason: 'disabled' }
   }
 
@@ -314,9 +380,17 @@ export async function sendDocumentReleasedEmail(
   const subject = `🎉 Document Released: ${context.documentNumber}${context.documentVersion}`
   const htmlBody = generateDocumentReleasedHTML(check.userName, context, viewUrl)
 
-  // Queue if digest mode
+  // Queue if user prefers digest
   if (check.action === 'queue' && check.tenantId && check.digestTime) {
-    return await queueEmail(creatorId, check.tenantId, 'document_released', subject, htmlBody, context, check.digestTime)
+    return await queueEmail(
+      creatorId,
+      check.tenantId,
+      'document_released',
+      subject,
+      htmlBody,
+      context,
+      check.digestTime
+    )
   }
 
   // Send immediately
@@ -324,14 +398,16 @@ export async function sendDocumentReleasedEmail(
     await resend.emails.send({
       from: fromEmail,
       to: check.email,
-      subject: subject,
+      subject,
       html: htmlBody,
     })
 
-    console.log(`[Email] ✓ Sent release notification to ${check.email}`)
+    console.log(`[Email] ✓ Sent release notice to ${check.email}`)
     
-    // Log email send to audit_log
+    // ⭐ Track email usage
     if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'success')
+      
       await logEmailSent(
         context.documentId,
         check.email,
@@ -343,15 +419,17 @@ export async function sendDocumentReleasedEmail(
     
     return { success: true }
   } catch (error) {
-    console.error('[Email] ✗ Failed to send release notification:', error)
+    console.error('[Email] ✗ Failed to send release notice:', error)
+    
+    if (check.tenantId) {
+      await trackEmailUsage(check.tenantId, check.email, subject, 'error')
+    }
+    
     return { success: false, reason: 'error', error }
   }
 }
 
-// ============================================================================
-// HTML EMAIL TEMPLATES (Same as Phase 1)
-// ============================================================================
-
+// HTML template generation functions...
 function generateApprovalRequestHTML(userName: string, context: EmailContext, viewUrl: string): string {
   return `
 <!DOCTYPE html>
@@ -368,15 +446,15 @@ function generateApprovalRequestHTML(userName: string, context: EmailContext, vi
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
     <p style="margin-top: 0; font-size: 16px;">Hi ${userName},</p>
     
-    <p>You've been assigned to review and approve the following document:</p>
+    <p>A document has been submitted for your approval.</p>
     
     <div style="background: white; border-left: 4px solid #667eea; padding: 20px; margin: 20px 0; border-radius: 5px;">
       <p style="margin: 0 0 10px 0;"><strong>Document:</strong> ${context.documentNumber}${context.documentVersion}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Title:</strong> ${context.documentTitle}</p>
-      ${context.submittedBy ? `<p style="margin: 0;"><strong>Submitted by:</strong> ${context.submittedBy}</p>` : ''}
+      <p style="margin: 0;"><strong>Title:</strong> ${context.documentTitle}</p>
+      ${context.submittedBy ? `<p style="margin: 10px 0 0 0;"><strong>Submitted by:</strong> ${context.submittedBy}</p>` : ''}
     </div>
     
-    <p>Please review the document and provide your approval decision.</p>
+    <p>Please review the document and provide your approval or feedback.</p>
     
     <div style="text-align: center; margin: 30px 0;">
       <a href="${viewUrl}" style="background: #667eea; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">Review Document</a>
@@ -398,22 +476,22 @@ function generateApprovalCompleteHTML(userName: string, context: EmailContext, v
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #11998e 0%, #38ef7d 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+  <div style="background: linear-gradient(135deg, #56ab2f 0%, #a8e063 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
     <h1 style="color: white; margin: 0; font-size: 24px;">✅ Document Approved</h1>
   </div>
   
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
     <p style="margin-top: 0; font-size: 16px;">Hi ${userName},</p>
     
-    <p>Great news! Your document has been approved by all reviewers and is now released.</p>
+    <p>Your document has been approved by all reviewers and is now released!</p>
     
-    <div style="background: white; border-left: 4px solid #38ef7d; padding: 20px; margin: 20px 0; border-radius: 5px;">
+    <div style="background: white; border-left: 4px solid #56ab2f; padding: 20px; margin: 20px 0; border-radius: 5px;">
       <p style="margin: 0 0 10px 0;"><strong>Document:</strong> ${context.documentNumber}${context.documentVersion}</p>
       <p style="margin: 0;"><strong>Title:</strong> ${context.documentTitle}</p>
     </div>
     
     <div style="text-align: center; margin: 30px 0;">
-      <a href="${viewUrl}" style="background: #38ef7d; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Document</a>
+      <a href="${viewUrl}" style="background: #56ab2f; color: white; padding: 12px 30px; text-decoration: none; border-radius: 5px; display: inline-block; font-weight: bold;">View Document</a>
     </div>
     
     <p style="color: #666; font-size: 14px; margin-bottom: 0;">This is an automated notification from your Document Control System.</p>
@@ -432,19 +510,19 @@ function generateDocumentRejectedHTML(userName: string, context: EmailContext, e
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
-  <div style="background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
+  <div style="background: linear-gradient(135deg, #f5576c 0%, #f093fb 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
     <h1 style="color: white; margin: 0; font-size: 24px;">❌ Document Rejected</h1>
   </div>
   
   <div style="background: #f8f9fa; padding: 30px; border-radius: 0 0 10px 10px;">
     <p style="margin-top: 0; font-size: 16px;">Hi ${userName},</p>
     
-    <p>Your document has been rejected and returned to draft status for revision.</p>
+    <p>Your document has been rejected and returned to draft status.</p>
     
     <div style="background: white; border-left: 4px solid #f5576c; padding: 20px; margin: 20px 0; border-radius: 5px;">
       <p style="margin: 0 0 10px 0;"><strong>Document:</strong> ${context.documentNumber}${context.documentVersion}</p>
-      <p style="margin: 0 0 10px 0;"><strong>Title:</strong> ${context.documentTitle}</p>
-      ${context.rejectedBy ? `<p style="margin: 0 0 10px 0;"><strong>Rejected by:</strong> ${context.rejectedBy}</p>` : ''}
+      <p style="margin: 0;"><strong>Title:</strong> ${context.documentTitle}</p>
+      ${context.rejectedBy ? `<p style="margin: 10px 0 0 0;"><strong>Rejected by:</strong> ${context.rejectedBy}</p>` : ''}
       ${context.rejectionReason ? `
         <div style="margin-top: 15px; padding: 15px; background: #fff3cd; border-radius: 5px;">
           <p style="margin: 0; color: #856404;"><strong>Reason:</strong></p>
@@ -472,7 +550,7 @@ function generateDocumentReleasedHTML(userName: string, context: EmailContext, v
 <html>
 <head>
   <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-case1.0">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: system-ui, -apple-system, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px;">
   <div style="background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%); padding: 30px; border-radius: 10px 10px 0 0; text-align: center;">
@@ -507,23 +585,32 @@ export async function sendWelcomeEmail(
   userEmail: string,
   userName: string,
   tenantSubdomain: string,
-  tenantName: string
+  tenantName: string,
+  tenantId: string
 ) {
   const loginUrl = `https://${tenantSubdomain}.baselinedocs.com`
   const settingsUrl = `${loginUrl}/settings/notifications`
+  const subject = `🎉 Welcome to ${tenantName} on BaselineDocs!`
 
   try {
     await resend.emails.send({
       from: fromEmail,
       to: userEmail,
-      subject: `🎉 Welcome to ${tenantName} on BaselineDocs!`,
+      subject,
       html: generateWelcomeHTML(userName, tenantName, tenantSubdomain, loginUrl, settingsUrl),
     })
 
     console.log(`[Email] ✓ Sent welcome email to ${userEmail}`)
+    
+    // ⭐ Track email usage
+    await trackEmailUsage(tenantId, userEmail, subject, 'success')
+    
     return { success: true }
   } catch (error) {
     console.error('[Email] ✗ Failed to send welcome email:', error)
+    
+    await trackEmailUsage(tenantId, userEmail, subject, 'error')
+    
     return { success: false, reason: 'error', error }
   }
 }
