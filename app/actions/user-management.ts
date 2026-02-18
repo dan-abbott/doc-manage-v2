@@ -413,7 +413,7 @@ export async function addUser(data: {
     console.log('🔍 [User Limit Check] Counting existing users...')
     console.log('🔍 [User Limit Check] Query: tenant_id =', targetTenantId, ', role !=', 'Deactivated')
     
-    const { count: userCount, error: countError, data: debugUsers } = await supabase
+    const { count: userCount, error: countError, data: debugUsers } = await supabaseAdmin
       .from('users')
       .select('id, email, role, is_active', { count: 'exact' })
       .eq('tenant_id', targetTenantId)
