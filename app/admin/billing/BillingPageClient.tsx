@@ -263,14 +263,13 @@ export default function BillingPageClient({
                   }
                 </div>
 
-// Also add a progress bar (optional but recommended):
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
                   <div
                     className={`h-full transition-all duration-300 ${parseFloat(usage.storageGB) >= billing.storage_limit_gb
-                        ? 'bg-red-500'
-                        : parseFloat(usage.storageGB) / billing.storage_limit_gb >= 0.9
-                          ? 'bg-amber-500'
-                          : 'bg-blue-500'
+                      ? 'bg-red-500'
+                      : parseFloat(usage.storageGB) / billing.storage_limit_gb >= 0.9
+                        ? 'bg-amber-500'
+                        : 'bg-blue-500'
                       }`}
                     style={{
                       width: `${Math.min((parseFloat(usage.storageGB) / (billing.storage_limit_gb || 1)) * 100, 100)}%`
