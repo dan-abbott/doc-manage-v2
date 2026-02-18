@@ -256,12 +256,11 @@ export default function BillingPageClient({
                 <div className="text-2xl font-bold text-gray-900">
                   {usage.storageGB} / {billing.storage_limit_gb || 1} GB
                 </div>
-                <div className="text-xs text-gray-500 mt-1">
-                  {billing.storage_limit_gb
-                    ? `${((parseFloat(usage.storageGB) / billing.storage_limit_gb) * 100).toFixed(0)}% used`
-                    : '0% used'
-                  }
-                </div>
+                {billing.storage_limit_gb && (
+                  <div className="text-sm text-gray-500 mt-1">
+                    {((parseFloat(usage.storageGB) / billing.storage_limit_gb) * 100).toFixed(0)}% used
+                  </div>
+                )}
 
                 <div className="w-full bg-gray-200 rounded-full h-2 mt-2 overflow-hidden">
                   <div
