@@ -14,7 +14,7 @@ const OWNER_EMAIL = process.env.FEEDBACK_EMAIL || 'abbott.dan@gmail.com'
 
 const PLAN_NAMES: Record<string, string> = {
   starter: 'Starter',
-  professional: 'Professional', 
+  professional: 'Professional',
   enterprise: 'Enterprise',
   trial: 'Trial',
 }
@@ -73,7 +73,7 @@ export async function POST(request: NextRequest) {
     eventId: event.id,
     created: new Date(event.created * 1000).toISOString()
   })
-  
+
   await logEvent(event)
 
   try {
@@ -253,10 +253,10 @@ async function handleSubscription(sub: Stripe.Subscription) {
     customerId: sub.customer,
     status: sub.status
   })
-  
+
   const tenantId = await getTenantId(sub.customer as string)
   console.log('🟢 [Webhook] Tenant ID resolved:', tenantId)
-  
+
   let pm = null
   if (sub.default_payment_method) {
     // default_payment_method may already be expanded (object) or just an ID (string)
@@ -291,6 +291,9 @@ async function handleSubscription(sub: Stripe.Subscription) {
     stripe_customer_id: sub.customer as string,
     stripe_subscription_id: sub.id,
     plan,
+    user_limit: plan === 'starter' ? 25 :
+                plan === 'professional' ? 100 :
+                plan === 'enterprise' ? 999999 : 5,  // ← ADD THIS LINE
     status: sub.status,
     billing_cycle: sub.items.data[0]?.price?.recurring?.interval || 'month',
     current_period_start: new Date(currentPeriodStart * 1000).toISOString(),
@@ -314,7 +317,7 @@ async function handleSubscription(sub: Stripe.Subscription) {
   const { error } = existing
     ? await supabase.from('tenant_billing').update(billingUpdate).eq('tenant_id', tenantId)
     : await supabase.from('tenant_billing').insert(billingUpdate)
-  
+
   if (error) {
     console.error('🔴 [Webhook] Failed to update tenant_billing:', error)
     throw error
@@ -455,8 +458,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
 
   // Stripe v20: subscription might be string or object
   const invoiceAny = invoice as any
-  const subscriptionId = typeof invoiceAny.subscription === 'string' 
-    ? invoiceAny.subscription 
+  const subscriptionId = typeof invoiceAny.subscription === 'string'
+    ? invoiceAny.subscription
     : invoiceAny.subscription?.id || null
 
   await supabase.from('invoices').upsert({
@@ -475,7 +478,8 @@ async function handleInvoicePaid(invoice: Stripe.Invoice) {
   }, { onConflict: 'stripe_invoice_id' })
 
   await supabase.from('tenant_billing')
-    .update({ status: 'active' })
+    .update({
+      status: 'active'})
     .eq('tenant_id', tenantId)
     .eq('status', 'past_due')
 
@@ -491,7 +495,7 @@ async function sendPaymentConfirmation(tenantId: string, invoice: Stripe.Invoice
   const { sendPaymentConfirmationEmail } = await import('@/lib/billing-emails')
   const { createServiceRoleClient } = await import('@/lib/supabase/server')
   const adminClient = createServiceRoleClient()
-  
+
   const { data: tenant } = await adminClient
     .from('tenants')
     .select('company_name, subdomain')
