@@ -136,8 +136,7 @@ onFailure: async ({ error, event }: { error: any; event: { data: { fileId: strin
       if ('error' in result) {
         return {
           status: 'error' as const,
-          error: result.error,
-          errorType: result.errorType
+          error: result.error
         }
       }
 
@@ -186,7 +185,6 @@ onFailure: async ({ error, event }: { error: any; event: { data: { fileId: strin
             scan_status: 'error',
             scan_result: {
               error: scanSummary.error,
-              errorType: scanSummary.errorType
             },
             scanned_at: new Date().toISOString(),
           })
