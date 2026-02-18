@@ -17,7 +17,7 @@ export const scanPendingFiles = inngest.createFunction(
     name: 'Scan Pending Files for Viruses',
     retries: 3, // Retry up to 3 times on failure
     // ⭐ ADD: Global error handler for function-level failures
-    onFailure: async ({ error, event }) => {
+onFailure: async ({ error, event }: { error: any; event: { data: { fileId: string } } }) => {
       console.error('[Inngest] Function failed:', error)
       const { fileId } = event.data
 
