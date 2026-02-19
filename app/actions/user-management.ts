@@ -168,6 +168,7 @@ export async function updateUserRole(
 ) {
   const startTime = Date.now()
   const supabase = await createClient()
+  const supabaseAdmin = createServiceRoleClient()
 
   try {
     // Validate UUID
@@ -205,7 +206,7 @@ export async function updateUserRole(
     }
 
     // Get target user details
-    const { data: targetUser, error: targetError } = await supabase
+    const { data: targetUser, error: targetError } = await supabaseAdmin
       .from('users')
       .select('email, full_name, role')
       .eq('id', targetUserId)
@@ -226,7 +227,7 @@ export async function updateUserRole(
     })
 
     // Update role
-    const { error: updateError } = await supabase
+    const { error: updateError } = await supabaseAdmin
       .from('users')
       .update({
         role: data.role,
