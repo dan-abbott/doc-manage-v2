@@ -220,14 +220,7 @@ export async function sendApprovalRequestEmail(
     if (check.tenantId) {
       await trackEmailUsage(check.tenantId, check.email, subject, 'success')
       
-      // Also log to audit_log
-      await logEmailSent(
-        context.documentId,
-        check.email,
-        'approval_requested',
-        check.tenantId,
-        approverId
-      )
+      
     }
     
     return { success: true }
@@ -289,13 +282,7 @@ export async function sendApprovalCompleteEmail(
     if (check.tenantId) {
       await trackEmailUsage(check.tenantId, check.email, subject, 'success')
       
-      await logEmailSent(
-        context.documentId,
-        check.email,
-        'approval_completed',
-        check.tenantId,
-        creatorId
-      )
+      
     }
     
     return { success: true }
@@ -341,13 +328,7 @@ export async function sendDocumentRejectedEmail(
     if (check.tenantId) {
       await trackEmailUsage(check.tenantId, check.email, subject, 'success')
       
-      await logEmailSent(
-        context.documentId,
-        check.email,
-        'document_rejected',
-        check.tenantId,
-        creatorId
-      )
+      
     }
     
     return { success: true }
@@ -408,13 +389,7 @@ export async function sendDocumentReleasedEmail(
     if (check.tenantId) {
       await trackEmailUsage(check.tenantId, check.email, subject, 'success')
       
-      await logEmailSent(
-        context.documentId,
-        check.email,
-        'document_released',
-        check.tenantId,
-        creatorId
-      )
+      
     }
     
     return { success: true }
@@ -716,36 +691,3 @@ function generateWelcomeHTML(
   `
 }
 
-/**
- * Log email send to audit_log for tracking and billing
- */
-async function logEmailSent(
-  documentId: string,
-  recipientEmail: string,
-  emailType: string,
-  tenantId: string,
-  performedBy: string
-) {
-  try {
-    const supabase = await createClient()
-    
-    await supabase
-      .from('audit_log')
-      .insert({
-        document_id: documentId,
-        action: 'email_sent',
-        performed_by: performedBy,
-        performed_by_email: recipientEmail,
-        tenant_id: tenantId,
-        details: {
-          email_type: emailType,
-          recipient: recipientEmail,
-          timestamp: new Date().toISOString()
-        }
-      })
-    
-    console.log(`[Audit] Logged email send: ${emailType} to ${recipientEmail}`)
-  } catch (error) {
-    console.error('[Audit] Failed to log email send:', error)
-  }
-}
