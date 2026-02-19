@@ -59,7 +59,7 @@ export default function UserManagementTable() {
       const result = await getAllUsers()
       
       if (result.success) {
-        setUsers(result.data)
+        setUsers(result.data || [])
       } else {
         const error = result.error as any
         const errorMessage = typeof error === 'string' 
