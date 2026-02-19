@@ -133,8 +133,8 @@ export default function AdvancedFilters({
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {/* Created Date */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Created Date</Label>
-                <div className="space-y-2">
+                <Label className="text-sm font-semibold">Created Date (between)</Label>
+                <div className="flex gap-2">
                   <Input
                     type="date"
                     placeholder="From"
@@ -144,6 +144,7 @@ export default function AdvancedFilters({
                       createdAfter: e.target.value ? new Date(e.target.value).toISOString() : undefined,
                       page: 1
                     })}
+                    className="flex-1"
                   />
                   <Input
                     type="date"
@@ -154,14 +155,15 @@ export default function AdvancedFilters({
                       createdBefore: e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : undefined,
                       page: 1
                     })}
+                    className="flex-1"
                   />
                 </div>
               </div>
 
               {/* Updated Date */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Updated Date</Label>
-                <div className="space-y-2">
+                <Label className="text-sm font-semibold">Updated Date (between)</Label>
+                <div className="flex gap-2">
                   <Input
                     type="date"
                     placeholder="From"
@@ -171,6 +173,7 @@ export default function AdvancedFilters({
                       updatedAfter: e.target.value ? new Date(e.target.value).toISOString() : undefined,
                       page: 1
                     })}
+                    className="flex-1"
                   />
                   <Input
                     type="date"
@@ -181,14 +184,15 @@ export default function AdvancedFilters({
                       updatedBefore: e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : undefined,
                       page: 1
                     })}
+                    className="flex-1"
                   />
                 </div>
               </div>
 
               {/* Released Date */}
               <div className="space-y-2">
-                <Label className="text-sm font-semibold">Released Date</Label>
-                <div className="space-y-2">
+                <Label className="text-sm font-semibold">Released Date (between)</Label>
+                <div className="flex gap-2">
                   <Input
                     type="date"
                     placeholder="From"
@@ -198,6 +202,7 @@ export default function AdvancedFilters({
                       releasedAfter: e.target.value ? new Date(e.target.value).toISOString() : undefined,
                       page: 1
                     })}
+                    className="flex-1"
                   />
                   <Input
                     type="date"
@@ -208,6 +213,7 @@ export default function AdvancedFilters({
                       releasedBefore: e.target.value ? new Date(e.target.value + 'T23:59:59').toISOString() : undefined,
                       page: 1
                     })}
+                    className="flex-1"
                   />
                 </div>
               </div>
