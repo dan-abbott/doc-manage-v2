@@ -213,7 +213,13 @@ export async function updateUserRole(
       .single()
 
     if (targetError || !targetUser) {
-      return { success: false, error: 'User not found' }
+      logger.error('User lookup failed', {
+        targetUserId,
+        errorCode: targetError?.code,  
+        errorMessage: targetError?.message,
+        dataIsNull: !targetUser
+      })
+      return { success: false, error: `User not found (${targetError?.code || 'no data'})` }
     }
 
     logger.info('Updating user role', {
