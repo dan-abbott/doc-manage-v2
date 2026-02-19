@@ -1,33 +1,30 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import BillingPageClient from './BillingPageClient'
 import { syncInvoicesFromStripe } from './sync-invoices'
+import { getSubdomainTenantId } from '@/lib/tenant'
+
 
 export default async function BillingPage() {
   const supabase = await createClient()
-  const cookieStore = await cookies()
+  
 
   // Check authentication
   const { data: { user }, error: userError } = await supabase.auth.getUser()
-  
+
   if (userError || !user) {
     redirect('/')
   }
 
   // Get subdomain tenant ID
-  const subdomainCookie = cookieStore.get('tenant_subdomain')
-  const subdomain = subdomainCookie?.value
+  const tenantId = await getSubdomainTenantId()
 
-  if (!subdomain) {
-    redirect('/dashboard')
-  }
 
   // Get tenant ID from subdomain
   const { data: tenantData } = await supabase
     .from('tenants')
     .select('id, company_name, subdomain, created_at')
-    .eq('subdomain', subdomain)
+    .eq('id', tenantId)
     .single()
 
   if (!tenantData) {
@@ -73,7 +70,7 @@ export default async function BillingPage() {
 
   // ⭐ FIX 1: Use service role client to bypass RLS for api_usage
   const supabaseAdmin = createServiceRoleClient()
-  
+
   const { data: apiUsage } = await supabaseAdmin
     .from('api_usage')
     .select('api_type, created_at')

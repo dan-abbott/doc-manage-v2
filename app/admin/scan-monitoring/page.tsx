@@ -1,21 +1,20 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import ScanMonitoringClient from './ScanMonitoringClient'
 import { Button } from '@/components/ui/button'
 import { ShieldOff } from 'lucide-react'
 import Link from 'next/link'
+import { getCurrentSubdomain } from '@/lib/tenant'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
 export default async function AdminScanMonitoringPage() {
   const supabase = await createClient()
-  const cookieStore = await cookies()
 
   // Get current user
   const { data: { user } } = await supabase.auth.getUser()
-  
+
   if (!user) {
     redirect('/auth/login')
   }
@@ -32,8 +31,7 @@ export default async function AdminScanMonitoringPage() {
   }
 
   // ⭐ GET TENANT FROM SUBDOMAIN (not user's home tenant)
-  const subdomainCookie = cookieStore.get('tenant_subdomain')
-  const subdomain = subdomainCookie?.value
+  const subdomain = await getCurrentSubdomain()
 
   let tenantId = userData.tenant_id
 
@@ -43,7 +41,7 @@ export default async function AdminScanMonitoringPage() {
       .select('id')
       .eq('subdomain', subdomain)
       .single()
-    
+
     if (subdomainTenant) {
       tenantId = subdomainTenant.id
     }
@@ -68,7 +66,7 @@ export default async function AdminScanMonitoringPage() {
             Virus scanning is currently disabled for this tenant
           </p>
         </div>
-        
+
         <div className="bg-gray-100 border-2 border-dashed border-gray-300 rounded-lg p-12 text-center">
           <div className="max-w-md mx-auto">
             <ShieldOff className="h-16 w-16 text-gray-400 mx-auto mb-4" />
@@ -76,7 +74,7 @@ export default async function AdminScanMonitoringPage() {
               Virus Scanning Disabled
             </h3>
             <p className="text-gray-600 mb-4">
-              Virus scanning is currently disabled in company settings. 
+              Virus scanning is currently disabled in company settings.
               Enable it to start monitoring file scans.
             </p>
             <Button asChild variant="outline">

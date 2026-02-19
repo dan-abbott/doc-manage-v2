@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect } from 'next/navigation'
-import { cookies } from 'next/headers'
 import CompanySettingsForm from './CompanySettingsForm'
+import { getCurrentSubdomain } from '@/lib/tenant'
 
 export default async function CompanySettingsPage() {
   const supabase = await createClient()
@@ -25,8 +25,7 @@ export default async function CompanySettingsPage() {
   }
 
   // FIXED: Get current subdomain from cookie (set by middleware)
-  const cookieStore = await cookies()
-  const currentSubdomain = cookieStore.get('tenant_subdomain')?.value || 'app'
+  const currentSubdomain = await getCurrentSubdomain()
 
   // FIXED: Query tenant by subdomain, not by user's tenant_id
   // This allows master admins to view settings for any tenant they're accessing

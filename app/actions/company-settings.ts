@@ -2,6 +2,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
@@ -44,7 +45,12 @@ export async function uploadCompanyLogo(formData: FormData) {
 
     // Get tenant ID from formData (passed by the form)
     const tenantId = formData.get('tenantId') as string
+    const subdomainTenantId = await getSubdomainTenantId()
     
+    if(tenantId !== subdomainTenantId) {
+      return { success: false, error: 'Tenant ID does not match subdomain tenant ID' }
+    }
+
     if (!tenantId) {
       return { success: false, error: 'Tenant ID required' }
     }

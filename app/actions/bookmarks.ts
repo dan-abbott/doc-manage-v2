@@ -1,6 +1,7 @@
 'use server'
 
 import { createClient } from '@/lib/supabase/server'
+import { getSubdomainTenantId } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 
 /**
@@ -17,14 +18,10 @@ export async function toggleBookmark(documentNumber: string) {
       return { success: false, error: 'Not authenticated' }
     }
 
-    // Get user's tenant_id
-    const { data: userData } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', user.id)
-      .single()
-
-    if (!userData?.tenant_id) {
+    // Get sub-domain's tenant_id
+    const subdomainTenantId = await getSubdomainTenantId()
+    
+    if (!subdomainTenantId) {
       return { success: false, error: 'User tenant not found' }
     }
 
@@ -34,7 +31,7 @@ export async function toggleBookmark(documentNumber: string) {
       .select('id')
       .eq('user_id', user.id)
       .eq('document_number', documentNumber)
-      .eq('tenant_id', userData.tenant_id)
+      .eq('tenant_id', subdomainTenantId)
       .single()
 
     if (existing) {
@@ -59,7 +56,7 @@ export async function toggleBookmark(documentNumber: string) {
         .insert({
           user_id: user.id,
           document_number: documentNumber,
-          tenant_id: userData.tenant_id,
+          tenant_id: subdomainTenantId,
         })
 
       if (insertError) {
@@ -94,11 +91,19 @@ export async function getBookmarkedDocuments() {
       return { success: false, error: 'Not authenticated' }
     }
 
+    // Get current sub-domain's tenant_id
+    const subdomainTenantId = await getSubdomainTenantId()
+    
+    if (!subdomainTenantId) {
+      return { success: false, error: 'User tenant not found' }
+    }
+
     // Get user's bookmarks
     const { data: bookmarks, error: bookmarksError } = await supabase
       .from('document_bookmarks')
       .select('document_number')
       .eq('user_id', user.id)
+      .eq('tenant_id', subdomainTenantId)
 
     if (bookmarksError) {
       console.error('Failed to fetch bookmarks:', bookmarksError)

@@ -6,6 +6,8 @@ import { formatDocumentFilename } from '@/lib/file-naming'
 import { inngest } from '@/lib/inngest/client'
 import { createDocumentAudit, AuditAction } from '@/lib/audit-helper'
 import { checkStorageLimit, getTotalFileSize } from '@/lib/storage-limit'
+import { getSubdomainTenantId } from '@/lib/tenant'
+import { logger } from '@/lib/logger'
 
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
@@ -34,14 +36,20 @@ export async function updateDocumentWithFiles(formData: FormData) {
       return { success: false, error: 'Document not found' }
     }
 
-    // Use the DOCUMENT's tenant_id (not the creator's home tenant)
-    const tenantId = document.tenant_id
+    // Use the subdomain's tenant_id (not the creator's home tenant)
+    const tenantId = await getSubdomainTenantId()
+    
+    if (!tenantId) {
+      logger.error('Tenant not found', { userId: user.id, userEmail: user.email })
+      return { success: false, error: 'Tenant not found' }
+    }
+
     const { data: tenant } = await supabase
       .from('tenants')
       .select('auto_rename_files, virus_scan_enabled')
       .eq('id', tenantId)
       .single()
-    
+
     const autoRename = tenant?.auto_rename_files ?? true
     const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
@@ -70,43 +78,43 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
     // Handle file uploads
     const files = formData.getAll('files') as File[]
-    
+
     // ⭐ CHECK STORAGE LIMIT BEFORE UPLOADING ⭐
     if (files.length > 0 && files.some(f => f.size > 0)) {
       const totalFileSize = getTotalFileSize(files.filter(f => f.size > 0))
-      
+
       console.log(`🔍 [Storage Check] Checking storage limit before upload...`)
       console.log(`🔍 [Storage Check] Tenant: ${tenantId}`)
       console.log(`🔍 [Storage Check] Files to upload: ${(totalFileSize / (1024 * 1024)).toFixed(2)} MB`)
-      
+
       const storageCheck = await checkStorageLimit(tenantId, totalFileSize)
-      
+
       console.log(`🔍 [Storage Check] Result:`, {
         allowed: storageCheck.allowed,
         currentGB: storageCheck.currentStorageGB.toFixed(2),
         limitGB: storageCheck.storageLimitGB,
         percentUsed: storageCheck.percentUsed.toFixed(1)
       })
-      
+
       if (!storageCheck.allowed) {
         console.log(`🚫 [Storage Check] BLOCKED - Storage limit exceeded`)
-        return { 
-          success: false, 
+        return {
+          success: false,
           error: storageCheck.error || 'Storage limit exceeded',
           requiresUpgrade: true,
           currentStorageGB: storageCheck.currentStorageGB,
           storageLimitGB: storageCheck.storageLimitGB
         }
       }
-      
+
       console.log(`✅ [Storage Check] PASSED - Upload allowed`)
     }
-    
+
     const uploadedFiles: any[] = []
-    
+
     if (files.length > 0) {
       console.log(`Uploading ${files.length} files for document ${documentId}`)
-      
+
       for (let i = 0; i < files.length; i++) {
         const file = files[i]
         if (file.size === 0) continue
@@ -129,9 +137,9 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         if (uploadError) {
           console.error('File upload error:', uploadError)
-          return { 
-            success: false, 
-            error: `Failed to upload file ${file.name}: ${uploadError.message}` 
+          return {
+            success: false,
+            error: `Failed to upload file ${file.name}: ${uploadError.message}`
           }
         }
 
@@ -139,7 +147,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         // Use service role client for DB insert
         const supabaseAdmin = createServiceRoleClient()
-        
+
         // Format filename with smart renaming
         const formattedFileName = formatDocumentFilename(
           document.document_number,
@@ -147,7 +155,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           file.name,
           autoRename
         )
-        
+
         // Create file record with scan_status='pending'
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
@@ -168,9 +176,9 @@ export async function updateDocumentWithFiles(formData: FormData) {
         if (fileError) {
           console.error('File record creation error:', fileError)
           await supabase.storage.from('documents').remove([fileName])
-          return { 
-            success: false, 
-            error: `Failed to save file metadata for ${file.name}: ${fileError.message}` 
+          return {
+            success: false,
+            error: `Failed to save file metadata for ${file.name}: ${fileError.message}`
           }
         }
 
@@ -215,7 +223,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
     }
 
     revalidatePath('/documents')
-    
+
     return {
       success: true,
       documentNumber: document.document_number,

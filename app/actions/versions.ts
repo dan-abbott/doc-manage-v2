@@ -6,6 +6,8 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError } from '@/lib/logger'
 import { uuidSchema } from '@/lib/validation/schemas'
+import { getSubdomainTenantId } from '@/lib/tenant'
+
 
 /**
  * Create a new version of an existing document
@@ -14,52 +16,43 @@ import { uuidSchema } from '@/lib/validation/schemas'
 export async function createNewVersion(sourceDocumentId: string) {
   const startTime = Date.now()
   const supabase = await createClient()
-  
+
   try {
     // Validate ID
     const idValidation = uuidSchema.safeParse(sourceDocumentId)
     if (!idValidation.success) {
-      logger.warn('Invalid document ID for version creation', { 
-        providedId: sourceDocumentId 
+      logger.warn('Invalid document ID for version creation', {
+        providedId: sourceDocumentId
       })
-      return { 
-        success: false, 
-        error: 'Invalid document ID' 
+      return {
+        success: false,
+        error: 'Invalid document ID'
       }
     }
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
-      logger.warn('Unauthorized version creation attempt', { 
-        error: userError?.message 
+      logger.warn('Unauthorized version creation attempt', {
+        error: userError?.message
       })
-      return { 
-        success: false, 
-        error: 'You must be logged in to create versions' 
+      return {
+        success: false,
+        error: 'You must be logged in to create versions'
       }
     }
 
     const userId = user.id
     const userEmail = user.email
 
-    // Get user's tenant_id
-    const { data: userData } = await supabase
-      .from('users')
-      .select('tenant_id')
-      .eq('id', userId)
-      .single()
+    // Get subdomain tenant_id
+    const tenantId = await getSubdomainTenantId()
 
-    if (!userData?.tenant_id) {
-      logger.error('User has no tenant_id', { userId, userEmail })
-      return {
-        success: false,
-        error: 'User tenant not found'
-      }
+    if (!tenantId) {
+      logger.error('Tenant not found', { userId, userEmail })
+      return { success: false, error: 'Tenant not found' }
     }
-
-    const tenantId = userData.tenant_id
 
     logger.info('Creating new document version', {
       userId,
@@ -94,9 +87,9 @@ export async function createNewVersion(sourceDocumentId: string) {
         sourceDocumentId,
         error: fetchError
       })
-      return { 
-        success: false, 
-        error: 'Source document not found' 
+      return {
+        success: false,
+        error: 'Source document not found'
       }
     }
 
@@ -109,9 +102,9 @@ export async function createNewVersion(sourceDocumentId: string) {
         documentNumber: sourceDoc.document_number,
         currentStatus: sourceDoc.status
       })
-      return { 
-        success: false, 
-        error: 'Only Released documents can be versioned. Current status: ' + sourceDoc.status 
+      return {
+        success: false,
+        error: 'Only Released documents can be versioned. Current status: ' + sourceDoc.status
       }
     }
 
@@ -124,7 +117,7 @@ export async function createNewVersion(sourceDocumentId: string) {
       // Extract numeric version (v1 -> 1)
       const currentVersionNum = parseInt(sourceDoc.version.substring(1))
       nextVersion = `v${currentVersionNum + 1}`
-      
+
       logger.debug('Calculating next production version', {
         currentVersion: sourceDoc.version,
         nextVersion,
@@ -135,7 +128,7 @@ export async function createNewVersion(sourceDocumentId: string) {
       const currentVersionLetter = sourceDoc.version.substring(1)
       const nextLetter = String.fromCharCode(currentVersionLetter.charCodeAt(0) + 1)
       nextVersion = `v${nextLetter}`
-      
+
       logger.debug('Calculating next prototype version', {
         currentVersion: sourceDoc.version,
         nextVersion,
@@ -168,9 +161,9 @@ export async function createNewVersion(sourceDocumentId: string) {
         documentNumber: sourceDoc.document_number,
         existingVersion: nextVersion
       })
-      return { 
-        success: false, 
-        error: `Version ${nextVersion} already exists for this document` 
+      return {
+        success: false,
+        error: `Version ${nextVersion} already exists for this document`
       }
     }
 
@@ -233,7 +226,7 @@ export async function createNewVersion(sourceDocumentId: string) {
     }
 
     const duration = Date.now() - startTime
-    
+
     logger.info('New version created successfully', {
       userId,
       userEmail,
@@ -260,17 +253,17 @@ export async function createNewVersion(sourceDocumentId: string) {
     revalidatePath('/documents')
     revalidatePath(`/documents/${sourceDocumentId}`)
     revalidatePath(`/documents/${newVersion.id}`)
-    
-    return { 
+
+    return {
       success: true,
       version: nextVersion,
       documentId: newVersion.id,
-      data: newVersion 
+      data: newVersion
     }
 
   } catch (error) {
     const duration = Date.now() - startTime
-    
+
     logError(error, {
       action: 'createNewVersion',
       sourceDocumentId,
@@ -278,9 +271,9 @@ export async function createNewVersion(sourceDocumentId: string) {
       duration
     })
 
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to create new version' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to create new version'
     }
   }
 }
@@ -290,13 +283,13 @@ export async function createNewVersion(sourceDocumentId: string) {
  * This is called automatically when a document is released
  */
 export async function markPreviousVersionObsolete(
-  documentNumber: string, 
+  documentNumber: string,
   currentVersion: string,
   currentUserId: string
 ) {
   const startTime = Date.now()
   const supabase = await createClient()
-  
+
   try {
     logger.info('Marking previous version as obsolete', {
       documentNumber,
@@ -328,7 +321,7 @@ export async function markPreviousVersionObsolete(
 
     // Find the current version in the list
     const currentVersionIndex = allVersions.findIndex(v => v.version === currentVersion)
-    
+
     if (currentVersionIndex === -1) {
       logger.warn('Current version not found in version list', {
         documentNumber,
@@ -406,7 +399,7 @@ export async function markPreviousVersionObsolete(
     }
 
     const duration = Date.now() - startTime
-    
+
     logger.info('Previous version marked obsolete', {
       documentNumber,
       obsoletedVersion: previousVersion.version,
@@ -426,12 +419,12 @@ export async function markPreviousVersionObsolete(
     })
 
     revalidatePath('/documents')
-    
+
     return { success: true }
 
   } catch (error) {
     const duration = Date.now() - startTime
-    
+
     logError(error, {
       action: 'markPreviousVersionObsolete',
       documentNumber,
@@ -440,9 +433,9 @@ export async function markPreviousVersionObsolete(
       duration
     })
 
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to mark version obsolete' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to mark version obsolete'
     }
   }
 }
@@ -453,7 +446,7 @@ export async function markPreviousVersionObsolete(
 export async function getDocumentVersions(documentNumber: string) {
   const startTime = Date.now()
   const supabase = await createClient()
-  
+
   try {
     logger.debug('Fetching document versions', {
       documentNumber
@@ -486,29 +479,29 @@ export async function getDocumentVersions(documentNumber: string) {
     }
 
     const duration = Date.now() - startTime
-    
+
     logger.debug('Document versions fetched', {
       documentNumber,
       versionCount: versions?.length || 0,
       duration
     })
 
-    return { 
-      success: true, 
-      data: versions || [] 
+    return {
+      success: true,
+      data: versions || []
     }
 
   } catch (error) {
     const duration = Date.now() - startTime
-    
+
     logError(error, {
       action: 'getDocumentVersions',
       documentNumber,
       duration
     })
 
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch versions',
       data: []
     }
@@ -520,7 +513,7 @@ export async function getDocumentVersions(documentNumber: string) {
  */
 export async function getLatestReleasedVersion(documentNumber: string) {
   const supabase = await createClient()
-  
+
   const { data, error } = await supabase
     .from('documents')
     .select('*')
@@ -529,7 +522,7 @@ export async function getLatestReleasedVersion(documentNumber: string) {
     .order('created_at', { ascending: false })
     .limit(1)
     .single()
-  
+
   if (error) throw error
   return data
 }
@@ -539,7 +532,7 @@ export async function getLatestReleasedVersion(documentNumber: string) {
  */
 export async function getVersionHistory(documentNumber: string) {
   const supabase = await createClient()
-  
+
   try {
     const { data, error } = await supabase
       .from('documents')
@@ -550,17 +543,17 @@ export async function getVersionHistory(documentNumber: string) {
       `)
       .eq('document_number', documentNumber)
       .order('created_at', { ascending: true })
-    
+
     if (error) {
       logger.error('Failed to fetch version history', { documentNumber, error })
       return { success: false, error: error.message, data: [] }
     }
-    
+
     return { success: true, data: data || [] }
   } catch (error) {
     logger.error('Error in getVersionHistory', { documentNumber, error })
-    return { 
-      success: false, 
+    return {
+      success: false,
       error: error instanceof Error ? error.message : 'Failed to fetch version history',
       data: []
     }
@@ -573,13 +566,13 @@ export async function getVersionHistory(documentNumber: string) {
  */
 export async function getImmediatePredecessor(documentNumber: string, currentVersion: string) {
   const supabase = await createClient()
-  
+
   try {
     // Determine if this is a production document (numeric version) or prototype (alpha version)
     const isProduction = /^v\d+$/.test(currentVersion)
-    
+
     let predecessorVersion: string | null = null
-    
+
     if (isProduction) {
       // Production: v1, v2, v3... -> get previous number
       const versionNum = parseInt(currentVersion.substring(1))
@@ -594,12 +587,12 @@ export async function getImmediatePredecessor(documentNumber: string, currentVer
         predecessorVersion = `v${prevLetter}`
       }
     }
-    
+
     // If there's no predecessor (first version), return null
     if (!predecessorVersion) {
       return { success: true, data: null }
     }
-    
+
     // Query for the predecessor version
     const { data, error } = await supabase
       .from('documents')
@@ -607,32 +600,32 @@ export async function getImmediatePredecessor(documentNumber: string, currentVer
       .eq('document_number', documentNumber)
       .eq('version', predecessorVersion)
       .single()
-    
+
     if (error) {
       // If no predecessor found, that's okay (might have been deleted)
       if (error.code === 'PGRST116') {
         return { success: true, data: null }
       }
-      
-      logger.error('Failed to fetch predecessor version', { 
-        documentNumber, 
-        currentVersion, 
+
+      logger.error('Failed to fetch predecessor version', {
+        documentNumber,
+        currentVersion,
         predecessorVersion,
-        error 
+        error
       })
       return { success: false, error: error.message }
     }
-    
+
     return { success: true, data }
   } catch (error) {
-    logger.error('Error in getImmediatePredecessor', { 
-      documentNumber, 
-      currentVersion, 
-      error 
+    logger.error('Error in getImmediatePredecessor', {
+      documentNumber,
+      currentVersion,
+      error
     })
-    return { 
-      success: false, 
-      error: error instanceof Error ? error.message : 'Failed to get predecessor version' 
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to get predecessor version'
     }
   }
 }

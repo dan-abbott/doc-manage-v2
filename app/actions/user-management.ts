@@ -6,6 +6,7 @@ import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 import { logger, logServerAction, logError } from '@/lib/logger'
 import { uuidSchema } from '@/lib/validation/schemas'
+import { getSubdomainTenantId } from '@/lib/tenant'
 
 // User role type
 // Type exports for components
@@ -25,15 +26,15 @@ export async function getAllUsers() {
   const startTime = Date.now()
   const supabase = await createClient()
   const supabaseAdmin = createServiceRoleClient() // For cross-tenant access
-  
+
   try {
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
       logger.warn('Unauthorized user list access attempt')
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'You must be logged in',
         data: []
       }
@@ -50,58 +51,30 @@ export async function getAllUsers() {
       .single()
 
     if (adminCheckError || !userData?.is_admin) {
-      logger.warn('Non-admin attempted to access user list', { 
-        userId, 
+      logger.warn('Non-admin attempted to access user list', {
+        userId,
         userEmail,
-        isAdmin: userData?.is_admin 
+        isAdmin: userData?.is_admin
       })
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'Only administrators can view user list',
         data: []
       }
     }
 
-    logger.debug('Fetching users for tenant', { 
-      userId, 
-      userEmail, 
+    logger.debug('Fetching users for tenant', {
+      userId,
+      userEmail,
       tenantId: userData.tenant_id,
-      isMasterAdmin: userData.is_master_admin 
+      isMasterAdmin: userData.is_master_admin
     })
 
     // Get subdomain tenant (not user's home tenant)
-    const { cookies } = await import('next/headers')
-    const cookieStore = await cookies()
-    const subdomainCookie = cookieStore.get('tenant_subdomain')
-    const subdomain = subdomainCookie?.value
-
-    logger.info('getAllUsers - Subdomain lookup', { subdomain })
-
-    if (!subdomain) {
-      logger.error('getAllUsers - No subdomain cookie found')
-      return { success: false, error: 'Unable to determine tenant context', data: [] }
+    const targetTenantId = await getSubdomainTenantId()
+    if (!targetTenantId) {
+      return { success: false, error: 'Tenant not found' }
     }
-
-    // Get the subdomain's tenant ID
-    const { data: subdomainTenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .single()
-
-    logger.info('getAllUsers - Tenant lookup result', { 
-      subdomain, 
-      found: !!subdomainTenant, 
-      tenantId: subdomainTenant?.id,
-      error: tenantError?.message 
-    })
-
-    if (!subdomainTenant) {
-      logger.error('getAllUsers - Tenant not found for subdomain', { subdomain })
-      return { success: false, error: 'Invalid tenant context', data: [] }
-    }
-
-    const targetTenantId = subdomainTenant.id
 
     logger.info('getAllUsers - Filtering by tenant', { targetTenantId })
 
@@ -157,12 +130,12 @@ export async function getAllUsers() {
     )
 
     const duration = Date.now() - startTime
-    logger.info('User list fetched successfully', { 
-      userId, 
+    logger.info('User list fetched successfully', {
+      userId,
       userCount: usersWithStats.length,
       tenantId: userData.tenant_id,
       isMasterAdmin: userData.is_master_admin,
-      duration 
+      duration
     })
 
     return {
@@ -211,7 +184,7 @@ export async function updateUserRole(
 
     // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
       return { success: false, error: 'You must be logged in' }
     }
@@ -255,7 +228,7 @@ export async function updateUserRole(
     // Update role
     const { error: updateError } = await supabase
       .from('users')
-      .update({ 
+      .update({
         role: data.role,
         updated_at: new Date().toISOString()
       })
@@ -315,7 +288,7 @@ export async function addUser(data: {
   const startTime = Date.now()
   const supabase = await createClient()
   const supabaseAdmin = createServiceRoleClient() // For admin API operations
-  
+
   try {
     // Validate input
     const schema = z.object({
@@ -324,7 +297,7 @@ export async function addUser(data: {
       lastName: z.string().min(1, 'Last name is required').max(100),
       role: z.enum(['Admin', 'Normal', 'Read Only', 'Deactivated'])
     })
-    
+
     const validation = schema.safeParse(data)
     if (!validation.success) {
       return {
@@ -335,7 +308,7 @@ export async function addUser(data: {
 
     // Get current user and verify admin
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
       return { success: false, error: 'You must be logged in' }
     }
@@ -361,20 +334,13 @@ export async function addUser(data: {
     }
 
     // Get the subdomain's tenant ID
-    const { data: subdomainTenant } = await supabase
-      .from('tenants')
-      .select('id')
-      .eq('subdomain', subdomain)
-      .single()
-
-    if (!subdomainTenant) {
-      return { success: false, error: 'Invalid tenant context' }
+    const targetTenantId = await getSubdomainTenantId()
+    if (!targetTenantId) {
+      return { success: false, error: 'Tenant not found' }
     }
 
-    const targetTenantId = subdomainTenant.id
-
-// Enhanced debugging version for user limit check
-// Replace lines 383-421 in app/actions/user-management.ts
+    // Enhanced debugging version for user limit check
+    // Replace lines 383-421 in app/actions/user-management.ts
 
     console.log('🔍 [User Limit Check] Starting user limit validation')
     console.log('🔍 [User Limit Check] Subdomain:', subdomain)
@@ -407,12 +373,12 @@ export async function addUser(data: {
     })
 
     // Enhanced debug - shows EACH user being counted
-// Replace the user count query section (around lines 413-424)
+    // Replace the user count query section (around lines 413-424)
 
     // Count users in tenant (include all except Deactivated role)
     console.log('🔍 [User Limit Check] Counting existing users...')
     console.log('🔍 [User Limit Check] Query: tenant_id =', targetTenantId, ', role !=', 'Deactivated')
-    
+
     const { count: userCount, error: countError, data: debugUsers } = await supabaseAdmin
       .from('users')
       .select('id, email, role, is_active', { count: 'exact' })
@@ -425,12 +391,12 @@ export async function addUser(data: {
       countError: countError?.message,
       actualUsers: debugUsers?.length
     })
-    
+
     console.log('🔍 [User Limit Check] FULL USER LIST:')
     debugUsers?.forEach((u, index) => {
       console.log(`  ${index + 1}. ${u.email} | Role: ${u.role} | Active: ${u.is_active}`)
     })
-    
+
     console.log('🔍 [User Limit Check] Summary:', {
       totalFound: debugUsers?.length,
       countReturned: userCount,
@@ -466,7 +432,7 @@ export async function addUser(data: {
         professional: 'Professional',
         enterprise: 'Enterprise'
       }
-      
+
       console.log('🚫 [User Limit Check] LIMIT REACHED - Blocking user creation')
       console.log('🚫 [User Limit Check] Details:', {
         plan: currentPlan,
@@ -475,7 +441,7 @@ export async function addUser(data: {
         current: userCount,
         attemptedEmail: data.email
       })
-      
+
       logger.warn('User limit reached', {
         plan: currentPlan,
         limit: userLimit,
@@ -483,7 +449,7 @@ export async function addUser(data: {
         attemptedBy: user.email,
         attemptedEmail: data.email
       })
-      
+
       return {
         success: false,
         error: `Your ${planNames[currentPlan] || currentPlan} plan is limited to ${userLimit} users. Please upgrade your plan to add more users.`,
@@ -506,9 +472,9 @@ export async function addUser(data: {
       .single()
 
     if (existingUser) {
-      return { 
-        success: false, 
-        error: 'A user with this email address already exists' 
+      return {
+        success: false,
+        error: 'A user with this email address already exists'
       }
     }
 
@@ -524,7 +490,7 @@ export async function addUser(data: {
     if (existingAuthUser) {
       // User exists in auth but not in public.users - reuse the auth user
       authUserId = existingAuthUser.id
-      
+
       // Update their metadata
       await supabaseAdmin.auth.admin.updateUserById(existingAuthUser.id, {
         email_confirm: true,
@@ -535,9 +501,9 @@ export async function addUser(data: {
         }
       })
 
-      logger.info('Reusing existing auth user', { 
+      logger.info('Reusing existing auth user', {
         email: validation.data.email,
-        authUserId: existingAuthUser.id 
+        authUserId: existingAuthUser.id
       })
     } else {
       // Create new auth user with service role client
@@ -604,12 +570,12 @@ export async function addUser(data: {
           `${validation.data.firstName} ${validation.data.lastName}`,
           tenantData.subdomain,
           tenantData.company_name || tenantData.subdomain,
-          tenantData.id  
+          tenantData.id
         )
       } catch (emailError) {
-        logger.warn('Failed to send welcome email (non-critical)', { 
+        logger.warn('Failed to send welcome email (non-critical)', {
           email: validation.data.email,
-          error: emailError 
+          error: emailError
         })
         // Don't fail user creation if email fails
       }
@@ -649,14 +615,14 @@ export async function addUser(data: {
 export async function importUsersFromCSV(csvData: string) {
   const startTime = Date.now()
   const supabase = await createClient()
-  
+
   try {
     // Get current user and verify admin
     const { data: { user }, error: userError } = await supabase.auth.getUser()
-    
+
     if (userError || !user) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'You must be logged in',
         imported: 0,
         failed: 0,
@@ -671,8 +637,8 @@ export async function importUsersFromCSV(csvData: string) {
       .single()
 
     if (!userData?.is_admin) {
-      return { 
-        success: false, 
+      return {
+        success: false,
         error: 'Only administrators can import users',
         imported: 0,
         failed: 0,
@@ -694,7 +660,7 @@ export async function importUsersFromCSV(csvData: string) {
 
     // Skip header row
     const dataRows = lines.slice(1)
-    
+
     let imported = 0
     let failed = 0
     const errors: string[] = []
@@ -704,7 +670,7 @@ export async function importUsersFromCSV(csvData: string) {
       if (!row) continue // Skip empty rows
 
       const columns = row.split(',').map(col => col.trim().replace(/^["']|["']$/g, ''))
-      
+
       if (columns.length < 4) {
         failed++
         errors.push(`Row ${i + 2}: Invalid format - expected 4 columns`)
