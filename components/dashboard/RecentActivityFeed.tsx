@@ -1,41 +1,19 @@
-import { Activity, Clock, User, FileText, CheckCircle, XCircle, Edit, Trash, Upload, Download, UserPlus, UserMinus, Send, ChevronDown, ChevronUp, ShieldAlert } from 'lucide-react'
+import { Activity, ArrowUp, Clock, GitBranch, FileText, CheckCircle, XCircle} from 'lucide-react'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { getSubdomainTenantId } from '@/lib/tenant'
 
 // Map actions to icons and labels
 const actionConfig: Record<string, { icon: any, label: string, color: string }> = {
- // Document lifecycle
-  'created': { label: 'Created', icon: FileText, color: 'text-blue-600' },
-  'updated': { label: 'Updated', icon: Edit, color: 'text-gray-600' },
-  'document_deleted': { label: 'Draft Deleted', icon: Trash, color: 'text-red-600' },
-  'released': { label: 'Released', icon: CheckCircle, color: 'text-green-600' },
-  'document_obsoleted': { label: 'Obsoleted', icon: FileText, color: 'text-gray-600' },
-
-  // Files
-  'file_uploaded': { label: 'File Uploaded', icon: Upload, color: 'text-green-600' },
-  'file_deleted': { label: 'File Deleted', icon: Download, color: 'text-red-600' },
-  'file_scan_completed': { label: 'Virus Scan Completed', icon: ShieldAlert, color: 'text-green-600' },
-  'file_scan_failed': { label: 'Virus Scan Failed', icon: ShieldAlert, color: 'text-red-600' },
-
-  // Approvals
-  'submitted_for_approval': { label: 'Submitted', icon: Send, color: 'text-yellow-600' },
-  'approved': { label: 'Approved', icon: CheckCircle, color: 'text-green-600' },
-  'rejected': { label: 'Rejected', icon: XCircle, color: 'text-red-600' },
-  'withdrawn_from_approval': { label: 'Withdrawn', icon: XCircle, color: 'text-orange-600' },
-  'approver_added': { label: 'Approver Added', icon: UserPlus, color: 'text-blue-600' },
-  'approver_removed': { label: 'Approver Removed', icon: UserMinus, color: 'text-orange-600' },
-
-  // Versions
-  'version_created': { label: 'New Version', icon: FileText, color: 'text-blue-600' },
-  'promoted_to_production': { label: 'Promoted', icon: FileText, color: 'text-purple-600' },
-  'converted_to_production': { label: 'Converted to Production', icon: FileText, color: 'text-purple-600' },
-
-  // Admin actions
-  'admin_status_change': { label: 'Status Changed (Admin)', icon: ShieldAlert, color: 'text-red-600' },
-  'admin_delete': { label: 'Deleted (Admin)', icon: Trash, color: 'text-red-600' },
-  'admin_rename': { label: 'Renamed (Admin)', icon: Edit, color: 'text-red-600' },
-  'admin_change_owner': { label: 'Owner Changed (Admin)', icon: UserPlus, color: 'text-red-600' },
+  'created': { icon: FileText, label: 'Created', color: 'text-blue-600' },
+  'released': { icon: CheckCircle, label: 'Released', color: 'text-green-600' },
+  'approved': { icon: CheckCircle, label: 'Approved', color: 'text-green-600' },
+  'rejected': { icon: XCircle, label: 'Rejected', color: 'text-red-600' },
+  'promoted_to_production': { icon: ArrowUp, label: 'Promoted', color: 'text-purple-600' },
+  'version_created': { icon: GitBranch, label: 'New Version', color: 'text-blue-600' },
+  'submitted_for_approval': { icon: Clock, label: 'Submitted', color: 'text-yellow-600' },
+  'document_obsoleted': { icon: Activity, label: 'Obsoleted', color: 'text-gray-600' },
+  'updated': { icon: FileText, label: 'Updated', color: 'text-blue-600' },
 }
 
 function formatTimeAgo(dateString: string) {
