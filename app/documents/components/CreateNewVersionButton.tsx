@@ -76,7 +76,7 @@ export default function CreateNewVersionButton({
               <li>Start as a Draft</li>
               <li>Inherit the document metadata (title, description, project)</li>
               <li>NOT copy any files (you'll need to upload files again)</li>
-              <li>Require approval before release{isProduction ? ' (Production document)' : ''}</li>
+              <li>{isProduction ? 'Require approval before release (Production document)' : ''}</li>
             </ul>
             <p className="text-sm text-muted-foreground mt-2">
               When the new version is released, this version will become Obsolete.
