@@ -136,7 +136,7 @@ export async function getRecentActivity(limit: number = 10) {
         action,
         performed_by_email,
         created_at,
-        document:documents(document_number, version, title)
+        document:documents!inner(document_number, version, title)
       `)
       .order('created_at', { ascending: false })
       .limit(limit)
