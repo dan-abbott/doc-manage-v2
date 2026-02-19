@@ -32,18 +32,18 @@ function smartRenameFile(
   autoRename: boolean
 ): { fileName: string; wasRenamed: boolean } {
   const expectedPrefix = `${documentNumber}${version}_`
-  
+
   // Pattern to match any doc number prefix: FORM-00001vA_ or PROC-00123v2_
   // Matches: PREFIX-#####v[A-Z or number]_
   const docPrefixPattern = /^[A-Z]+-\d{5}v[A-Z0-9]+_/
-  
+
   // Check if file already has a doc number prefix
   const hasExistingPrefix = docPrefixPattern.test(originalFileName)
-  
+
   if (hasExistingPrefix) {
     // Remove the existing prefix (could be old/incorrect)
     const cleanFileName = originalFileName.replace(docPrefixPattern, '')
-    
+
     // If auto-rename is enabled, add the correct prefix
     if (autoRename) {
       return {
@@ -106,7 +106,7 @@ export async function uploadFile(formData: FormData) {
   console.log('🚨 [TEST] uploadFile function called!')
 
   try {
-       
+
     const supabase = await createClient()
 
     // Get current user
@@ -148,9 +148,9 @@ export async function uploadFile(formData: FormData) {
 
     // Check status - only Draft can have files uploaded
     if (document.status !== 'Draft') {
-      return { 
-        success: false, 
-        error: 'Files can only be uploaded to Draft documents' 
+      return {
+        success: false,
+        error: 'Files can only be uploaded to Draft documents'
       }
     }
 
@@ -171,9 +171,9 @@ export async function uploadFile(formData: FormData) {
     // Validate file size (50MB limit)
     const maxSize = 50 * 1024 * 1024 // 50MB in bytes
     if (file.size > maxSize) {
-      return { 
-        success: false, 
-        error: 'File size exceeds 50MB limit' 
+      return {
+        success: false,
+        error: 'File size exceeds 50MB limit'
       }
     }
 
@@ -191,16 +191,16 @@ export async function uploadFile(formData: FormData) {
     ]
 
     if (!allowedTypes.includes(file.type)) {
-      return { 
-        success: false, 
-        error: 'Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, TXT, CSV' 
+      return {
+        success: false,
+        error: 'Invalid file type. Allowed: PDF, DOC, DOCX, XLS, XLSX, PNG, JPG, TXT, CSV'
       }
     }
 
     // ==========================================
     // VIRUS SCAN - ENHANCED DEBUG LOGGING
     // ==========================================
-    
+
     console.log('[VirusTotal] Pre-scan check:', {
       fileName: file.name,
       fileSize: file.size,
@@ -212,14 +212,14 @@ export async function uploadFile(formData: FormData) {
     const fileBuffer = await file.arrayBuffer()
     console.log('[VirusTotal] File buffer created, size:', fileBuffer.byteLength)
     console.log('[VirusTotal] Starting virus scan for file:', file.name)
-    
+
     const scanResult = await scanFile(fileBuffer, file.name)
-    
+
     console.log('[VirusTotal] Scan result received:', {
       hasError: 'error' in scanResult,
       result: scanResult
     })
-    
+
     if ('error' in scanResult) {
       console.error('[VirusTotal] Virus scan error:', scanResult.error)
       console.error('[VirusTotal] Error details:', scanResult.details)
@@ -235,14 +235,14 @@ export async function uploadFile(formData: FormData) {
         scanId: scanResult.scanId,
         permalink: scanResult.permalink
       })
-      
+
       if (!scanResult.safe) {
         return {
           success: false,
           error: `File blocked: ${scanResult.malicious} malicious and ${scanResult.suspicious} suspicious detections found. This file may contain malware.`,
         }
       }
-      
+
       console.log('[VirusTotal] ✅ File passed virus scan - safe to upload')
     }
 
@@ -264,9 +264,11 @@ export async function uploadFile(formData: FormData) {
       version: document.version
     })
 
-    // Generate file path: documents/{subDomain}/{doc number}/{filename}
+    // Generate file path: documents/{subdomain}/{docNumber}/{filename}
     const tenantSubdomain = await getCurrentSubdomain()
-    const filePath = `${tenantSubdomain}/${document.document_number}`
+    const filePath = `${tenantSubdomain}/${document.document_number}/${displayName}`
+
+    console.log('[File Upload] Storage path:', filePath)
 
     // Upload to storage (reuse buffer from virus scan)
     const { error: uploadError } = await supabase.storage
@@ -278,18 +280,18 @@ export async function uploadFile(formData: FormData) {
 
     if (uploadError) {
       console.error('Storage upload error:', uploadError)
-      
+
       // Check if file already exists
       if (uploadError.message?.includes('already exists')) {
-        return { 
-          success: false, 
-          error: 'A file with this name already exists. Please rename and try again.' 
+        return {
+          success: false,
+          error: 'A file with this name already exists. Please rename and try again.'
         }
       }
-      
-      return { 
-        success: false, 
-        error: uploadError.message || 'Failed to upload file' 
+
+      return {
+        success: false,
+        error: uploadError.message || 'Failed to upload file'
       }
     }
 
@@ -307,13 +309,13 @@ export async function uploadFile(formData: FormData) {
       })
       .select()
       .single()
-      
+
     if (dbError) {
       console.error('Database insert error:', dbError)
-      
+
       // Try to clean up storage if database insert fails
       await supabase.storage.from('documents').remove([filePath])
-      
+
       return { success: false, error: 'Failed to save file metadata' }
     }
 
@@ -335,11 +337,11 @@ export async function uploadFile(formData: FormData) {
 
     revalidatePath(`/documents/${documentId}`)
 
-    return { 
-      success: true, 
+    return {
+      success: true,
       file: fileRecord,
       wasRenamed,
-      message: wasRenamed 
+      message: wasRenamed
         ? `File uploaded and renamed to: ${displayName}`
         : 'File uploaded successfully'
     }
@@ -384,9 +386,9 @@ export async function deleteFile(fileId: string) {
 
     // Check document status - only Draft documents can have files deleted
     if (file.document.status !== 'Draft') {
-      return { 
-        success: false, 
-        error: 'Files can only be deleted from Draft documents' 
+      return {
+        success: false,
+        error: 'Files can only be deleted from Draft documents'
       }
     }
 
@@ -426,9 +428,9 @@ export async function deleteFile(fileId: string) {
 
     revalidatePath(`/documents/${file.document_id}`)
 
-    return { 
-      success: true, 
-      message: 'File deleted successfully' 
+    return {
+      success: true,
+      message: 'File deleted successfully'
     }
   } catch (error: any) {
     console.error('Delete file error:', error)
@@ -522,10 +524,10 @@ export async function uploadMultipleFiles(formData: FormData) {
 
     // Verify document access once
     const { data: document, error: docError } = await supabase
-    .from('documents')
-    .select('*')
-    .eq('id', documentId)
-    .single()
+      .from('documents')
+      .select('*')
+      .eq('id', documentId)
+      .single()
 
 
     if (docError || !document) {
@@ -546,15 +548,15 @@ export async function uploadMultipleFiles(formData: FormData) {
 
     for (const file of files) {
       console.log('[Upload Multiple] Processing file:', file.name)
-      
+
       const fileFormData = new FormData()
       fileFormData.append('documentId', documentId)
       fileFormData.append('file', file)
 
       const result = await uploadFile(fileFormData)
-      
+
       console.log('[Upload Multiple] File result:', file.name, result.success ? '✅' : '❌', result)
-      
+
       if (result.success) {
         results.push(result.file)
       } else {
