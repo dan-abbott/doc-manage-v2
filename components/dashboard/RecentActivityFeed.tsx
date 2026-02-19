@@ -10,12 +10,14 @@ const actionConfig: Record<string, { icon: any, label: string, color: string }> 
   'approved': { icon: CheckCircle, label: 'Approved', color: 'text-green-600' },
   'rejected': { icon: XCircle, label: 'Rejected', color: 'text-red-600' },
   'promoted_to_production': { icon: ArrowUp, label: 'Promoted to Production', color: 'text-purple-600' },
+  'document_promoted': { icon: ArrowUp, label: 'Promoted to Production', color: 'text-purple-600' },
   'converted_to_production': { icon: ArrowUp, label: 'Converted to Production', color: 'text-purple-600' },
   'version_created': { icon: GitBranch, label: 'New Version', color: 'text-blue-600' },
   'submitted_for_approval': { icon: Clock, label: 'Submitted for Approval', color: 'text-yellow-600' },
   'document_obsoleted': { icon: Activity, label: 'Obsoleted', color: 'text-gray-600' },
   'updated': { icon: FileText, label: 'Updated', color: 'text-blue-600' },
-  'file_scan_completed': { icon: FileText, label: 'Virus Scan Completed', color: 'text-green-600' }
+  'file_scan_completed': { icon: FileText, label: 'Virus Scan Completed', color: 'text-green-600' },
+  'admin_status_change': { icon: Activity, label: 'Admin Status Changed', color: 'text-red-600' }
 }
 
 function formatTimeAgo(dateString: string) {
