@@ -57,8 +57,8 @@ export default function DocumentsTable({ documents, onDocumentSelect, selectedDo
                 {doc.document_number}{doc.version}
               </span>
               <div className="flex items-center gap-2">
-                <BookmarkButton 
-                  documentNumber={doc.document_number} 
+                <BookmarkButton
+                  documentNumber={doc.document_number}
                   size="sm"
                 />
                 <Badge className={cn("text-xs px-1.5 py-0", STATUS_COLORS[doc.status] || 'bg-gray-500')}>
@@ -69,8 +69,7 @@ export default function DocumentsTable({ documents, onDocumentSelect, selectedDo
             <p className="text-sm text-gray-900 truncate">
               {doc.title}
             </p>
-            <div className="flex items-center justify-between text-xs text-gray-500">
-              <span>{doc.document_type?.name || 'Unknown'}</span>
+            <div className="flex items-center justify-end text-xs text-gray-500">
               <span suppressHydrationWarning>
                 {formatDistanceToNow(new Date(doc.updated_at), { addSuffix: true })}
               </span>
