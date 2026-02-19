@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { scanFile } from '@/lib/virustotal'
+import { getCurrentSubdomain } from '@/lib/tenant'
 
 // ==========================================
 // Types
@@ -263,8 +264,9 @@ export async function uploadFile(formData: FormData) {
       version: document.version
     })
 
-    // Generate file path: documents/{document-id}/{filename}
-    const filePath = `${documentId}/${displayName}`
+    // Generate file path: documents/{subDomain}/{doc number}/{filename}
+    const tenantSubdomain = await getCurrentSubdomain()
+    const filePath = `${tenantSubdomain}/${document.document_number}`
 
     // Upload to storage (reuse buffer from virus scan)
     const { error: uploadError } = await supabase.storage
