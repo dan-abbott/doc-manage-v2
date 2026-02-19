@@ -43,7 +43,7 @@ const TOUR_STEPS: TourStep[] = [
     title: 'Pending Approvals',
     content: 'When documents are submitted for your review, they\'ll appear here. You can approve or reject documents assigned to you, with the option to add comments.',
     target: '[href="/approvals"]',
-    position: 'left'
+    position: 'center'
   },
   {
     title: 'You\'re All Set! 🎉',
