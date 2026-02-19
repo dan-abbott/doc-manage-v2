@@ -6,7 +6,7 @@ import { formatDocumentFilename } from '@/lib/file-naming'
 import { inngest } from '@/lib/inngest/client'
 import { createDocumentAudit, AuditAction } from '@/lib/audit-helper'
 import { checkStorageLimit, getTotalFileSize } from '@/lib/storage-limit'
-import { getSubdomainTenantId } from '@/lib/tenant'
+import { getCurrentSubdomain, getSubdomainTenantId } from '@/lib/tenant'
 import { logger } from '@/lib/logger'
 
 export async function updateDocumentWithFiles(formData: FormData) {
@@ -38,7 +38,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
     // Use the subdomain's tenant_id (not the creator's home tenant)
     const tenantId = await getSubdomainTenantId()
-    
+
     if (!tenantId) {
       logger.error('Tenant not found', { userId: user.id, userEmail: user.email })
       return { success: false, error: 'Tenant not found' }
@@ -125,7 +125,13 @@ export async function updateDocumentWithFiles(formData: FormData) {
         const fileBuffer = await file.arrayBuffer()
 
         // Generate unique file name
-        const fileName = `${documentId}/${Date.now()}-${file.name}`
+        const subdomain = await getCurrentSubdomain()
+
+        if (!subdomain) {
+          return { success: false, error: 'Unable to determine tenant context' }
+        }
+
+        const fileName = `${subdomain}/${document.document_number}${document.version}/${file.name}`
 
         // Upload to Supabase Storage
         const { error: uploadError } = await supabase.storage
