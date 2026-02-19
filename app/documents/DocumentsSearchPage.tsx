@@ -150,9 +150,6 @@ export default function DocumentsSearchPage({
                         Title
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                        Type
-                      </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
                         Status
                       </th>
                       <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
@@ -179,11 +176,6 @@ export default function DocumentsSearchPage({
                           <div className="text-sm font-medium text-gray-900 line-clamp-2">
                             {doc.title}
                           </div>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <span className="text-sm text-gray-600">
-                            {doc.document_type?.prefix}
-                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           <span className={`
