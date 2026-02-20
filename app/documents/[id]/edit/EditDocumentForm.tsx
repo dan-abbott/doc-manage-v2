@@ -10,7 +10,7 @@ import { FileUpload } from '@/components/documents/FileUpload'
 import { toast } from 'sonner'
 import { updateDocumentWithFiles } from '@/app/actions/documents-formdata'
 import { deleteFile } from '@/app/actions/documents'
-import { Trash2, FileText, Shield } from 'lucide-react'
+import { Trash2, FileText } from 'lucide-react'
 
 interface EditDocumentFormProps {
   document: any
@@ -164,28 +164,18 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
         <div>
           <Label>Current Files</Label>
           <div className="space-y-2 mt-2">
-            {existingFiles.map((file: any) => {              const isBlocked = scanStatus === 'blocked'
-              
-              return (
+            {existingFiles.map((file: any) => (
                 <div
                   key={file.id}
-                  className={`flex items-center justify-between p-3 border rounded-lg ${
-                    isBlocked ? 'bg-red-50 border-red-200' : 'bg-muted/50'
-                  }`}
+                  className="flex items-center justify-between p-3 border rounded-lg bg-muted/50"
                 >
                   <div className="flex items-center gap-3 flex-1">
-                    <FileText className={`h-5 w-5 ${isBlocked ? 'text-red-500' : 'text-muted-foreground'}`} />
+                    <FileText className="h-5 w-5 text-muted-foreground" />
                     <div className="flex-1">
-                      <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{file.file_name}</p>                      </div>
+                      <p className="text-sm font-medium">{file.file_name}</p>
                       <p className="text-xs text-muted-foreground">
                         {(file.file_size / 1024 / 1024).toFixed(2)} MB
                       </p>
-                      {isBlocked && file.scan_result && (
-                        <p className="text-xs text-red-600 mt-1">
-                          Malware detected: {file.scan_result.malicious || 0} threats found
-                        </p>
-                      )}
                     </div>
                   </div>
                   <Button
@@ -198,8 +188,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
                     <Trash2 className="h-4 w-4 text-destructive" />
                   </Button>
                 </div>
-              )
-            })}
+            ))}
           </div>
         </div>
       )}
@@ -208,27 +197,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
       <div>
         <Label>Add New Files</Label>
         <FileUpload files={files} onFilesChange={setFiles} />
-        
-        {/* Background scanning notice */}
-        {files.length > 0 && (
-          <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start gap-2">
-              <Shield className="h-5 w-5 text-blue-600 flex-shrink-0 mt-0.5" />
-              <div className="text-sm text-blue-900">
-                <p className="font-medium mb-1">Background Virus Scanning</p>
-                <p>
-                  {files.length === 1 
-                    ? 'This file will be scanned for viruses in the background. You can continue working immediately.'
-                    : `All ${files.length} files will be scanned for viruses in the background. You can continue working immediately.`
-                  }
-                </p>
-                <p className="text-xs text-blue-700 mt-1">
-                  Scanning typically completes within 2-5 minutes. Files show "⏳ Pending" status until scanned.
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
+
       </div>
 
       {/* Actions */}
