@@ -23,7 +23,6 @@ interface BillingPageClientProps {
   billing: any
   invoices: any[]
   usage: {
-    vtScans: number
     emailsSent: number
     storageGB: string
     userCount: number
@@ -226,7 +225,6 @@ export default function BillingPageClient({
                     <div className="text-xs text-gray-500">Files scanned</div>
                   </div>
                 </div>
-                <div className="text-2xl font-bold text-gray-900">{usage.vtScans}</div>
               </div>
 
               <div className="flex items-center justify-between">

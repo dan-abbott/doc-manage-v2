@@ -77,7 +77,8 @@ export default async function BillingPage() {
     .eq('tenant_id', tenantData.id)
     .gte('created_at', thirtyDaysAgo.toISOString())
 
-  // Calculate usage  const emailsSent = apiUsage?.filter(u => u.api_type === 'resend_email').length || 0
+  // Calculate usage
+  const emailsSent = apiUsage?.filter(u => u.api_type === 'resend_email').length || 0
 
   // Get storage usage (use admin client to bypass RLS)
   const { data: storageData } = await supabaseAdmin
@@ -103,7 +104,6 @@ export default async function BillingPage() {
           billing={billing}
           invoices={invoices || []}
           usage={{
-            vtScans,
             emailsSent,
             storageGB,
             userCount: userCount || 0
