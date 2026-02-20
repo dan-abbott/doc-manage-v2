@@ -15,10 +15,11 @@ import DeleteDocumentButton from './components/DeleteDocumentButton'
 import CreateNewVersionButton from './components/CreateNewVersionButton'
 import PromoteToProductionButton from './components/PromoteToProductionButton'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 // Dynamically import components
 const ApprovalWorkflow = dynamic(() => import('./components/ApprovalWorkflow'), { ssr: false })
-const AuditTrail = dynamic(() => import('./components/AuditTrailClient'), { ssr: false })
+const AuditTrail = dynamic(() => import('./components/AuditTrail'), { ssr: false })
 const AdminActions = dynamic(() => import('./components/AdminActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
@@ -100,6 +101,7 @@ export default function DocumentActionsPanel({
   const explicitTab = searchParams.get('tab') as 'released' | 'wip' | null
   
   const [mounted, setMounted] = useState(false)
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
 
   useEffect(() => {
     setMounted(true)
@@ -203,22 +205,29 @@ export default function DocumentActionsPanel({
                   <Button
                     variant="outline"
                     className="border-orange-200 text-orange-700 hover:bg-orange-50 col-span-2"
-                    onClick={async () => {
-                      if (confirm('Withdraw this document from approval? It will return to Draft status and you can make changes.')) {
-                        const { withdrawFromApproval } = await import('@/app/actions/approvals')
-                        const { toast } = await import('sonner')
-                        const result = await withdrawFromApproval(draftDocument.id)
-                        if (result.success) {
-                          toast.success('Document withdrawn from approval')
-                          router.refresh()
-                        } else {
-                          toast.error(result.error || 'Failed to withdraw document')
-                        }
-                      }
-                    }}
+                    onClick={() => setShowWithdrawConfirm(true)}
                   >
                     Withdraw from Approval
                   </Button>
+                  <ConfirmDialog
+                    open={showWithdrawConfirm}
+                    onOpenChange={setShowWithdrawConfirm}
+                    title="Withdraw from Approval?"
+                    description="This document will return to Draft status and you can make changes before resubmitting."
+                    confirmText="Withdraw"
+                    variant="default"
+                    onConfirm={async () => {
+                      const { withdrawFromApproval } = await import('@/app/actions/approvals')
+                      const { toast } = await import('sonner')
+                      const result = await withdrawFromApproval(draftDocument.id)
+                      if (result.success) {
+                        toast.success('Document withdrawn from approval')
+                        router.refresh()
+                      } else {
+                        toast.error(result.error || 'Failed to withdraw document')
+                      }
+                    }}
+                  />
                 </>
               )}
               

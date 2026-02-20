@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { FileText, Search, Users, CheckCircle, Plus, ArrowRight, Sparkles } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { toast } from 'sonner'
 
 interface EmptyStateProps {
   type: 'documents' | 'my-documents' | 'approvals' | 'search-results' | 'document-types'
@@ -77,8 +78,7 @@ export default function EmptyState({ type, searchQuery }: EmptyStateProps) {
       secondaryAction: {
         label: 'Create Standard Types',
         onClick: () => {
-          // This would trigger creation of Form, Procedure, Work Instruction
-          alert('Quick setup coming soon!')
+          toast.info('Quick setup coming soon!')
         },
         icon: Sparkles
       },

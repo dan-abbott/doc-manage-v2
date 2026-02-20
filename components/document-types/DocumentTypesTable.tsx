@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
+import { toast } from 'sonner';
 import {
   toggleDocumentTypeStatus,
   deleteDocumentType,
@@ -27,7 +28,7 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
       if (result.success) {
         router.refresh();
       } else {
-        alert(result.error?.message || 'Failed to update status');
+        toast.error(result.error?.message || 'Failed to update status');
       }
     } finally {
       setLoading(null);
@@ -42,7 +43,7 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
         setDeleteConfirm(null);
         router.refresh();
       } else {
-        alert(result.error?.message || 'Failed to delete document type');
+        toast.error(result.error?.message || 'Failed to delete document type');
       }
     } finally {
       setLoading(null);
@@ -57,7 +58,7 @@ export default function DocumentTypesTable({ documentTypes }: Props) {
         setResetConfirm(null);
         router.refresh();
       } else {
-        alert(result.error?.message || 'Failed to reset counter');
+        toast.error(result.error?.message || 'Failed to reset counter');
       }
     } finally {
       setLoading(null);

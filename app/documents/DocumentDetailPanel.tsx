@@ -6,13 +6,14 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScanStatusBadge } from '@/components/ScanStatusBadge'
-import { useScanStatusPolling } from '@/components/hooks/useScanStatusPolling'
+import { useScanStatusPolling } from '@/hooks/useScanStatusPolling'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import BookmarkButton from './components/BookmarkButton'
+import { ConfirmDialog } from '@/components/ConfirmDialog'
 
 const ApproverManagement = dynamic(() => import('./components/ApproverManagement'), { ssr: false })
 
@@ -45,8 +46,7 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
   const files = version.document_files || []
   const approvers = version.approvers || []
-  const router = useRouter()  
-  
+
   // Extract file IDs for scanning status
   const fileIds = useMemo(() => files.map((f: any) => f.id), [files])
   
@@ -271,22 +271,29 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
                     variant="outline"
                     size="sm"
                     className="border-orange-200 text-orange-700 hover:bg-orange-50"
-                    onClick={async () => {
-                      if (confirm('Withdraw this document from approval? It will return to Draft status and you can make changes.')) {
-                        const { withdrawFromApproval } = await import('@/app/actions/approvals')
-                        const { toast } = await import('sonner')
-                        const result = await withdrawFromApproval(version.id)
-                        if (result.success) {
-                          toast.success('Document withdrawn from approval')
-                          router.refresh()
-                        } else {
-                          toast.error(result.error || 'Failed to withdraw document')
-                        }
-                      }
-                    }}
+                    onClick={() => setShowWithdrawConfirm(true)}
                   >
                     Withdraw from Approval
                   </Button>
+                  <ConfirmDialog
+                    open={showWithdrawConfirm}
+                    onOpenChange={setShowWithdrawConfirm}
+                    title="Withdraw from Approval?"
+                    description="This document will return to Draft status and you can make changes before resubmitting."
+                    confirmText="Withdraw"
+                    variant="default"
+                    onConfirm={async () => {
+                      const { withdrawFromApproval } = await import('@/app/actions/approvals')
+                      const { toast } = await import('sonner')
+                      const result = await withdrawFromApproval(version.id)
+                      if (result.success) {
+                        toast.success('Document withdrawn from approval')
+                        router.refresh()
+                      } else {
+                        toast.error(result.error || 'Failed to withdraw document')
+                      }
+                    }}
+                  />
                 </div>
               )}
             </div>
@@ -331,6 +338,7 @@ export default function DocumentDetailPanel({
   const isSelectedVersionWIP = selectedVersion && wipVersions.some(v => v.version === selectedVersion)
   const defaultTab = isSelectedVersionWIP ? 'wip' : (latestReleased ? 'released' : 'wip')
   const [activeTab, setActiveTab] = useState<'released' | 'wip'>(defaultTab)
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
 
   // Check if current user is creator of any version
   const isCreator = latestReleased?.created_by === currentUserId || 

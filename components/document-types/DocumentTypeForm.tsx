@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import { toast } from 'sonner';
 import {
   createDocumentType,
   updateDocumentType,
@@ -43,7 +44,7 @@ export default function DocumentTypeForm({ documentType, mode }: Props) {
         if (result.error.field) {
           setErrors({ [result.error.field]: result.error.message });
         } else {
-          alert(result.error.message);
+          toast.error(result.error.message);
         }
       }
     } finally {

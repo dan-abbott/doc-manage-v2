@@ -129,9 +129,7 @@ export default function ProductTour() {
   }
 
   const skipTour = () => {
-    if (confirm('Skip the tour? You can always access help from the navigation menu.')) {
-      completeTour()
-    }
+    completeTour()
   }
 
   if (!isOpen) return null

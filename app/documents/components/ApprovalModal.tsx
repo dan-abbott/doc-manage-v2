@@ -222,7 +222,7 @@ export default function ApprovalModal({
             className="w-full sm:w-auto sm:mr-auto"
           >
             <Link 
-              href={`/documents?selected=${document.document_number}&version=${document.version}`}
+              href={`/documents/${document.id}?tab=wip`}
               target="_blank"
             >
               <ExternalLink className="h-4 w-4 mr-2" />

@@ -2,6 +2,7 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
+import { toast } from 'sonner'
 
 export function SignInButton() {
   const [isLoading, setIsLoading] = useState(false)
@@ -36,13 +37,13 @@ export function SignInButton() {
       
       if (error) {
         console.error('Error signing in:', error.message)
-        alert('Failed to sign in. Please try again.')
+        toast.error('Failed to sign in. Please try again.')
         setIsLoading(false)
       }
       // Don't set isLoading to false here - browser will redirect
     } catch (error) {
       console.error('Unexpected error:', error)
-      alert('An unexpected error occurred. Please try again.')
+      toast.error('An unexpected error occurred. Please try again.')
       setIsLoading(false)
     }
   }
