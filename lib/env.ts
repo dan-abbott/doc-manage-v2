@@ -1,27 +1,21 @@
-#!/usr/bin/env node
-
 /**
- * Environment Validation Script
+ * Environment Variable Validation
  * 
- * Run this before starting the development server or deploying to production
- * to ensure all required environment variables are properly configured.
- * 
- * Usage:
- *   node scripts/validate-env.js
- *   npm run validate-env
- * 
- * Note: This script does NOT load .env files - it only validates what's already
- * in process.env. Next.js automatically loads .env files during build.
+ * This module validates that all required environment variables are present
+ * and properly configured. It should be called at application startup to
+ * fail fast if the configuration is invalid.
  */
-require('dotenv').config({ path: '.env.local' })
 
-console.log('Loading from:', process.cwd())
-console.log('NEXT_PUBLIC_SUPABASE_URL:', process.env.NEXT_PUBLIC_SUPABASE_URL ? 'FOUND' : 'MISSING')
+interface EnvVar {
+  key: string
+  required: boolean
+  description: string
+  validation?: (value: string) => boolean
+  errorMessage?: string
+}
 
-
-
-
-const ENV_VARS = [
+// Define all environment variables used in the application
+const ENV_VARS: EnvVar[] = [
   // Supabase - Required
   {
     key: 'NEXT_PUBLIC_SUPABASE_URL',
@@ -77,13 +71,29 @@ const ENV_VARS = [
     description: 'Email address to receive feedback submissions',
     validation: (value) => value.includes('@') && value.includes('.'),
     errorMessage: 'Must be a valid email address'
-  },]
+  },
 
-function validateEnv() {
-  const errors = []
-  const warnings = []
-  const missing = []
-  const configured = []
+    validation: (value) => value.length === 64,
+    errorMessage: 'Must be a 64-character API key'
+  },
+]
+
+interface ValidationResult {
+  valid: boolean
+  errors: string[]
+  warnings: string[]
+  missing: string[]
+  configured: string[]
+}
+
+/**
+ * Validate all environment variables
+ */
+export function validateEnv(): ValidationResult {
+  const errors: string[] = []
+  const warnings: string[] = []
+  const missing: string[] = []
+  const configured: string[] = []
 
   for (const envVar of ENV_VARS) {
     const value = process.env[envVar.key]
@@ -121,7 +131,10 @@ function validateEnv() {
   }
 }
 
-function printResults(result) {
+/**
+ * Print validation results to console
+ */
+export function printValidationResults(result: ValidationResult): void {
   console.log('\n' + '='.repeat(80))
   console.log('🔍 ENVIRONMENT VARIABLE VALIDATION')
   console.log('='.repeat(80))
@@ -154,31 +167,64 @@ function printResults(result) {
   }
 
   console.log('\n' + '='.repeat(80))
-  
+  console.log('')
+}
+
+/**
+ * Validate environment and throw error if invalid
+ * Use this at application startup
+ */
+export function validateEnvOrThrow(): void {
+  const result = validateEnv()
+  printValidationResults(result)
+
   if (!result.valid) {
-    console.log('\n💡 Next steps:')
-    console.log('   For local development:')
-    console.log('      1. Create a .env.local file if it doesn\'t exist')
-    console.log('      2. Copy .env.example and fill in the missing values')
-    console.log('')
-    console.log('   For Vercel deployment:')
-    console.log('      1. Go to your project settings')
-    console.log('      2. Navigate to Environment Variables')
-    console.log('      3. Add the missing variables listed above')
-    console.log('')
-    console.log('   Get credentials from:')
-    console.log('      - Supabase: https://supabase.com/dashboard')
-    console.log('      - Sentry: https://sentry.io/')
-    console.log('      - Resend: https://resend.com/')
-    console.log('    console.log('')
+    throw new Error(
+      `Environment validation failed. Please check the errors above and update your environment variables.`
+    )
   }
 }
 
-// Run validation
-const result = validateEnv()
-printResults(result)
-
-// Exit with error code if validation failed
-if (!result.valid) {
-  process.exit(1)
+/**
+ * Get a typed and validated environment variable
+ */
+export function getEnvVar(key: string, fallback?: string): string {
+  const value = process.env[key]
+  
+  if (!value && !fallback) {
+    throw new Error(`Environment variable ${key} is not set and no fallback provided`)
+  }
+  
+  return value || fallback || ''
 }
+
+/**
+ * Check if optional features are enabled
+ */
+export const features = {
+  sentry: !!process.env.NEXT_PUBLIC_SENTRY_DSN,
+  resend: !!process.env.RESEND_API_KEY,
+} as const
+
+/**
+ * Export validated config object
+ */
+export const config = {
+  supabase: {
+    url: getEnvVar('NEXT_PUBLIC_SUPABASE_URL'),
+    anonKey: getEnvVar('NEXT_PUBLIC_SUPABASE_ANON_KEY'),
+    serviceRoleKey: getEnvVar('SUPABASE_SERVICE_ROLE_KEY'),
+  },
+  site: {
+    url: getEnvVar('NEXT_PUBLIC_SITE_URL'),
+  },
+  sentry: {
+    dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
+    enabled: features.sentry,
+  },
+  resend: {
+    apiKey: process.env.RESEND_API_KEY,
+    feedbackEmail: process.env.FEEDBACK_EMAIL,
+    enabled: features.resend,
+  },
+} as const

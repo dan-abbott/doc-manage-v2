@@ -37,13 +37,8 @@ export default async function AdminLayout({
 
   // Get tenant's virus scan setting
   const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    .select('virus_scan_enabled')
-    .eq('id', subdomainTenantId)
+    .from('tenants')    .eq('id', subdomainTenantId)
     .single()
-
-  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
-
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -56,7 +51,6 @@ export default async function AdminLayout({
         {/* Admin Navigation Tabs */}
         <AdminNavTabs 
           isMasterAdmin={userData.is_master_admin || false}
-          virusScanEnabled={virusScanEnabled}
         />
 
         {/* Content */}

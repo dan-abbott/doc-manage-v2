@@ -90,12 +90,6 @@ export default async function SystemAdminPage() {
         {/* API Usage Metrics */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
           <MetricCard
-            title="VirusTotal Scans"
-            value={systemMetrics.total_virustotal_calls}
-            subtitle={formatCurrency(systemMetrics.total_virustotal_calls * 0.005)}
-            color="red"
-          />
-          <MetricCard
             title="Email Sends"
             value={systemMetrics.total_email_sends}
             subtitle={formatCurrency(systemMetrics.total_email_sends * 0.001)}
@@ -184,9 +178,7 @@ export default async function SystemAdminPage() {
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="text-gray-900">{tenant.virustotal_calls}</div>
                     <div className="text-xs text-gray-500">
-                      {formatCurrency(tenant.virustotal_calls * 0.005)}
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -220,9 +212,7 @@ export default async function SystemAdminPage() {
       <div className="mt-8 bg-blue-50 border border-blue-200 rounded-lg p-6">
         <h3 className="text-sm font-semibold text-blue-900 mb-2">Cost Estimates</h3>
         <ul className="text-sm text-blue-800 space-y-1">
-          <li>• Storage: $0.023 per GB/month (Supabase pricing)</li>
-          <li>• VirusTotal: $0.005 per scan (adjust to your actual rate)</li>
-          <li>• Email (Resend): $0.001 per email (adjust to your actual rate)</li>
+          <li>• Storage: $0.023 per GB/month (Supabase pricing)</li>          <li>• Email (Resend): $0.001 per email (adjust to your actual rate)</li>
           <li>• These are estimates - verify with actual vendor invoices</li>
         </ul>
       </div>

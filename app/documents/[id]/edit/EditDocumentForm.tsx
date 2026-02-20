@@ -7,7 +7,6 @@ import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Textarea } from '@/components/ui/textarea'
 import { FileUpload } from '@/components/documents/FileUpload'
-import { ScanStatusBadge } from '@/components/ScanStatusBadge'
 import { toast } from 'sonner'
 import { updateDocumentWithFiles } from '@/app/actions/documents-formdata'
 import { deleteFile } from '@/app/actions/documents'
@@ -15,10 +14,9 @@ import { Trash2, FileText, Shield } from 'lucide-react'
 
 interface EditDocumentFormProps {
   document: any
-  virusScanEnabled?: boolean
 }
 
-export default function EditDocumentForm({ document, virusScanEnabled = true }: EditDocumentFormProps) {
+export default function EditDocumentForm({ document }: EditDocumentFormProps) {
   const router = useRouter()
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [title, setTitle] = useState(document.title)
@@ -166,9 +164,7 @@ export default function EditDocumentForm({ document, virusScanEnabled = true }: 
         <div>
           <Label>Current Files</Label>
           <div className="space-y-2 mt-2">
-            {existingFiles.map((file: any) => {
-              const scanStatus = file.scan_status || 'safe'
-              const isBlocked = scanStatus === 'blocked'
+            {existingFiles.map((file: any) => {              const isBlocked = scanStatus === 'blocked'
               
               return (
                 <div
@@ -181,11 +177,7 @@ export default function EditDocumentForm({ document, virusScanEnabled = true }: 
                     <FileText className={`h-5 w-5 ${isBlocked ? 'text-red-500' : 'text-muted-foreground'}`} />
                     <div className="flex-1">
                       <div className="flex items-center gap-2">
-                        <p className="text-sm font-medium">{file.file_name}</p>
-                        {virusScanEnabled && (
-                          <ScanStatusBadge status={scanStatus} showText={false} />
-                        )}
-                      </div>
+                        <p className="text-sm font-medium">{file.file_name}</p>                      </div>
                       <p className="text-xs text-muted-foreground">
                         {(file.file_size / 1024 / 1024).toFixed(2)} MB
                       </p>

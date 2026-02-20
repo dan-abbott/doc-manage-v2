@@ -22,8 +22,7 @@ interface CompanySettingsFormProps {
     background_start_color: string
     background_end_color: string
     auto_rename_files: boolean
-    virus_scan_enabled: boolean
-    timezone: string
+      timezone: string
   }
 }
 
@@ -36,9 +35,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
   const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color)
   const [backgroundStartColor, setBackgroundStartColor] = useState(tenant.background_start_color || '#F8FAFC')
   const [backgroundEndColor, setBackgroundEndColor] = useState(tenant.background_end_color || '#E2E8F0')
-  const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)
-  const [virusScanEnabled, setVirusScanEnabled] = useState(tenant.virus_scan_enabled)
-  const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
+  const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)  const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 
@@ -121,9 +118,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
         secondary_color: secondaryColor,
         background_start_color: backgroundStartColor,
         background_end_color: backgroundEndColor,
-        auto_rename_files: autoRenameFiles,
-        virus_scan_enabled: virusScanEnabled,
-        timezone: timezone,
+        auto_rename_files: autoRenameFiles,        timezone: timezone,
       })
 
       if (result.success) {
@@ -455,7 +450,6 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
 
           {virusScanEnabled && (
             <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              <strong>Privacy Notice:</strong> Files are sent to VirusTotal for analysis. 
               Do not upload files containing sensitive or confidential information.
             </div>
           )}

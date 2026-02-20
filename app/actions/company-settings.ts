@@ -14,7 +14,6 @@ const companySettingsSchema = z.object({
   background_start_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   background_end_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   auto_rename_files: z.boolean(),
-  virus_scan_enabled: z.boolean(),
   timezone: z.string().min(1, 'Timezone is required'),
 })
 
@@ -151,9 +150,7 @@ export async function updateCompanySettings(data: {
   secondary_color: string
   background_start_color: string
   background_end_color: string
-  auto_rename_files: boolean
-  virus_scan_enabled: boolean
-  timezone: string
+  auto_rename_files: boolean  timezone: string
 }) {
   const supabase = await createClient()
 
@@ -195,9 +192,7 @@ export async function updateCompanySettings(data: {
         secondary_color: validation.data.secondary_color,
         background_start_color: validation.data.background_start_color,
         background_end_color: validation.data.background_end_color,
-        auto_rename_files: validation.data.auto_rename_files,
-        virus_scan_enabled: validation.data.virus_scan_enabled,
-        timezone: validation.data.timezone,
+        auto_rename_files: validation.data.auto_rename_files,        timezone: validation.data.timezone,
         updated_at: new Date().toISOString(),
       })
       .eq('id', data.tenantId)

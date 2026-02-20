@@ -45,7 +45,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
   // Get virus scan status from tenants table
   const { data: tenant, error: tenantError } = await supabase
     .from('tenants')
-    .select('virus_scan_enabled')
+    
     .eq('id', subdomainTenantId)
     .single()
 
@@ -54,13 +54,9 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     subdomainTenantId,
     tenantFound: !!tenant,
     tenantError: tenantError?.message,
-    virus_scan_enabled: tenant?.virus_scan_enabled,
     rawTenant: tenant,
   })
 
-  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
-
-  console.log('✅ Final virusScanEnabled value:', virusScanEnabled)
 
   // Fetch the document to get its document_number
   const { data: document } = await supabase
@@ -142,7 +138,6 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               isAdmin={isAdmin}
               currentUserId={user.id}
               currentUserEmail={user.email || ''}
-              virusScanEnabled={virusScanEnabled}
             />
           </div>
 

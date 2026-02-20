@@ -7,7 +7,7 @@ import { createServiceRoleClient } from '@/lib/supabase/server'
 
 export async function trackApiUsage(params: {
   tenantId: string
-  apiType: 'virustotal' | 'resend_email'
+  apiType: 'resend_email'
   endpoint?: string
   status?: 'success' | 'error'
   requestData?: Record<string, any>

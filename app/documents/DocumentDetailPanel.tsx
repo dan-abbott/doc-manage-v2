@@ -5,8 +5,6 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { ScanStatusBadge } from '@/components/ScanStatusBadge'
-import { useScanStatusPolling } from '@/components/hooks/useScanStatusPolling'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
@@ -24,8 +22,7 @@ interface DocumentDetailPanelProps {
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
-  virusScanEnabled?: boolean
-}
+
 
 const STATUS_COLORS: Record<string, string> = {
   'Draft': 'bg-gray-500',
@@ -42,24 +39,12 @@ function formatDate(dateString: string) {
   })
 }
 
-function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, availableUsers, isCollapsible = false, virusScanEnabled = true }: any) {
+function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, availableUsers, isCollapsible = false }: any) {
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
   const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
   const router = useRouter()
   const files = version.document_files || []
   const approvers = version.approvers || []
-
-  // Extract file IDs for scanning status
-  const fileIds = useMemo(() => files.map((f: any) => f.id), [files])
-  
-  // Check if any files are pending/scanning
-  const hasPendingScans = useMemo(() => 
-    files.some((f: any) => f.scan_status === 'pending' || f.scan_status === 'scanning'),
-    [files]
-  )
-
-  // Auto-refresh when scans complete
-  useScanStatusPolling(fileIds, hasPendingScans)
 
   const cardContent = (
     <>
@@ -135,59 +120,32 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
             <h4 className="text-sm font-medium mb-3">Attached Files</h4>
             {files && files.length > 0 ? (
               <div className="space-y-2">
-                {files.map((file: any) => {
-                  const scanStatus = file.scan_status || 'safe'
-                  const isBlocked = scanStatus === 'blocked'
-                  
-                  return (
-                    <div
-                      key={file.id}
-                      className={cn(
-                        "flex items-center justify-between p-3 rounded-lg border",
-                        isBlocked ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
-                      )}
-                    >
-                      <div className="flex items-center gap-3 flex-1 min-w-0">
-                        <FileText className={cn(
-                          "h-5 w-5 flex-shrink-0",
-                          isBlocked ? "text-red-400" : "text-gray-400"
-                        )} />
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-2">
-                            <p className="text-sm font-medium truncate">{file.file_name}</p>
-                            {virusScanEnabled && (
-                              <ScanStatusBadge status={scanStatus} showText={false} />
-                            )}
-                          </div>
-                          <p className="text-xs text-gray-500">
-                            {(file.file_size / 1024 / 1024).toFixed(2)} MB
-                          </p>
-                          {isBlocked && file.scan_result && (
-                            <p className="text-xs text-red-600 mt-1">
-                              Blocked: {file.scan_result.malicious || 0} threats detected
-                            </p>
-                          )}
-                        </div>
+                {files.map((file: any) => (
+                  <div
+                    key={file.id}
+                    className="flex items-center justify-between p-3 rounded-lg border bg-gray-50 border-gray-200"
+                  >
+                    <div className="flex items-center gap-3 flex-1 min-w-0">
+                      <FileText className="h-5 w-5 flex-shrink-0 text-gray-400" />
+                      <div className="flex-1 min-w-0">
+                        <p className="text-sm font-medium truncate">{file.file_name}</p>
+                        <p className="text-xs text-gray-500">
+                          {(file.file_size / 1024 / 1024).toFixed(2)} MB
+                        </p>
                       </div>
-                      {!isBlocked && (
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          asChild
-                        >
-                          <a
-                            href={`/api/documents/${version.id}/files/${file.id}/download`}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                          >
-                            <Download className="h-4 w-4 mr-2" />
-                            Download
-                          </a>
-                        </Button>
-                      )}
                     </div>
-                  )
-                })}
+                    <Button size="sm" variant="outline" asChild>
+                      <a
+                        href={`/api/documents/${version.id}/files/${file.id}/download`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                      >
+                        <Download className="h-4 w-4 mr-2" />
+                        Download
+                      </a>
+                    </Button>
+                  </div>
+                ))}
               </div>
             ) : (
               <p className="text-gray-500 text-sm">No files attached</p>
@@ -330,13 +288,12 @@ export default function DocumentDetailPanel({
   isAdmin,
   currentUserId,
   currentUserEmail,
-  virusScanEnabled = true
 }: DocumentDetailPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { latestReleased, wipVersions, documentNumber, title } = documentData
   
-  // Determine default tab based on selected version
+  // Determine default tab — URL param takes priority, then fall back to logic
   const tabParam = searchParams.get('tab') as 'released' | 'wip' | null
   const isSelectedVersionWIP = selectedVersion && wipVersions.some(v => v.version === selectedVersion)
   const defaultTab = tabParam || (isSelectedVersionWIP ? 'wip' : (latestReleased ? 'released' : 'wip'))
@@ -424,7 +381,6 @@ export default function DocumentDetailPanel({
               currentUserEmail={currentUserEmail}
               availableUsers={availableUsers}
               isCollapsible={false}
-              virusScanEnabled={virusScanEnabled}
             />
           ) : (
             <Card>
@@ -449,7 +405,6 @@ export default function DocumentDetailPanel({
                 currentUserEmail={currentUserEmail}
                 availableUsers={availableUsers}
                 isCollapsible={false}
-                virusScanEnabled={virusScanEnabled}
               />
             ))
           ) : (

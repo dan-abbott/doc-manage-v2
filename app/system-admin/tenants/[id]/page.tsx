@@ -48,16 +48,10 @@ export default async function TenantDetailPage({ params }: PageProps) {
   // Calculate API usage
   const apiByDay = apiUsage.reduce((acc: any, usage: any) => {
     const date = new Date(usage.created_at).toLocaleDateString()
-    if (!acc[date]) {
-      acc[date] = { virustotal: 0, email: 0 }
-    }
-    if (usage.api_type === 'virustotal') acc[date].virustotal++
-    else if (usage.api_type === 'resend_email') acc[date].email++
+    if (!acc[date]) {      acc[date] = { email: 0 }
+    }    else if (usage.api_type === 'resend_email') acc[date].email++
     return acc
-  }, {})
-
-  const totalVt = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.virustotal, 0)
-  const totalEmail = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.email, 0)
+  }, {})  const totalEmail = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.email, 0)
 
   // Calculate usage costs
   const vtCost = totalVt * 0.005
@@ -207,7 +201,6 @@ export default async function TenantDetailPage({ params }: PageProps) {
                   <span className="text-gray-900">{formatCurrency(storageCost)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-600">VirusTotal:</span>
                   <span className="text-gray-900">{formatCurrency(vtCost)}</span>
                 </div>
                 <div className="flex justify-between">

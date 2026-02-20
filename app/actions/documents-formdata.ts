@@ -3,7 +3,6 @@
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { formatDocumentFilename } from '@/lib/file-naming'
-import { inngest } from '@/lib/inngest/client'
 import { createDocumentAudit, AuditAction } from '@/lib/audit-helper'
 import { checkStorageLimit, getTotalFileSize } from '@/lib/storage-limit'
 import { getCurrentSubdomain, getSubdomainTenantId } from '@/lib/tenant'
@@ -46,12 +45,11 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
     const { data: tenant } = await supabase
       .from('tenants')
-      .select('auto_rename_files, virus_scan_enabled')
+      .select('auto_rename_files')
       .eq('id', tenantId)
       .single()
 
     const autoRename = tenant?.auto_rename_files ?? true
-    const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
     if (document.created_by !== user.id) {
       return { success: false, error: 'Not authorized' }
@@ -162,7 +160,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           autoRename
         )
 
-        // Create file record with scan_status='pending'
+        // Create file record
         const { data: fileRecord, error: fileError } = await supabaseAdmin
           .from('document_files')
           .insert({
@@ -174,7 +172,6 @@ export async function updateDocumentWithFiles(formData: FormData) {
             mime_type: file.type,
             uploaded_by: user.id,
             tenant_id: document.tenant_id,
-            scan_status: 'pending', // Inngest will scan this
           })
           .select()
           .single()
@@ -188,7 +185,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
           }
         }
 
-        console.log(`[${i + 1}/${files.length}] ✅ File queued for scanning`)
+        console.log(`[${i + 1}/${files.length}] ✅ File uploaded successfully`)
 
         // ✅ AUDIT: Log file upload
         await createDocumentAudit({
@@ -205,24 +202,6 @@ export async function updateDocumentWithFiles(formData: FormData) {
             mime_type: file.type,
           }
         })
-
-        // ✨ TRIGGER INNGEST BACKGROUND SCAN (only if enabled) ✨
-        if (virusScanEnabled) {
-          try {
-            await inngest.send({
-              name: 'file/uploaded',
-              data: {
-                fileId: fileRecord.id,
-              },
-            })
-            console.log(`[${i + 1}/${files.length}] 🚀 Inngest scan triggered`)
-          } catch (inngestError) {
-            console.warn(`[${i + 1}/${files.length}] ⚠️ Inngest not configured, skipping background scan:`, inngestError instanceof Error ? inngestError.message : 'Unknown error')
-            // File upload succeeded, just no background scanning
-          }
-        } else {
-          console.log(`[${i + 1}/${files.length}] ⏭️ Virus scanning disabled for this tenant, skipping Inngest`)
-        }
 
         uploadedFiles.push(fileRecord)
       }

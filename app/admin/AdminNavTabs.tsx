@@ -14,10 +14,9 @@ const baseTabs = [
 
 interface AdminNavTabsProps {
   isMasterAdmin: boolean
-  virusScanEnabled?: boolean
 }
 
-export default function AdminNavTabs({ isMasterAdmin, virusScanEnabled = true }: AdminNavTabsProps) {
+export default function AdminNavTabs({ isMasterAdmin }: AdminNavTabsProps) {
   const pathname = usePathname()
 
   // Filter tabs based on virus scan setting

@@ -50,11 +50,10 @@ export default async function EditDocumentPage({ params }: PageProps) {
   // Get virus scan status from tenants table
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('virus_scan_enabled')
+    
     .eq('id', document.tenant_id)
     .single()
 
-  const virusScanEnabled = tenant?.virus_scan_enabled ?? true
 
   // Check permissions
   if (document.created_by !== user.id) {
@@ -77,7 +76,6 @@ export default async function EditDocumentPage({ params }: PageProps) {
         <CardContent>
           <EditDocumentForm 
             document={document}
-            virusScanEnabled={virusScanEnabled}
           />
         </CardContent>
       </Card>
