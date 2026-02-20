@@ -156,7 +156,7 @@ export default async function SystemAdminPage() {
                         {tenant.company_name}
                       </div>
                       <div className="text-sm text-gray-500">
-                        {tenant.subdomain}.yourdomain.com
+                        {tenant.subdomain}.baselinedocs.com
                       </div>
                     </Link>
                   </td>
