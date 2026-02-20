@@ -8,6 +8,7 @@ import { checkStorageLimit, getTotalFileSize } from '@/lib/storage-limit'
 import { getCurrentSubdomain, getSubdomainTenantId } from '@/lib/tenant'
 import { logger } from '@/lib/logger'
 
+
 export async function updateDocumentWithFiles(formData: FormData) {
   try {
     const supabase = await createClient()
@@ -129,7 +130,8 @@ export async function updateDocumentWithFiles(formData: FormData) {
           return { success: false, error: 'Unable to determine tenant context' }
         }
 
-        const fileName = `${subdomain}/${document.document_number}${document.version}/${file.name}`
+        const fileName = `${subdomain}/${document.document_number}${document.version}/${Date.now()}-${file.name}`
+
 
         // Upload to Supabase Storage (use service role to bypass RLS)
         const supabaseAdmin = createServiceRoleClient()
