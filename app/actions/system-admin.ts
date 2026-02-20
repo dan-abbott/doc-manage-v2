@@ -128,7 +128,33 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
       const storageMB = storageBytes / (1024 * 1024)
       const storageGB = storageMB / 1024
 
-      // Count virus scans from audit_log for this tenant        email_sends: emailSends || 0,
+      // Count email sends
+      const { count: emailSends } = await supabase
+        .from('audit_log')
+        .select('*', { count: 'exact', head: true })
+        .eq('tenant_id', tenant.id)
+        .eq('action', 'email_sent')
+
+      const { data: lastDoc } = await supabase
+        .from('documents')
+        .select('updated_at')
+        .eq('tenant_id', tenant.id)
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .single()
+
+      const emailCost = (emailSends || 0) * 0.001
+      const storageCost = storageGB * 0.023
+      const totalCost = emailCost + storageCost
+
+      return {
+        tenant_id: tenant.id,
+        company_name: tenant.company_name,
+        subdomain: tenant.subdomain,
+        user_count: userCount || 0,
+        document_count: documentCount || 0,
+        storage_gb: storageGB,
+        email_sends: emailSends || 0,
         total_cost_estimate: totalCost,
         created_at: tenant.created_at,
         last_activity: lastDoc?.updated_at || null
@@ -186,15 +212,13 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
   const totalStorageGB = totalStorageBytes / (1024 * 1024 * 1024)
   console.log(`[System Admin] Total storage: ${totalStorageBytes} bytes (${totalStorageGB.toFixed(2)} GB)`)
 
-  // Count virus scans from audit_log (file_scan_completed actions)    .from('audit_log')
-    .select('*', { count: 'exact', head: true })
-    .eq('action', 'file_scan_completed')
-
   // Count email sends from audit_log (email_sent actions)
   const { count: totalEmailSends } = await supabase
     .from('audit_log')
     .select('*', { count: 'exact', head: true })
-    .eq('action', 'email_sent')  const emailCost = (totalEmailSends || 0) * 0.001
+    .eq('action', 'email_sent')
+
+  const emailCost = (totalEmailSends || 0) * 0.001
   const storageCost = totalStorageGB * 0.023
   const totalEstimatedCost = emailCost + storageCost
 

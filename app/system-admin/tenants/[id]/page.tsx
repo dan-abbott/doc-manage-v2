@@ -48,13 +48,14 @@ export default async function TenantDetailPage({ params }: PageProps) {
   // Calculate API usage
   const apiByDay = apiUsage.reduce((acc: any, usage: any) => {
     const date = new Date(usage.created_at).toLocaleDateString()
-    if (!acc[date]) {      acc[date] = { email: 0 }
-    }    else if (usage.api_type === 'resend_email') acc[date].email++
+    if (!acc[date]) {
+      acc[date] = { email: 0 }
+    } else if (usage.api_type === 'resend_email') acc[date].email++
     return acc
-  }, {})  const totalEmail = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.email, 0)
+  }, {})
+  const totalEmail = Object.values(apiByDay).reduce((sum: number, day: any) => sum + day.email, 0)
 
   // Calculate usage costs
-  const vtCost = totalVt * 0.005
   const emailCost = totalEmail * 0.001
   const storageCost = 0 // TODO: Get from tenant metrics
 
@@ -67,7 +68,7 @@ export default async function TenantDetailPage({ params }: PageProps) {
   }
   const planPrice = planPrices[billing?.plan || 'trial'] || 0
 
-  const totalMonthlyCost = vtCost + emailCost + storageCost + planPrice
+  const totalMonthlyCost = emailCost + storageCost + planPrice
 
   // Status badge color
   const statusColors: Record<string, string> = {
@@ -105,7 +106,6 @@ export default async function TenantDetailPage({ params }: PageProps) {
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
         <MetricCard title="Users" value={users.length} color="blue" />
         <MetricCard title="Documents" value={recentDocs.length} color="green" />
-        <MetricCard title="VT Scans (30d)" value={totalVt} color="red" />
         <MetricCard title="Emails (30d)" value={totalEmail} color="indigo" />
       </div>
 
@@ -201,7 +201,6 @@ export default async function TenantDetailPage({ params }: PageProps) {
                   <span className="text-gray-900">{formatCurrency(storageCost)}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-900">{formatCurrency(vtCost)}</span>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-gray-600">Email:</span>

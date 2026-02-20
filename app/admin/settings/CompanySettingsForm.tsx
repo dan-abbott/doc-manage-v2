@@ -35,7 +35,8 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
   const [secondaryColor, setSecondaryColor] = useState(tenant.secondary_color)
   const [backgroundStartColor, setBackgroundStartColor] = useState(tenant.background_start_color || '#F8FAFC')
   const [backgroundEndColor, setBackgroundEndColor] = useState(tenant.background_end_color || '#E2E8F0')
-  const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)  const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
+  const [autoRenameFiles, setAutoRenameFiles] = useState(tenant.auto_rename_files)
+  const [timezone, setTimezone] = useState(tenant.timezone || 'America/Los_Angeles')
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [isUploadingLogo, setIsUploadingLogo] = useState(false)
 

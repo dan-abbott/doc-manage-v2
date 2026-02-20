@@ -22,7 +22,7 @@ interface DocumentDetailPanelProps {
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
-
+}
 
 const STATUS_COLORS: Record<string, string> = {
   'Draft': 'bg-gray-500',
