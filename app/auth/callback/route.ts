@@ -88,64 +88,21 @@ export async function GET(request: Request) {
       .eq('id', user.id)
       .maybeSingle()
 
-    // CRITICAL FIX: Create user record ONLY if it truly doesn't exist
+    // User not found in this tenant — access is invite-only
+    // Admins must add users via the admin panel; self-registration is not permitted
     if (!userRecord && (!userError || userError.code === 'PGRST116')) {
-      console.log('[Auth Callback] User record not found, creating...')
-      
-      // Extract full name from Google OAuth metadata
-      const fullName = user.user_metadata?.full_name || 
-                      user.user_metadata?.name || 
-                      user.email?.split('@')[0] || 
-                      'User'
-      
-      // Create user record for this tenant
-      const { data: newUser, error: createError } = await supabaseAdmin
-        .from('users')
-        .insert({
-          id: user.id,
-          email: user.email,
-          full_name: fullName,
-          tenant_id: tenant.id,
-          is_admin: false, // Regular user by default
-          is_master_admin: false,
-        })
-        .select('tenant_id, is_master_admin, full_name')
-        .single()
-      
-      if (createError) {
-        console.error('[Auth Callback] Error creating user record:', createError)
-        
-        if (oauthOriginCookie) {
-          cookieStore.delete('oauth_origin_subdomain')
-        }
-        
-        return NextResponse.redirect(`${origin}/auth/error?message=user_creation_failed`)
-      }
-      
-      // Use the newly created user record
-      const finalUserRecord = newUser
-      
-      if (!finalUserRecord) {
-        console.error('[Auth Callback] Created user record is null')
-        
-        if (oauthOriginCookie) {
-          cookieStore.delete('oauth_origin_subdomain')
-        }
-        
-        return NextResponse.redirect(`${origin}/auth/error?message=user_record_null`)
-      }
-      
-      console.log('[Auth Callback] Created new user record:', finalUserRecord)
-      
-      // New users are never master admin, so redirect to their tenant only
-      const redirectUrl = `https://${tenant.subdomain}.baselinedocs.com/dashboard`
-      console.log('[Auth Callback] Redirecting new user to:', redirectUrl)
-      
+      console.log('[Auth Callback] 🚨 SECURITY: User not found in users table — access denied:', user.email)
+
+      // Sign the user out of Supabase so they don't hold an active session
+      await supabaseAdmin.auth.admin.signOut(user.id, 'global')
+
       if (oauthOriginCookie) {
         cookieStore.delete('oauth_origin_subdomain')
       }
-      
-      return NextResponse.redirect(redirectUrl)
+
+      return NextResponse.redirect(
+        `${origin}/auth/error?message=You+are+not+authorised+to+access+this+organisation.+Please+contact+your+administrator.`
+      )
     } else if (userError) {
       console.error('[Auth Callback] User lookup error:', userError)
       
