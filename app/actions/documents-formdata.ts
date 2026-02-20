@@ -131,8 +131,9 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         const fileName = `${subdomain}/${document.document_number}${document.version}/${file.name}`
 
-        // Upload to Supabase Storage
-        const { error: uploadError } = await supabase.storage
+        // Upload to Supabase Storage (use service role to bypass RLS)
+        const supabaseAdmin = createServiceRoleClient()
+        const { error: uploadError } = await supabaseAdmin.storage
           .from('documents')
           .upload(fileName, fileBuffer, {
             contentType: file.type,
@@ -148,9 +149,6 @@ export async function updateDocumentWithFiles(formData: FormData) {
         }
 
         console.log(`[${i + 1}/${files.length}] File uploaded to storage`)
-
-        // Use service role client for DB insert
-        const supabaseAdmin = createServiceRoleClient()
 
         // Format filename with smart renaming
         const formattedFileName = formatDocumentFilename(
@@ -178,7 +176,7 @@ export async function updateDocumentWithFiles(formData: FormData) {
 
         if (fileError) {
           console.error('File record creation error:', fileError)
-          await supabase.storage.from('documents').remove([fileName])
+          await supabaseAdmin.storage.from('documents').remove([fileName])
           return {
             success: false,
             error: `Failed to save file metadata for ${file.name}: ${fileError.message}`

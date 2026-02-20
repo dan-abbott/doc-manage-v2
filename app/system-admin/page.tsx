@@ -131,9 +131,6 @@ export default async function SystemAdminPage() {
                   Storage
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
-                  VT Scans
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
                   Emails
                 </th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
@@ -175,10 +172,6 @@ export default async function SystemAdminPage() {
                     </div>
                     <div className="text-xs text-gray-500">
                       {formatCurrency(tenant.storage_gb * 0.023)}/mo
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm">
-                    <div className="text-xs text-gray-500">
                     </div>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm">

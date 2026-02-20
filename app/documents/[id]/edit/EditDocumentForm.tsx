@@ -53,9 +53,9 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
     try {
       setIsSubmitting(true)
       
-      // Show background scanning notice if files present
+      // Show upload notice if files present
       if (files.length > 0) {
-        const message = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}. Virus scanning will happen in the background.`
+        const message = `Uploading ${files.length} file${files.length > 1 ? 's' : ''}...`
         toast.info(message, { duration: 4000 })
       }
 
@@ -77,7 +77,7 @@ export default function EditDocumentForm({ document }: EditDocumentFormProps) {
 
       if (result.success) {
         const successMessage = files.length > 0
-          ? `Document updated! ${result.filesUploaded} file(s) queued for virus scanning.`
+          ? `Document updated! ${result.filesUploaded} file(s) uploaded successfully.`
           : 'Document updated successfully'
         
         toast.success(successMessage)
