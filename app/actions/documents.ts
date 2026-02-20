@@ -2,8 +2,7 @@
 
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { logger } from '@/lib/logger'
-import { logError, logServerAction, logFileOperation, measureTime } from '@/lib/utils/logging-helpers'
+import { logger, logError, logServerAction } from '@/lib/logger'
 import { createDocumentSchema } from '@/lib/validation/schemas'
 import { validateFormData, validateFile } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } from '@/lib/security/sanitize'
@@ -272,7 +271,7 @@ export async function createDocument(formData: FormData) {
             .upload(filePath, file)
 
           if (uploadError) {
-            logFileOperation('upload', {
+            logger.info({msg: 'File upload', 
               fileName: sanitizedName,
               fileSize: file.size,
               documentId: document.id,
@@ -308,7 +307,7 @@ export async function createDocument(formData: FormData) {
             return null
           }
 
-          logFileOperation('upload', {
+          logger.info({msg: 'File Upload', 
             fileName: sanitizedName,
             fileSize: file.size,
             documentId: document.id,
@@ -538,7 +537,7 @@ export async function updateDocument(
             .upload(filePath, file)
 
           if (uploadError) {
-            logFileOperation('upload', {
+            logger.info({msg: 'File Upload',
               fileName: sanitizedName,
               fileSize: file.size,
               documentId: document.id,
@@ -562,7 +561,7 @@ export async function updateDocument(
               uploaded_by: user.id,
             })
 
-          logFileOperation('upload', {
+          logger.info({msg: 'File Upload',
             fileName: sanitizedName,
             fileSize: file.size,
             documentId: document.id,
@@ -925,7 +924,7 @@ export async function deleteFile(documentId: string, fileId: string) {
       return { success: false, error: 'Failed to delete file' }
     }
 
-    logFileOperation('delete', {
+    logger.info({msg: 'File Delete',
       fileName: file.file_name,
       fileSize: file.file_size,
       documentId: documentId,

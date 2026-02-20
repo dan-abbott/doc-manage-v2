@@ -2,8 +2,7 @@
 
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
-import { logger } from '@/lib/logger'
-import { logError, logServerAction, logApproval } from '@/lib/utils/logging-helpers'
+import { logger, logError, logServerAction } from '@/lib/logger'
 import { addApproverSchema, removeApproverSchema, approveDocumentSchema, rejectDocumentSchema } from '@/lib/validation/schemas'
 import { validateJSON } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeEmail } from '@/lib/security/sanitize'
@@ -481,7 +480,7 @@ export async function submitForApproval(documentId: string) {
     })
 
     // Log approval workflow event
-    logApproval('submitted', {
+    logger.info({msg: 'Approval Submitted', 
       documentId,
       documentNumber: `${document.document_number}${document.version}`,
       userId,
@@ -667,7 +666,7 @@ export async function approveDocument(documentId: string, comments?: string) {
     })
 
     // Log approval event
-    logApproval('approved', {
+    logger.info({msg: 'Document Approved', 
       documentId,
       documentNumber: `${document.document_number}${document.version}`,
       approverId: user.id,
@@ -823,7 +822,7 @@ export async function approveDocument(documentId: string, comments?: string) {
       }
 
       // Log release event
-      logApproval('released', {
+      logger.info({msg: 'Document Released', 
         documentId,
         documentNumber: `${document.document_number}${document.version}`,
         userId,
@@ -1021,14 +1020,8 @@ export async function rejectDocument(documentId: string, rejectionReason: string
       .eq('document_id', documentId)
       .neq('id', approver.id)
 
-    logger.info('Document rejected and returned to Draft', {
-      userId,
-      documentId,
-      documentNumber: `${document.document_number}${document.version}`,
-    })
-
     // Log rejection event
-    logApproval('rejected', {
+    logger.info({msg: 'Document Rejected', 
       documentId,
       documentNumber: `${document.document_number}${document.version}`,
       approverId: user.id,
