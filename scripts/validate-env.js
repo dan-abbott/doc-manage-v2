@@ -170,7 +170,7 @@ function printResults(result) {
     console.log('      - Supabase: https://supabase.com/dashboard')
     console.log('      - Sentry: https://sentry.io/')
     console.log('      - Resend: https://resend.com/')
-    console.log('    console.log('')
+    console.log('')
   }
 }
 
