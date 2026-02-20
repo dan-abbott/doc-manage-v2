@@ -9,7 +9,6 @@ const baseTabs = [
   { href: '/admin/billing', label: 'Billing' },
   { href: '/admin/settings', label: 'Company Settings' },
   { href: '/admin/document-types', label: 'Document Types' },
-  { href: '/admin/scan-monitoring', label: 'Scan Monitoring' },
 ]
 
 interface AdminNavTabsProps {
@@ -19,12 +18,7 @@ interface AdminNavTabsProps {
 export default function AdminNavTabs({ isMasterAdmin }: AdminNavTabsProps) {
   const pathname = usePathname()
 
-  // Filter tabs based on virus scan setting
   const tabs = baseTabs.filter(tab => {
-    // Hide Scan Monitoring tab if virus scanning is disabled
-    if (tab.href === '/admin/scan-monitoring' && !virusScanEnabled) {
-      return false
-    }
     return true
   })
 
