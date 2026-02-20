@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScanStatusBadge } from '@/components/ScanStatusBadge'
-import { useScanStatusPolling } from '@/hooks/useScanStatusPolling'
+import { useScanStatusPolling } from '@/components/hooks/useScanStatusPolling'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
@@ -45,7 +45,8 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
   const files = version.document_files || []
   const approvers = version.approvers || []
-
+  const router = useRouter()  
+  
   // Extract file IDs for scanning status
   const fileIds = useMemo(() => files.map((f: any) => f.id), [files])
   
