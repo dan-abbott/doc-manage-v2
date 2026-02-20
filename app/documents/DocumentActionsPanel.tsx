@@ -18,7 +18,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 
 // Dynamically import components
 const ApprovalWorkflow = dynamic(() => import('./components/ApprovalWorkflow'), { ssr: false })
-const AuditTrail = dynamic(() => import('./components/AuditTrail'), { ssr: false })
+const AuditTrail = dynamic(() => import('./components/AuditTrailClient'), { ssr: false })
 const AdminActions = dynamic(() => import('./components/AdminActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
