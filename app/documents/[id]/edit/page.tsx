@@ -47,14 +47,6 @@ export default async function EditDocumentPage({ params }: PageProps) {
     notFound()
   }
 
-  // Get virus scan status from tenants table
-  const { data: tenant } = await supabase
-    .from('tenants')
-    
-    .eq('id', document.tenant_id)
-    .single()
-
-
   // Check permissions
   if (document.created_by !== user.id) {
     redirect('/documents')

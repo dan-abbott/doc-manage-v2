@@ -42,22 +42,6 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     notFound()
   }
 
-  // Get virus scan status from tenants table
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')
-    
-    .eq('id', subdomainTenantId)
-    .single()
-
-  // DEBUG: Log the settings fetch
-  console.log('🔍 Virus scan settings check:', {
-    subdomainTenantId,
-    tenantFound: !!tenant,
-    tenantError: tenantError?.message,
-    rawTenant: tenant,
-  })
-
-
   // Fetch the document to get its document_number
   const { data: document } = await supabase
     .from('documents')
