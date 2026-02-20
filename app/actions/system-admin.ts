@@ -153,6 +153,8 @@ export async function getAllTenantMetrics(): Promise<TenantMetrics[]> {
         subdomain: tenant.subdomain,
         user_count: userCount || 0,
         document_count: documentCount || 0,
+        storage_bytes: storageBytes,
+        storage_mb: storageMB,
         storage_gb: storageGB,
         email_sends: emailSends || 0,
         total_cost_estimate: totalCost,
@@ -226,7 +228,8 @@ export async function getSystemMetrics(): Promise<SystemMetrics> {
     total_tenants: totalTenants || 0,
     total_users: totalUsers || 0,
     total_documents: totalDocuments || 0,
-    total_storage_gb: totalStorageGB,    total_email_sends: totalEmailSends || 0,
+    total_storage_gb: totalStorageGB,
+    total_email_sends: totalEmailSends || 0,
     total_estimated_cost: totalEstimatedCost
   }
 }
