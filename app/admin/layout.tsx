@@ -35,10 +35,6 @@ export default async function AdminLayout({
     redirect('/dashboard')
   }
 
-  // Get tenant's virus scan setting
-  const { data: tenant, error: tenantError } = await supabase
-    .from('tenants')    .eq('id', subdomainTenantId)
-    .single()
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
