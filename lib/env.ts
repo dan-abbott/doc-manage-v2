@@ -72,10 +72,6 @@ const ENV_VARS: EnvVar[] = [
     validation: (value) => value.includes('@') && value.includes('.'),
     errorMessage: 'Must be a valid email address'
   },
-
-    validation: (value) => value.length === 64,
-    errorMessage: 'Must be a 64-character API key'
-  },
 ]
 
 interface ValidationResult {
