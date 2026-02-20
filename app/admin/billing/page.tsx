@@ -96,6 +96,12 @@ export default async function BillingPage() {
     .eq('tenant_id', tenantData.id)
     .neq('role', 'Deactivated')
 
+  // Get document count
+  const { count: documentCount } = await supabaseAdmin
+    .from('documents')
+    .select('id', { count: 'exact', head: true })
+    .eq('tenant_id', tenantData.id)
+
   return (
     <div className="min-h-screen py-8">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -106,7 +112,8 @@ export default async function BillingPage() {
           usage={{
             emailsSent,
             storageGB,
-            userCount: userCount || 0
+            userCount: userCount || 0,
+            documentCount: documentCount || 0
           }}
         />
       </div>

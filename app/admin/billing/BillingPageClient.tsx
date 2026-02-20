@@ -10,7 +10,7 @@ import {
   TrendingUp,
   Users,
   Mail,
-  Shield,
+  FileText,
   HardDrive,
   ArrowUpCircle,
   CheckCircle,
@@ -26,6 +26,7 @@ interface BillingPageClientProps {
     emailsSent: number
     storageGB: string
     userCount: number
+    documentCount: number
   }
 }
 
@@ -217,14 +218,15 @@ export default function BillingPageClient({
 
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-3">
-                  <div className="p-2 bg-red-100 rounded-lg">
-                    <Shield className="h-5 w-5 text-red-600" />
+                  <div className="p-2 bg-blue-100 rounded-lg">
+                    <FileText className="h-5 w-5 text-blue-600" />
                   </div>
                   <div>
-                    <div className="text-sm font-medium text-gray-900">Virus Scans</div>
-                    <div className="text-xs text-gray-500">Files scanned</div>
+                    <div className="text-sm font-medium text-gray-900">Documents</div>
+                    <div className="text-xs text-gray-500">Total in system</div>
                   </div>
                 </div>
+                <div className="text-2xl font-bold text-gray-900">{usage.documentCount}</div>
               </div>
 
               <div className="flex items-center justify-between">
