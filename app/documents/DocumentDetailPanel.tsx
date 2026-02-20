@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScanStatusBadge } from '@/components/ScanStatusBadge'
-import { useScanStatusPolling } from '@/hooks/useScanStatusPolling'
+import { useScanStatusPolling } from '@/components/hooks/useScanStatusPolling'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
@@ -44,6 +44,8 @@ function formatDate(dateString: string) {
 
 function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEmail, availableUsers, isCollapsible = false, virusScanEnabled = true }: any) {
   const [isExpanded, setIsExpanded] = useState(!isCollapsible)
+  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
+  const router = useRouter()
   const files = version.document_files || []
   const approvers = version.approvers || []
 
@@ -338,7 +340,6 @@ export default function DocumentDetailPanel({
   const isSelectedVersionWIP = selectedVersion && wipVersions.some(v => v.version === selectedVersion)
   const defaultTab = isSelectedVersionWIP ? 'wip' : (latestReleased ? 'released' : 'wip')
   const [activeTab, setActiveTab] = useState<'released' | 'wip'>(defaultTab)
-  const [showWithdrawConfirm, setShowWithdrawConfirm] = useState(false)
 
   // Check if current user is creator of any version
   const isCreator = latestReleased?.created_by === currentUserId || 
