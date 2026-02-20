@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { XCircle } from 'lucide-react'
 import { rejectDocument } from '@/app/actions/approvals'
+import { toast } from 'sonner'
 
 interface RejectButtonProps {
   documentId: string
@@ -32,9 +33,8 @@ export default function RejectButton({ documentId, documentNumber }: RejectButto
       const result = await rejectDocument(documentId, rejectionReason.trim())
 
       if (result.success) {
-        alert(`Document ${documentNumber} has been rejected and returned to Draft status.`)
-        // Force full page reload to show updated status
-        window.location.reload()
+        toast.success(`${documentNumber} has been rejected and returned to Draft.`)
+        router.refresh()
       } else {
         setError(result.error || 'Failed to reject document')
         setIsSubmitting(false)

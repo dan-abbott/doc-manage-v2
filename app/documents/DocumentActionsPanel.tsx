@@ -14,11 +14,11 @@ import SubmitForApprovalButton from './components/SubmitForApprovalButton'
 import DeleteDocumentButton from './components/DeleteDocumentButton'
 import CreateNewVersionButton from './components/CreateNewVersionButton'
 import PromoteToProductionButton from './components/PromoteToProductionButton'
-import { useSearchParams } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 
 // Dynamically import components
 const ApprovalWorkflow = dynamic(() => import('./components/ApprovalWorkflow'), { ssr: false })
-const AuditTrail = dynamic(() => import('./components/AuditTrailClient'), { ssr: false })
+const AuditTrail = dynamic(() => import('./components/AuditTrail'), { ssr: false })
 const AdminActions = dynamic(() => import('./components/AdminActions'), { ssr: false })
 
 interface DocumentActionsPanelProps {
@@ -95,6 +95,7 @@ export default function DocumentActionsPanel({
   currentUserId,
   currentUserEmail
 }: DocumentActionsPanelProps) {
+  const router = useRouter()
   const searchParams = useSearchParams()
   const explicitTab = searchParams.get('tab') as 'released' | 'wip' | null
   
@@ -209,7 +210,7 @@ export default function DocumentActionsPanel({
                         const result = await withdrawFromApproval(draftDocument.id)
                         if (result.success) {
                           toast.success('Document withdrawn from approval')
-                          window.location.reload()
+                          router.refresh()
                         } else {
                           toast.error(result.error || 'Failed to withdraw document')
                         }

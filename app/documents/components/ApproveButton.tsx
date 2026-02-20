@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { CheckCircle } from 'lucide-react'
 import { approveDocument } from '@/app/actions/approvals'
+import { toast } from 'sonner'
 
 interface ApproveButtonProps {
   documentId: string
@@ -28,13 +29,11 @@ export default function ApproveButton({ documentId, documentNumber }: ApproveBut
 
       if (result.success) {
         if (result.allApproved) {
-          alert(`All approvers have approved! Document ${documentNumber} has been released.`)
-          // Force full page reload when document is released
-          window.location.reload()
+          toast.success(`All approvers have approved — ${documentNumber} has been released.`)
         } else {
-          alert('Document approved successfully. Waiting for other approvers.')
-          router.refresh()
+          toast.success('Approved. Waiting for other approvers.')
         }
+        router.refresh()
       } else {
         setError(result.error || 'Failed to approve document')
         setIsSubmitting(false)

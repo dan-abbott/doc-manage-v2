@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { ScanStatusBadge } from '@/components/ScanStatusBadge'
-import { useScanStatusPolling } from '@/components/hooks/useScanStatusPolling'
+import { useScanStatusPolling } from '@/hooks/useScanStatusPolling'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
 import Link from 'next/link'
@@ -273,11 +273,13 @@ function VersionCard({ version, isCreator, isAdmin, currentUserId, currentUserEm
                     onClick={async () => {
                       if (confirm('Withdraw this document from approval? It will return to Draft status and you can make changes.')) {
                         const { withdrawFromApproval } = await import('@/app/actions/approvals')
+                        const { toast } = await import('sonner')
                         const result = await withdrawFromApproval(version.id)
                         if (result.success) {
-                          window.location.reload()
+                          toast.success('Document withdrawn from approval')
+                          router.refresh()
                         } else {
-                          alert(result.error || 'Failed to withdraw document')
+                          toast.error(result.error || 'Failed to withdraw document')
                         }
                       }
                     }}
