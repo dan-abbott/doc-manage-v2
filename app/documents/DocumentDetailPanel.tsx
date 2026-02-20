@@ -337,8 +337,9 @@ export default function DocumentDetailPanel({
   const { latestReleased, wipVersions, documentNumber, title } = documentData
   
   // Determine default tab based on selected version
+  const tabParam = searchParams.get('tab') as 'released' | 'wip' | null
   const isSelectedVersionWIP = selectedVersion && wipVersions.some(v => v.version === selectedVersion)
-  const defaultTab = isSelectedVersionWIP ? 'wip' : (latestReleased ? 'released' : 'wip')
+  const defaultTab = tabParam || (isSelectedVersionWIP ? 'wip' : (latestReleased ? 'released' : 'wip'))
   const [activeTab, setActiveTab] = useState<'released' | 'wip'>(defaultTab)
 
   // Check if current user is creator of any version
