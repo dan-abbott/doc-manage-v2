@@ -430,30 +430,7 @@ export default function CompanySettingsForm({ tenant }: CompanySettingsFormProps
             />
           </div>
 
-          {/* Virus Scanning - Compact Row */}
-          <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
-            <div className="flex-1 pr-4">
-              <div className="font-medium text-sm">Virus Scanning</div>
-              <p className="text-xs text-gray-500 mt-1">
-                Scan uploaded files for malware and security threats
-              </p>
-              {!virusScanEnabled && (
-                <div className="mt-2 text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded px-2 py-1">
-                  ⚠️ Scanning disabled - files will not be checked for threats
-                </div>
-              )}
-            </div>
-            <Switch
-              checked={virusScanEnabled}
-              onCheckedChange={setVirusScanEnabled}
-            />
-          </div>
 
-          {virusScanEnabled && (
-            <div className="text-xs text-gray-500 bg-blue-50 border border-blue-200 rounded-lg p-3">
-              Do not upload files containing sensitive or confidential information.
-            </div>
-          )}
         </CardContent>
       </Card>
 
