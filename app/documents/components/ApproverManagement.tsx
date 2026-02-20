@@ -72,7 +72,7 @@ export default function ApproverManagement({
         setShowApproverDropdown(false)
         toast.success(`Added ${user.email} as approver`)
         // Force full page reload to update button states
-        setTimeout(() => window.location.reload(), 500)
+        router.refresh()
       } else {
         toast.error(result.error || 'Failed to add approver')
       }
@@ -89,7 +89,7 @@ export default function ApproverManagement({
         setApprovers(approvers.filter(a => a.id !== approverId))
         toast.success('Approver removed')
         // Force full page reload to update button states
-        setTimeout(() => window.location.reload(), 500)
+        router.refresh()
       } else {
         toast.error(result.error || 'Failed to remove approver')
       }
