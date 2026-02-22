@@ -20,7 +20,7 @@ export const metadata: Metadata = {
     ],
   },
   verification: {
-    google: '0aVetCsBxt_WOeXc11C2Kml-8MTYzpkWKvWdOoClBsw',
+    google: 'j4lxs7P85HywcD0KshopP0LymuTmUwHZQaacgY5Ixf8',
   },
 }
 
