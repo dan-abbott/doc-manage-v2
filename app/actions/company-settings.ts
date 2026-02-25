@@ -6,13 +6,10 @@ import { getSubdomainTenantId } from '@/lib/tenant'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
 
+// Color fields removed — app colors are now fixed to the ClearStride brand system.
 const companySettingsSchema = z.object({
   company_name: z.string().min(1, 'Company name is required').max(100),
   logo_url: z.string().url().nullable().optional(),
-  primary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
-  secondary_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
-  background_start_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
-  background_end_color: z.string().regex(/^#[0-9A-Fa-f]{6}$/, 'Invalid hex color'),
   auto_rename_files: z.boolean(),
   timezone: z.string().min(1, 'Timezone is required'),
 })
@@ -24,14 +21,12 @@ export async function uploadCompanyLogo(formData: FormData) {
   const supabase = await createClient()
 
   try {
-    // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
       return { success: false, error: 'You must be logged in' }
     }
 
-    // Get user and verify admin
     const { data: userData } = await supabase
       .from('users')
       .select('is_admin')
@@ -42,11 +37,10 @@ export async function uploadCompanyLogo(formData: FormData) {
       return { success: false, error: 'Only administrators can upload logos' }
     }
 
-    // Get tenant ID from formData (passed by the form)
     const tenantId = formData.get('tenantId') as string
     const subdomainTenantId = await getSubdomainTenantId()
     
-    if(tenantId !== subdomainTenantId) {
+    if (tenantId !== subdomainTenantId) {
       return { success: false, error: 'Tenant ID does not match subdomain tenant ID' }
     }
 
@@ -54,25 +48,21 @@ export async function uploadCompanyLogo(formData: FormData) {
       return { success: false, error: 'Tenant ID required' }
     }
 
-    // Get the file
     const file = formData.get('logo') as File
     
     if (!file) {
       return { success: false, error: 'No file provided' }
     }
 
-    // Validate file type - only PNG, JPG, SVG
     const validTypes = ['image/png', 'image/jpeg', 'image/jpg', 'image/svg+xml']
     if (!validTypes.includes(file.type)) {
       return { success: false, error: 'Invalid file type. Only PNG, JPG, and SVG are allowed' }
     }
 
-    // Validate file size (5MB limit)
     if (file.size > 5 * 1024 * 1024) {
       return { success: false, error: 'File size must be less than 5MB' }
     }
 
-    // Get tenant subdomain for filename
     const { data: tenant } = await supabase
       .from('tenants')
       .select('subdomain')
@@ -83,17 +73,15 @@ export async function uploadCompanyLogo(formData: FormData) {
       return { success: false, error: 'Tenant not found' }
     }
 
-    // Generate filename: {subdomain}-logo.{extension}
     const fileExt = file.name.split('.').pop()
     const fileName = `${tenant.subdomain}-logo.${fileExt}`
     const filePath = `logos/${fileName}`
 
-    // Upload to storage (upsert to replace existing logo)
     const { error: uploadError } = await supabase.storage
       .from('company-logos')
       .upload(filePath, file, {
         cacheControl: '3600',
-        upsert: true // Replace existing logo
+        upsert: true,
       })
 
     if (uploadError) {
@@ -101,12 +89,10 @@ export async function uploadCompanyLogo(formData: FormData) {
       return { success: false, error: uploadError.message || 'Failed to upload logo' }
     }
 
-    // Get public URL
     const { data: { publicUrl } } = supabase.storage
       .from('company-logos')
       .getPublicUrl(filePath)
 
-    // Update tenant with logo URL
     const { error: updateError } = await supabase
       .from('tenants')
       .update({ 
@@ -141,29 +127,26 @@ export async function uploadCompanyLogo(formData: FormData) {
 
 /**
  * Update company settings
+ * Note: color fields (primary_color, secondary_color, background colors) have been
+ * removed. Those columns still exist in the DB schema but are no longer written to
+ * from the app. A future migration can drop them once confirmed stable.
  */
 export async function updateCompanySettings(data: {
   tenantId: string
   company_name: string
   logo_url: string | null
-  primary_color: string
-  secondary_color: string
-  background_start_color: string
-  background_end_color: string
   auto_rename_files: boolean
   timezone: string
 }) {
   const supabase = await createClient()
 
   try {
-    // Get current user
     const { data: { user }, error: userError } = await supabase.auth.getUser()
     
     if (userError || !user) {
       return { success: false, error: 'You must be logged in' }
     }
 
-    // Validate inputs
     const validation = companySettingsSchema.safeParse(data)
     if (!validation.success) {
       return { 
@@ -172,7 +155,6 @@ export async function updateCompanySettings(data: {
       }
     }
 
-    // Get user and verify admin
     const { data: userData } = await supabase
       .from('users')
       .select('is_admin')
@@ -183,16 +165,11 @@ export async function updateCompanySettings(data: {
       return { success: false, error: 'Only administrators can update company settings' }
     }
 
-    // Update tenant settings (using tenantId from data, not user's home tenant)
     const { error: updateError } = await supabase
       .from('tenants')
       .update({
         company_name: validation.data.company_name,
         logo_url: validation.data.logo_url,
-        primary_color: validation.data.primary_color,
-        secondary_color: validation.data.secondary_color,
-        background_start_color: validation.data.background_start_color,
-        background_end_color: validation.data.background_end_color,
         auto_rename_files: validation.data.auto_rename_files,
         timezone: validation.data.timezone,
         updated_at: new Date().toISOString(),
@@ -204,7 +181,6 @@ export async function updateCompanySettings(data: {
       throw updateError
     }
 
-    // Revalidate pages that use tenant settings
     revalidatePath('/')
     revalidatePath('/dashboard')
     revalidatePath('/admin/settings')
@@ -236,7 +212,6 @@ export async function getCompanySettings() {
       return { success: false, error: 'Not authenticated', data: null }
     }
 
-    // Get user's tenant
     const { data: userData } = await supabase
       .from('users')
       .select('tenant_id')
@@ -247,7 +222,6 @@ export async function getCompanySettings() {
       return { success: false, error: 'User not found', data: null }
     }
 
-    // Get tenant settings
     const { data: tenant, error } = await supabase
       .from('tenants')
       .select('*')

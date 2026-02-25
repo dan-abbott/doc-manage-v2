@@ -4,6 +4,7 @@
 
 @layer base {
   :root {
+    /* ── shadcn/ui component tokens (preserved) ─────────────────────────── */
     --background: 0 0% 100%;
     --foreground: 222.2 84% 4.9%;
 
@@ -32,11 +33,38 @@
     --input: 214.3 31.8% 91.4%;
     --ring: 222.2 84% 4.9%;
 
-    --radius: 0.5rem;
-    
-    /* Tenant theme colors - defaults */
-    --primary-color: #2E7DB5;
-    --secondary-color: #1E3A5F;
+    --radius: 0.25rem; /* 4px — brand spec §5.1 */
+
+    /* ── ClearStride brand tokens — BaselineDocs ────────────────────────── */
+    /* Core palette */
+    --brand-dark-slate:     #1E293B;  /* Primary / nav / icons */
+    --brand-slate:          #475569;  /* Secondary UI / borders */
+    --brand-light-slate:    #9AA3B8;  /* Muted text / disabled */
+    --brand-off-white:      #F8FAFC;  /* Page background */
+    --brand-amber:          #D97706;  /* Brand accent / progress / active */
+
+    /* BaselineDocs accent */
+    --brand-docs-blue:      #2563EB;  /* Primary action / links / active states */
+    --brand-docs-blue-dark: #3B82F6;  /* Dark mode variant */
+
+    /* Semantic */
+    --brand-success:        #16A34A;
+    --brand-warning:        #D97706;
+    --brand-error:          #DC2626;
+
+    /* Design tokens */
+    --brand-shadow-card:    0 1px 3px rgba(0,0,0,.12);
+    --brand-shadow-modal:   0 8px 32px rgba(0,0,0,.24);
+    --brand-transition:     150ms ease;
+
+    /* Navigation active indicator — fixed to Clarity Blue,
+       no longer driven by tenant color settings */
+    --primary-color: #2563EB;
+
+    /* Dark mode brand tokens */
+    --brand-dark-bg:        #0E172A;
+    --brand-dark-card:      #1E253B;
+    --brand-amber-bright:   #F59E0B;
   }
 
   .dark {
@@ -67,6 +95,11 @@
     --border: 217.2 32.6% 17.5%;
     --input: 217.2 32.6% 17.5%;
     --ring: 212.7 26.8% 83.9%;
+
+    /* Dark mode brand token overrides */
+    --brand-docs-blue:      #3B82F6;
+    --brand-amber:          #F59E0B;
+    --primary-color:        #3B82F6;
   }
 }
 
@@ -74,56 +107,9 @@
   * {
     @apply border-border;
   }
+
   body {
-    @apply bg-background text-foreground;
-  }
-}
-
-/* Apply tenant theme colors to components */
-@layer components {
-  /* Primary buttons */
-  .btn-primary,
-  button[class*="bg-blue-600"],
-  button[class*="bg-blue-500"] {
-    background-color: var(--primary-color) !important;
-  }
-  
-  .btn-primary:hover,
-  button[class*="bg-blue-600"]:hover,
-  button[class*="bg-blue-500"]:hover {
-    filter: brightness(0.9);
-  }
-
-  /* Primary text colors */
-  .text-blue-600,
-  .text-blue-500 {
-    color: var(--primary-color) !important;
-  }
-
-  /* Primary border colors */
-  .border-blue-600,
-  .border-blue-500 {
-    border-color: var(--primary-color) !important;
-  }
-
-  /* Hover states */
-  .hover\:text-blue-600:hover,
-  .hover\:text-blue-500:hover {
-    color: var(--primary-color) !important;
-  }
-
-  .hover\:border-blue-600:hover,
-  .hover\:border-blue-500:hover {
-    border-color: var(--primary-color) !important;
-  }
-
-  /* Links */
-  a[class*="text-blue"] {
-    color: var(--primary-color) !important;
-  }
-
-  /* Focus rings */
-  .focus-visible\:ring-blue-500:focus-visible {
-    --tw-ring-color: var(--primary-color) !important;
+    @apply bg-[#F8FAFC] text-foreground;
+    font-family: Inter, system-ui, Arial, sans-serif;
   }
 }

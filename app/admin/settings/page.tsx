@@ -6,14 +6,12 @@ import { getCurrentSubdomain } from '@/lib/tenant'
 export default async function CompanySettingsPage() {
   const supabase = await createClient()
 
-  // Check authentication
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
     redirect('/')
   }
 
-  // Get user's tenant and master admin status
   const { data: userData } = await supabase
     .from('users')
     .select('tenant_id, is_admin, is_master_admin')
@@ -24,14 +22,11 @@ export default async function CompanySettingsPage() {
     redirect('/dashboard')
   }
 
-  // FIXED: Get current subdomain from cookie (set by middleware)
   const currentSubdomain = await getCurrentSubdomain()
 
-  // FIXED: Query tenant by subdomain, not by user's tenant_id
-  // This allows master admins to view settings for any tenant they're accessing
   const { data: tenant } = await supabase
     .from('tenants')
-    .select('*')
+    .select('id, company_name, subdomain, logo_url, auto_rename_files, timezone')
     .eq('subdomain', currentSubdomain)
     .single()
 
@@ -48,7 +43,6 @@ export default async function CompanySettingsPage() {
     )
   }
 
-  // For non-master admins, verify they're viewing their own tenant
   if (!userData.is_master_admin && tenant.id !== userData.tenant_id) {
     redirect('/dashboard')
   }
@@ -58,16 +52,25 @@ export default async function CompanySettingsPage() {
       <div className="mb-6">
         <h2 className="text-2xl font-bold text-gray-900">Company Settings</h2>
         <p className="mt-2 text-gray-600">
-          Customize your organization's branding and preferences
+          Manage your organization's identity and preferences
         </p>
         {userData.is_master_admin && (
-          <p className="mt-1 text-sm text-blue-600">
+          <p className="mt-1 text-sm text-[#2563EB]">
             Viewing settings for: <strong>{currentSubdomain}</strong>
           </p>
         )}
       </div>
 
-      <CompanySettingsForm tenant={tenant} />
+      <CompanySettingsForm
+        tenant={{
+          id: tenant.id,
+          company_name: tenant.company_name,
+          subdomain: tenant.subdomain,
+          logo_url: tenant.logo_url,
+          auto_rename_files: tenant.auto_rename_files ?? true,
+          timezone: tenant.timezone ?? 'America/Los_Angeles',
+        }}
+      />
     </div>
   )
 }
