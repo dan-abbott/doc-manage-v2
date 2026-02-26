@@ -10,7 +10,7 @@ import { getTenantAuthMethod } from '@/lib/auth/get-tenant-auth-method'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import MicrosoftSignInButton from '@/components/auth/MicrosoftSignInButton'
 import EmailPasswordForm from '@/components/auth/EmailPasswordForm'
-import { BaselineDocsLogoLight, ClearStrideIcon } from '@/components/dashboard/BaselineDocsLogo'
+import { BaselineDocsLogoLight, ClearStrideIconLight } from '@/components/dashboard/BaselineDocsLogo'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -90,7 +90,7 @@ export default async function LandingPage() {
           rel="noopener noreferrer"
           className="flex items-center gap-2 group"
         >
-          <ClearStrideIcon className="h-4 w-4 flex-shrink-0" />
+          <ClearStrideIconLight className="h-4 w-4 flex-shrink-0" />
           <span className="text-slate-500 text-xs group-hover:text-slate-300 transition-colors">Part of ClearStride Tools</span>
         </a>
       </div>

@@ -7,7 +7,7 @@ import { usePathname } from 'next/navigation';
 import { useState, useEffect, useRef } from 'react';
 import Image from 'next/image';
 import { FeedbackButton } from '@/components/FeedbackButton';
-import { BaselineDocsIconLight, BaselineDocsLogoLight, ClearStrideIcon } from './BaselineDocsLogo';
+import { BaselineDocsIconLight, BaselineDocsLogoLight, ClearStrideIconDark } from './BaselineDocsLogo';
 
 type Props = {
   user: {
@@ -257,7 +257,7 @@ export default function Navigation({ user, isAdmin }: Props) {
                       className="flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-600 transition-colors"
                       onClick={() => setIsDropdownOpen(false)}
                     >
-                      <ClearStrideIcon className="h-3.5 w-3.5 flex-shrink-0" />
+                      <ClearStrideIconDark className="h-3.5 w-3.5 flex-shrink-0" />
                       <span>Part of ClearStride Tools</span>
                     </Link>
                   </div>
