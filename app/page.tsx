@@ -45,9 +45,9 @@ export default async function LandingPage() {
         className="hidden lg:flex lg:w-1/2 flex-col justify-between p-12"
         style={{ backgroundColor: '#1E293B' }}
       >
-        {/* Logo */}
+        {/* Logo — larger so it reads clearly as the product name */}
         <div>
-          <BaselineDocsLogoLight className="h-8" />
+          <BaselineDocsLogoLight className="h-11" />
         </div>
 
         {/* Feature list */}
@@ -84,10 +84,15 @@ export default async function LandingPage() {
         </div>
 
         {/* ClearStride ecosystem footer */}
-        <div className="flex items-center gap-2">
+        <a
+          href="https://www.clearstridetools.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-2 group"
+        >
           <ClearStrideIcon className="h-4 w-4 flex-shrink-0" />
-          <span className="text-slate-500 text-xs">Part of ClearStride Tools</span>
-        </div>
+          <span className="text-slate-500 text-xs group-hover:text-slate-300 transition-colors">Part of ClearStride Tools</span>
+        </a>
       </div>
 
       {/* ── Right panel — auth form ──────────────────────────────────────── */}
@@ -107,31 +112,24 @@ export default async function LandingPage() {
             </div>
           </div>
 
-          {/* Tenant branding */}
-          {tenant?.logo_url ? (
+          {/* Tenant co-brand — only when tenant has uploaded a custom logo */}
+          {tenant?.logo_url && (
             <div className="flex flex-col items-center mb-8">
               <div className="relative h-14 w-40 mb-3">
                 <Image
                   src={tenant.logo_url}
-                  alt={`${tenant.company_name} logo`}
+                  alt={`${tenant.company_name ?? 'Company'} logo`}
                   fill
                   className="object-contain"
                 />
               </div>
               {tenant.company_name && (
                 <p className="text-sm font-medium text-slate-500">
-                  {tenant.company_name} · BaselineDocs
+                  {tenant.company_name}
                 </p>
               )}
             </div>
-          ) : tenant?.company_name ? (
-            <div className="text-center mb-8">
-              <p className="text-lg font-semibold" style={{ color: '#1E293B' }}>
-                {tenant.company_name}
-              </p>
-              <p className="text-sm text-slate-500 mt-1">BaselineDocs</p>
-            </div>
-          ) : null}
+          )}
 
           {/* Sign in heading */}
           <div className="mb-8">
