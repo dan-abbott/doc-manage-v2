@@ -123,11 +123,11 @@ export default function Navigation({ user, isAdmin }: Props) {
               </span>
             </Link>
 
-            {/* Tenant co-brand — divider + logo when set */}
-            {companyLogo && (
+            {/* Tenant co-brand — only renders when a logo URL is actually set */}
+            {companyLogo ? (
               <>
                 <div className="h-5 w-px bg-[#3d5068] hidden lg:block" aria-hidden="true" />
-                <div className="relative h-6 w-24 hidden lg:block">
+                <div className="relative h-6 w-24 hidden lg:block flex-shrink-0">
                   <Image
                     src={companyLogo}
                     alt="Company logo"
@@ -136,7 +136,7 @@ export default function Navigation({ user, isAdmin }: Props) {
                   />
                 </div>
               </>
-            )}
+            ) : null}
           </div>
 
           {/* Center — nav items */}
