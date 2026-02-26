@@ -10,7 +10,7 @@ import { getTenantAuthMethod } from '@/lib/auth/get-tenant-auth-method'
 import GoogleSignInButton from '@/components/auth/GoogleSignInButton'
 import MicrosoftSignInButton from '@/components/auth/MicrosoftSignInButton'
 import EmailPasswordForm from '@/components/auth/EmailPasswordForm'
-import { BaselineDocsLogoLight, BaselineDocsIconLight, ClearStrideIcon } from '@/components/dashboard/BaselineDocsLogo'
+import { BaselineDocsLogoLight, ClearStrideIcon } from '@/components/dashboard/BaselineDocsLogo'
 import Image from 'next/image'
 import Link from 'next/link'
 
@@ -101,16 +101,6 @@ export default async function LandingPage() {
         style={{ backgroundColor: '#F8FAFC' }}
       >
         <div className="w-full max-w-sm">
-
-          {/* Mobile-only logo — icon on Dark Slate tile */}
-          <div className="lg:hidden flex justify-center mb-8">
-            <div
-              className="flex items-center justify-center h-14 w-14 rounded-xl"
-              style={{ backgroundColor: '#1E293B' }}
-            >
-              <BaselineDocsIconLight className="h-9 w-9" />
-            </div>
-          </div>
 
           {/* Tenant co-brand — only when tenant has uploaded a custom logo */}
           {tenant?.logo_url && (
