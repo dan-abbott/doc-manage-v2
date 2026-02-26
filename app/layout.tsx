@@ -13,7 +13,9 @@ export const metadata: Metadata = {
   description: 'Professional Document Control & Version Management',
   icons: {
     icon: [
-      { url: '/icon.png', sizes: '32x32', type: 'image/png' },
+      { url: '/icon.png',     sizes: '32x32',   type: 'image/png' },
+      { url: '/icon-192.png', sizes: '192x192', type: 'image/png' },
+      { url: '/icon-512.png', sizes: '512x512', type: 'image/png' },
     ],
     apple: [
       { url: '/apple-icon.png', sizes: '180x180', type: 'image/png' },
@@ -32,7 +34,6 @@ export default async function RootLayout({
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  // Get user's admin status and role if authenticated
   let isAdmin = false
   let fullName = ''
   let userRole = null
@@ -48,23 +49,17 @@ export default async function RootLayout({
     userRole = userData?.role || null
   }
 
-return (
+  return (
     <html lang="en">
       <body className={inter.className}>
         <TenantThemeProvider>
-          {/* Show styled navigation only when user is authenticated */}
           {user && <Navigation user={{ email: user.email || '', fullName }} isAdmin={isAdmin} userRole={userRole} />}
-          
-          {/* Main content - gradient applied via TenantThemeProvider */}
           <main className="min-h-screen">
             {children}
           </main>
-          
-          {/* Toast notifications */}
           <Toaster position="top-right" />
         </TenantThemeProvider>
       </body>
     </html>
   )
-
 }
