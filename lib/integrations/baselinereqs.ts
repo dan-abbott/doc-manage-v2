@@ -152,6 +152,9 @@ export async function checkBaselineReqsReferencesForAllVersions(
     references: allReferences,
   }
 }
+
+/**
+ * Notify BaselineReqs that a document URL is now broken (document deleted).
  * Fire-and-forget — failures are logged but do not block the caller.
  */
 export async function markBaselineReqsLinksBroken(
