@@ -59,13 +59,16 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Query documents ───────────────────────────────────────────────────────
-  // Released only — Drafts and In-Approval docs aren't stable enough to link
-  // to, and Obsolete docs shouldn't attract new links.
+  // Return Released and Draft documents — engineers need to link requirements
+  // to work-in-progress docs during active development. Obsolete docs are
+  // excluded since they've been superseded and shouldn't attract new links.
+  // In Approval is also excluded — those are transitional and will become
+  // Released shortly anyway.
   let dbQuery = supabase
     .from('documents')
     .select('id, title, document_number, version, status, updated_at')
     .eq('tenant_id', tenant.id)
-    .eq('status', 'Released')
+    .in('status', ['Released', 'Draft'])
     .order('updated_at', { ascending: false })
     .limit(50)
 
