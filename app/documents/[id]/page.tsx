@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { fetchDocumentVersions } from '@/lib/document-helpers'
 import { getSubdomainTenantId, getCurrentSubdomain } from '@/lib/tenant'
-import { checkBaselineReqsReferences } from '@/lib/integrations/baselinereqs'
+import { checkBaselineReqsReferencesForAllVersions } from '@/lib/integrations/baselinereqs'
 import DocumentDetailPanel from '../DocumentDetailPanel'
 import DocumentActionsPanel from '../DocumentActionsPanel'
 import Link from 'next/link'
@@ -95,14 +95,15 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     })
   }
 
-  // ── BaselineReqs badge: fetch reference count for the most relevant version.
-  // Use the latest released version if one exists, otherwise fall back to the
-  // latest draft — so the badge shows even on draft-only documents.
+  // ── BaselineReqs badge: aggregate references across ALL versions of this document.
+  // BaselineReqs stores links by URL, and each version has its own UUID/URL.
+  // A requirement linked to vA stays linked to that URL even after v1 is released,
+  // so we check every version ID and merge the results to show the full picture.
   // Cached for 5 minutes via Next.js fetch cache.
   let baselineReqsRefs = null
-  const badgeDocumentId = documentData.latestReleased?.id ?? documentData.wipVersions[0]?.id ?? null
-  if (subdomain && badgeDocumentId) {
-    baselineReqsRefs = await checkBaselineReqsReferences(subdomain, badgeDocumentId, 300)
+  if (subdomain && documentData.allVersions.length > 0) {
+    const allVersionIds = documentData.allVersions.map((v) => v.id)
+    baselineReqsRefs = await checkBaselineReqsReferencesForAllVersions(subdomain, allVersionIds, 300)
   }
 
   return (

@@ -105,7 +105,53 @@ export async function checkBaselineReqsReferences(
 }
 
 /**
- * Notify BaselineReqs that a document URL is now broken (document deleted).
+ * Check BaselineReqs references across ALL versions of a document.
+ *
+ * Each version has its own UUID and therefore its own canonical URL.
+ * BaselineReqs stores links by URL, so a requirement linked to vA stays
+ * linked to that specific URL even after v1 is released. This function
+ * fetches in parallel for every version ID and merges the results so the
+ * badge always reflects the full picture regardless of which version was
+ * originally linked.
+ *
+ * Deduplicates by attachment_id in case the same requirement somehow
+ * references multiple versions of the same document.
+ */
+export async function checkBaselineReqsReferencesForAllVersions(
+  subdomain: string,
+  versionIds: string[],
+  revalidate: number | false = false
+): Promise<BaselineReqsLinksResult | null> {
+  if (versionIds.length === 0) return null
+
+  const results = await Promise.all(
+    versionIds.map((id) => checkBaselineReqsReferences(subdomain, id, revalidate))
+  )
+
+  // Merge all non-null results
+  const allReferences: BaselineReqsReference[] = []
+  const seenAttachmentIds = new Set<string>()
+
+  for (const result of results) {
+    if (!result?.linked) continue
+    for (const ref of result.references) {
+      if (!seenAttachmentIds.has(ref.attachment_id)) {
+        seenAttachmentIds.add(ref.attachment_id)
+        allReferences.push(ref)
+      }
+    }
+  }
+
+  if (allReferences.length === 0) {
+    return { linked: false, count: 0, references: [] }
+  }
+
+  return {
+    linked: true,
+    count: allReferences.length,
+    references: allReferences,
+  }
+}
  * Fire-and-forget — failures are logged but do not block the caller.
  */
 export async function markBaselineReqsLinksBroken(
