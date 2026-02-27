@@ -2,6 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { fetchDocumentVersions } from '@/lib/document-helpers'
 import { getSubdomainTenantId, getCurrentSubdomain } from '@/lib/tenant'
+import { checkBaselineReqsReferences, buildDocumentUrl } from '@/lib/integrations/baselinereqs'
 import DocumentDetailPanel from '../DocumentDetailPanel'
 import DocumentActionsPanel from '../DocumentActionsPanel'
 import Link from 'next/link'
@@ -94,6 +95,14 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     })
   }
 
+  // ── BaselineReqs badge: fetch reference count for the latest released version
+  // Cached for 5 minutes via Next.js fetch cache — won't add latency on repeat loads.
+  // Fails silently if integration is not configured or BaselineReqs is unreachable.
+  let baselineReqsRefs = null
+  if (subdomain && documentData.latestReleased) {
+    baselineReqsRefs = await checkBaselineReqsReferences(subdomain, documentData.latestReleased.id, 300)
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Header with back button */}
@@ -123,7 +132,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               isAdmin={isAdmin}
               currentUserId={user.id}
               currentUserEmail={user.email || ''}
-              subdomain={subdomain || ''}
+              baselineReqsRefs={baselineReqsRefs}
             />
           </div>
 

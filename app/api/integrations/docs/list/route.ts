@@ -2,12 +2,12 @@
  * GET /api/integrations/docs/list
  *
  * Powers the BaselineReqs "Link existing doc" file picker.
- * Returns a searchable list of Released/non-Obsolete documents for a tenant,
- * identified by subdomain (not tenant UUID — see integration design notes).
+ * Returns a searchable list of Released documents for the tenant identified
+ * by the request's Host header subdomain — consistent with the ping pattern,
+ * no subdomain query param needed.
  *
  * Query params:
- *   subdomain  — the tenant subdomain (e.g. "acme")
- *   q          — optional search string matched against title and document_number
+ *   q  — optional search string matched against title and document_number
  *
  * Auth: x-integration-key header must match INTEGRATION_SECRET env var.
  */
@@ -33,14 +33,17 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  // ── Params ────────────────────────────────────────────────────────────────
-  const subdomain = req.nextUrl.searchParams.get('subdomain')?.trim()
-  const query = req.nextUrl.searchParams.get('q')?.trim() ?? ''
+  // ── Tenant from Host header ───────────────────────────────────────────────
+  // BaselineReqs calls acme.baselinedocs.com/api/integrations/docs/list so the
+  // subdomain is already in the Host — no query param needed.
+  const host = req.headers.get('host') ?? ''
+  const subdomain = host.split('.')[0]
 
-  if (!subdomain) {
-    return NextResponse.json({ error: 'subdomain is required' }, { status: 400 })
+  if (!subdomain || subdomain === 'app' || subdomain === 'www') {
+    return NextResponse.json({ error: 'Invalid subdomain' }, { status: 400 })
   }
 
+  const query = req.nextUrl.searchParams.get('q')?.trim() ?? ''
   const supabase = createServiceClient()
 
   // ── Resolve tenant ────────────────────────────────────────────────────────
@@ -56,8 +59,8 @@ export async function GET(req: NextRequest) {
   }
 
   // ── Query documents ───────────────────────────────────────────────────────
-  // Surface Released documents only — Drafts and In-Approval docs aren't
-  // stable enough to link to, and Obsolete docs shouldn't attract new links.
+  // Released only — Drafts and In-Approval docs aren't stable enough to link
+  // to, and Obsolete docs shouldn't attract new links.
   let dbQuery = supabase
     .from('documents')
     .select('id, title, document_number, version, status, updated_at')
@@ -67,7 +70,6 @@ export async function GET(req: NextRequest) {
     .limit(50)
 
   if (query) {
-    // Partial, case-insensitive match on number or title — same as the app's search
     dbQuery = dbQuery.or(
       `document_number.ilike.%${query}%,title.ilike.%${query}%`
     )
@@ -94,10 +96,7 @@ export async function GET(req: NextRequest) {
     display_label: `${d.document_number}${d.version} — ${d.title}`,
   }))
 
-  logger.info(
-    { subdomain, query, count: docs.length },
-    'docs/list returned results'
-  )
+  logger.info({ subdomain, query, count: docs.length }, 'docs/list returned results')
 
   return NextResponse.json({ docs })
 }

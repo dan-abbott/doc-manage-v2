@@ -4,10 +4,17 @@
  * Centralises all outbound calls from BaselineDocs → BaselineReqs so that
  * both the standard delete flow and the admin delete flow share identical
  * logic.  All functions fail open — if BaselineReqs is unreachable or
- * BASELINEREQS_URL is not configured, operations proceed normally.
+ * BASELINEREQS_DOMAIN is not configured, operations proceed normally.
+ *
+ * URL construction: each call is directed to the tenant's own subdomain on
+ * baselinereqs.com (e.g. acme.baselinereqs.com) so tenant isolation is
+ * enforced at the network level, not just in query params.
  */
 
 import { logger } from '@/lib/logger'
+
+/** Timeout for all outbound BaselineReqs calls (ms). */
+const TIMEOUT_MS = 3000
 
 export interface BaselineReqsReference {
   attachment_id: string
@@ -26,40 +33,56 @@ export interface BaselineReqsLinksResult {
 }
 
 /**
- * Build the canonical public URL for a document.
- * Uses subdomain-based routing for proper tenant isolation.
- * e.g.  acme.baselinedocs.com/documents/<uuid>
+ * Build the canonical public URL for a BaselineDocs document.
+ * e.g.  https://acme.baselinedocs.com/documents/<uuid>
  */
 export function buildDocumentUrl(subdomain: string, documentId: string): string {
   return `https://${subdomain}.baselinedocs.com/documents/${documentId}`
 }
 
 /**
+ * Build the BaselineReqs base URL for a specific tenant.
+ * e.g.  https://acme.baselinereqs.com
+ */
+function buildBaselineReqsUrl(subdomain: string): string {
+  const domain = process.env.BASELINEREQS_DOMAIN
+  return `https://${subdomain}.${domain}`
+}
+
+/**
  * Check whether any BaselineReqs items reference this document URL.
  * Returns null if the integration is not configured or the request fails
  * (fail-open — callers should treat null as "no references known").
+ *
+ * @param revalidate  Next.js fetch revalidation seconds. Default 0 (no-store)
+ *                    — always pass 0 for delete-guard calls so you get fresh
+ *                    data. Pass 300 for badge fetches where a 5-minute cache
+ *                    is acceptable.
  */
 export async function checkBaselineReqsReferences(
   subdomain: string,
-  documentId: string
+  documentId: string,
+  revalidate: number | false = false
 ): Promise<BaselineReqsLinksResult | null> {
-  const baseUrl = process.env.BASELINEREQS_URL
+  const domain = process.env.BASELINEREQS_DOMAIN
   const secret = process.env.INTEGRATION_SECRET
 
-  if (!baseUrl || !secret) {
+  if (!domain || !secret) {
     // Integration not configured — skip silently
     return null
   }
 
   const docUrl = buildDocumentUrl(subdomain, documentId)
+  const baseUrl = buildBaselineReqsUrl(subdomain)
 
   try {
     const res = await fetch(
       `${baseUrl}/api/integrations/docs-links?doc_url=${encodeURIComponent(docUrl)}&subdomain=${encodeURIComponent(subdomain)}`,
       {
         headers: { 'x-integration-key': secret },
-        // Always fetch fresh — we need current state before a destructive action
-        cache: 'no-store',
+        next: revalidate === false ? undefined : { revalidate },
+        cache: revalidate === false ? 'no-store' : undefined,
+        signal: AbortSignal.timeout(TIMEOUT_MS),
       }
     )
 
@@ -89,12 +112,13 @@ export async function markBaselineReqsLinksBroken(
   subdomain: string,
   documentId: string
 ): Promise<void> {
-  const baseUrl = process.env.BASELINEREQS_URL
+  const domain = process.env.BASELINEREQS_DOMAIN
   const secret = process.env.INTEGRATION_SECRET
 
-  if (!baseUrl || !secret) return
+  if (!domain || !secret) return
 
   const docUrl = buildDocumentUrl(subdomain, documentId)
+  const baseUrl = buildBaselineReqsUrl(subdomain)
 
   try {
     const res = await fetch(`${baseUrl}/api/integrations/docs-links/mark-broken`, {
@@ -104,6 +128,7 @@ export async function markBaselineReqsLinksBroken(
         'x-integration-key': secret,
       },
       body: JSON.stringify({ doc_url: docUrl, subdomain }),
+      signal: AbortSignal.timeout(TIMEOUT_MS),
     })
 
     if (!res.ok) {

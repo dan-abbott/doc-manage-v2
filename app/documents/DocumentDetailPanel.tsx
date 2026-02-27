@@ -7,6 +7,7 @@ import { FileText, Download, ChevronDown, ChevronUp } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { DocumentVersionsData } from '@/lib/document-helpers'
+import type { BaselineReqsLinksResult } from '@/lib/integrations/baselinereqs'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -23,7 +24,7 @@ interface DocumentDetailPanelProps {
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
-  subdomain: string
+  baselineReqsRefs: BaselineReqsLinksResult | null
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -290,7 +291,7 @@ export default function DocumentDetailPanel({
   isAdmin,
   currentUserId,
   currentUserEmail,
-  subdomain,
+  baselineReqsRefs,
 }: DocumentDetailPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -332,12 +333,9 @@ export default function DocumentDetailPanel({
               </p>
             )}
 
-            {/* BaselineReqs reference badge — client-side, non-blocking */}
+            {/* BaselineReqs reference badge — pre-fetched server-side, 5-min cache */}
             {latestReleased && (
-              <BaselineReqsBadge
-                documentId={latestReleased.id}
-                subdomain={subdomain}
-              />
+              <BaselineReqsBadge refs={baselineReqsRefs} />
             )}
           </div>
           
