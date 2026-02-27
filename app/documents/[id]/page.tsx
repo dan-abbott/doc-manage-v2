@@ -2,7 +2,7 @@ import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { fetchDocumentVersions } from '@/lib/document-helpers'
 import { getSubdomainTenantId, getCurrentSubdomain } from '@/lib/tenant'
-import { checkBaselineReqsReferences, buildDocumentUrl } from '@/lib/integrations/baselinereqs'
+import { checkBaselineReqsReferences } from '@/lib/integrations/baselinereqs'
 import DocumentDetailPanel from '../DocumentDetailPanel'
 import DocumentActionsPanel from '../DocumentActionsPanel'
 import Link from 'next/link'
@@ -95,12 +95,14 @@ export default async function DocumentDetailPage({ params }: PageProps) {
     })
   }
 
-  // ── BaselineReqs badge: fetch reference count for the latest released version
-  // Cached for 5 minutes via Next.js fetch cache — won't add latency on repeat loads.
-  // Fails silently if integration is not configured or BaselineReqs is unreachable.
+  // ── BaselineReqs badge: fetch reference count for the most relevant version.
+  // Use the latest released version if one exists, otherwise fall back to the
+  // latest draft — so the badge shows even on draft-only documents.
+  // Cached for 5 minutes via Next.js fetch cache.
   let baselineReqsRefs = null
-  if (subdomain && documentData.latestReleased) {
-    baselineReqsRefs = await checkBaselineReqsReferences(subdomain, documentData.latestReleased.id, 300)
+  const badgeDocumentId = documentData.latestReleased?.id ?? documentData.wipVersions[0]?.id ?? null
+  if (subdomain && badgeDocumentId) {
+    baselineReqsRefs = await checkBaselineReqsReferences(subdomain, badgeDocumentId, 300)
   }
 
   return (
