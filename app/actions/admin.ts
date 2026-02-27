@@ -2,12 +2,22 @@
 
 import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
+import { getCurrentSubdomain } from '@/lib/tenant'
+import { checkBaselineReqsReferences, markBaselineReqsLinksBroken, type BaselineReqsLinksResult } from '@/lib/integrations/baselinereqs'
 
 /**
  * Admin: Force delete any document regardless of status
  * Creates audit log entry before deletion
  */
-export async function adminDeleteDocument(documentId: string) {
+export async function adminDeleteDocument(
+  documentId: string,
+  /**
+   * Two-phase delete — same pattern as deleteDocument().
+   * Pass false on the first call to surface BaselineReqs reference warnings.
+   * Pass true to proceed after the user acknowledges.
+   */
+  acknowledgedRefs: boolean = false
+) {
   try {
     const supabase = await createClient()
     
@@ -38,6 +48,24 @@ export async function adminDeleteDocument(documentId: string) {
     if (docError || !document) {
       return { success: false, error: 'Document not found' }
     }
+
+    // ── BaselineReqs integration: check for linked requirements ────────────
+    const subdomain = await getCurrentSubdomain()
+    let refsData: BaselineReqsLinksResult | null = null
+
+    if (subdomain) {
+      refsData = await checkBaselineReqsReferences(subdomain, documentId)
+    }
+
+    if (refsData?.linked && !acknowledgedRefs) {
+      return {
+        success: false,
+        requiresAcknowledgement: true,
+        refs: refsData,
+        error: `This document is referenced by ${refsData.count} item${refsData.count === 1 ? '' : 's'} in BaselineReqs. Deleting it will mark those links as broken.`,
+      }
+    }
+    // ── End BaselineReqs check ─────────────────────────────────────────────
 
     // Use service role client to bypass RLS
     const supabaseAdmin = createServiceRoleClient()
@@ -86,6 +114,12 @@ export async function adminDeleteDocument(documentId: string) {
     }
 
     revalidatePath('/documents')
+
+    // ── BaselineReqs integration: mark any links to this doc as broken ─────
+    if (subdomain) {
+      markBaselineReqsLinksBroken(subdomain, documentId)
+    }
+    // ── End BaselineReqs ───────────────────────────────────────────────────
     
     return { 
       success: true, 

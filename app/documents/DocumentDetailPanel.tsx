@@ -12,6 +12,7 @@ import dynamic from 'next/dynamic'
 import { useRouter, useSearchParams } from 'next/navigation'
 import BookmarkButton from './components/BookmarkButton'
 import { ConfirmDialog } from '@/components/ConfirmDialog'
+import BaselineReqsBadge from './components/BaselineReqsBadge'
 
 const ApproverManagement = dynamic(() => import('./components/ApproverManagement'), { ssr: false })
 
@@ -22,6 +23,7 @@ interface DocumentDetailPanelProps {
   isAdmin: boolean
   currentUserId: string
   currentUserEmail: string
+  subdomain: string
 }
 
 const STATUS_COLORS: Record<string, string> = {
@@ -288,6 +290,7 @@ export default function DocumentDetailPanel({
   isAdmin,
   currentUserId,
   currentUserEmail,
+  subdomain,
 }: DocumentDetailPanelProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -327,6 +330,14 @@ export default function DocumentDetailPanel({
               <p className="text-sm text-gray-500">
                 Latest: <span className="font-medium text-green-600">Released {latestReleased.version}</span>
               </p>
+            )}
+
+            {/* BaselineReqs reference badge — client-side, non-blocking */}
+            {latestReleased && (
+              <BaselineReqsBadge
+                documentId={latestReleased.id}
+                subdomain={subdomain}
+              />
             )}
           </div>
           

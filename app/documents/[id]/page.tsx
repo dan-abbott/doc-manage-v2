@@ -1,7 +1,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { redirect, notFound } from 'next/navigation'
 import { fetchDocumentVersions } from '@/lib/document-helpers'
-import { getSubdomainTenantId } from '@/lib/tenant'
+import { getSubdomainTenantId, getCurrentSubdomain } from '@/lib/tenant'
 import DocumentDetailPanel from '../DocumentDetailPanel'
 import DocumentActionsPanel from '../DocumentActionsPanel'
 import Link from 'next/link'
@@ -37,6 +37,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
 
   // Get tenant from CURRENT SUBDOMAIN
   const subdomainTenantId = await getSubdomainTenantId()
+  const subdomain = await getCurrentSubdomain()
   
   if (!subdomainTenantId) {
     notFound()
@@ -122,6 +123,7 @@ export default async function DocumentDetailPage({ params }: PageProps) {
               isAdmin={isAdmin}
               currentUserId={user.id}
               currentUserEmail={user.email || ''}
+              subdomain={subdomain || ''}
             />
           </div>
 

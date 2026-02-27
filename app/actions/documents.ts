@@ -8,6 +8,7 @@ import { validateFormData, validateFile } from '@/lib/validation/validate'
 import { sanitizeString, sanitizeFilename, sanitizeProjectCode, sanitizeHTML } from '@/lib/security/sanitize'
 import { getCurrentSubdomain, getCurrentTenantId, getSubdomainTenantId } from '@/lib/tenant'
 import { sendDocumentReleasedEmail } from '@/lib/email-notifications'
+import { checkBaselineReqsReferences, markBaselineReqsLinksBroken, type BaselineReqsLinksResult } from '@/lib/integrations/baselinereqs'
 
 
 // ==========================================
@@ -638,7 +639,16 @@ export async function updateDocument(
 // Action: Delete Document
 // ==========================================
 
-export async function deleteDocument(documentId: string) {
+export async function deleteDocument(
+  documentId: string,
+  /**
+   * Two-phase delete flow:
+   *   - Pass `false` (default) on the first call to get reference info without deleting.
+   *     If references exist the action returns early with `requiresAcknowledgement: true`.
+   *   - Pass `true` after the user has confirmed they want to proceed.
+   */
+  acknowledgedRefs: boolean = false
+) {
   const startTime = Date.now()
   let userId: string | undefined
 
@@ -761,6 +771,27 @@ export async function deleteDocument(documentId: string) {
       otherVersionCount: otherVersions.length,
     })
 
+    // ── BaselineReqs integration: check for linked requirements ────────────
+    // Do this before any destructive work. Fail open — if the integration is
+    // not configured or BaselineReqs is down, proceed normally.
+    const subdomain = await getCurrentSubdomain()
+    let refsData: BaselineReqsLinksResult | null = null
+
+    if (subdomain) {
+      refsData = await checkBaselineReqsReferences(subdomain, documentId)
+    }
+
+    if (refsData?.linked && !acknowledgedRefs) {
+      // First call: surface the warning so the client can show the confirm dialog
+      return {
+        success: false,
+        requiresAcknowledgement: true,
+        refs: refsData,
+        error: `This document is referenced by ${refsData.count} item${refsData.count === 1 ? '' : 's'} in BaselineReqs. Deleting it will mark those links as broken.`,
+      }
+    }
+    // ── End BaselineReqs check ─────────────────────────────────────────────
+
     // Delete all files from storage
     if (document.document_files && document.document_files.length > 0) {
       const filePaths = document.document_files.map((f: any) => f.file_path)
@@ -832,6 +863,13 @@ export async function deleteDocument(documentId: string) {
 
     revalidatePath('/documents')
     revalidatePath('/dashboard')
+
+    // ── BaselineReqs integration: mark any links to this doc as broken ─────
+    if (subdomain) {
+      // Fire-and-forget — don't await in the hot path; failures are logged inside
+      markBaselineReqsLinksBroken(subdomain, documentId)
+    }
+    // ── End BaselineReqs ───────────────────────────────────────────────────
 
     const duration = Date.now() - startTime
     logServerAction('deleteDocument', {
