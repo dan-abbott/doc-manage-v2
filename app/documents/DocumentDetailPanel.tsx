@@ -333,10 +333,8 @@ export default function DocumentDetailPanel({
               </p>
             )}
 
-            {/* BaselineReqs reference badge — pre-fetched server-side, 5-min cache */}
-            {latestReleased && (
-              <BaselineReqsBadge refs={baselineReqsRefs} />
-            )}
+            {/* BaselineReqs reference badge — shown for released and draft-only docs */}
+            <BaselineReqsBadge refs={baselineReqsRefs} />
           </div>
           
           {/* Bookmark Button */}
