@@ -1,155 +1,152 @@
-import { createClient } from '@/lib/supabase/server'
-import { redirect, notFound } from 'next/navigation'
-import { fetchDocumentVersions } from '@/lib/document-helpers'
-import { getSubdomainTenantId, getCurrentSubdomain } from '@/lib/tenant'
-import { checkBaselineReqsReferences } from '@/lib/integrations/baselinereqs'
-import DocumentDetailPanel from '../DocumentDetailPanel'
-import DocumentActionsPanel from '../DocumentActionsPanel'
-import Link from 'next/link'
-import { ArrowLeft } from 'lucide-react'
-import { Button } from '@/components/ui/button'
+import { createClient, createServiceRoleClient } from '@/lib/supabase/server'
+import { cookies } from 'next/headers'
+import StorageLimitBanner from '@/components/admin/StorageLimitBanner'
+import { redirect } from 'next/navigation'
+import DocumentsSearchPage from './DocumentsSearchPage'
+import {
+  searchDocuments,
+  getUsersForFilters,
+  getProjectCodesForFilters,
+  getDocumentTypesForFilters
+} from '@/app/actions/advanced-search'
+import type { AdvancedSearchFilters } from '@/lib/types/advanced-search'
+
+// Disable caching
+export const revalidate = 0
 
 interface PageProps {
-  params: { id: string }
+  searchParams: {
+    selected?: string  // Document number for split-panel view
+    q?: string
+    createdAfter?: string
+    createdBefore?: string
+    updatedAfter?: string
+    updatedBefore?: string
+    releasedAfter?: string
+    releasedBefore?: string
+    types?: string
+    statuses?: string
+    projects?: string
+    createdBy?: string
+    releasedBy?: string
+    isProduction?: string
+    hasAttachments?: string
+    myDocs?: string
+    page?: string
+    sortBy?: string
+    sortOrder?: string
+  }
 }
 
-export default async function DocumentDetailPage({ params }: PageProps) {
+export default async function DocumentsPage({ searchParams }: PageProps) {
   const supabase = await createClient()
 
-  // Get current user
-  const { data: { user } } = await supabase.auth.getUser()
+  // Check authentication
+  const { data: { user }, error: userError } = await supabase.auth.getUser()
   
-  if (!user) {
-    redirect('/auth/login')
+  if (userError || !user) {
+    redirect('/')
   }
 
-  // Check if user is admin
+  // Get user's tenant and admin status (single query)
   const { data: userData } = await supabase
     .from('users')
-    .select('is_admin')
+    .select('tenant_id, is_admin')
     .eq('id', user.id)
     .single()
 
-  if (!userData) {
-    redirect('/auth/login')
-  }
-
   const isAdmin = userData?.is_admin || false
 
-  // Get tenant from CURRENT SUBDOMAIN
-  const subdomainTenantId = await getSubdomainTenantId()
-  const subdomain = await getCurrentSubdomain()
-  
-  if (!subdomainTenantId) {
-    notFound()
+  // Get subdomain tenant (for multi-tenant support)
+  const cookieStore = await cookies()
+  const subdomainCookie = cookieStore.get('tenant_subdomain')
+  const subdomain = subdomainCookie?.value
+
+  let tenantId = userData?.tenant_id
+
+  if (subdomain) {
+    const { data: subdomainTenant } = await supabase
+      .from('tenants')
+      .select('id')
+      .eq('subdomain', subdomain)
+      .single()
+    
+    if (subdomainTenant) {
+      tenantId = subdomainTenant.id
+    }
   }
 
-  // Fetch the document to get its document_number
-  const { data: document } = await supabase
-    .from('documents')
-    .select('document_number, tenant_id')
-    .eq('id', params.id)
+  // ⭐ GET STORAGE INFO FOR BANNER ⭐
+  const supabaseAdmin = createServiceRoleClient()
+
+  // Get billing info
+  const { data: billingData } = await supabase
+    .from('tenant_billing')
+    .select('plan, storage_limit_gb')
+    .eq('tenant_id', tenantId)
     .single()
 
-  if (!document) {
-    notFound()
+  // Calculate current storage (use admin to bypass RLS)
+  const { data: files } = await supabaseAdmin
+    .from('document_files')
+    .select('file_size, documents!inner(tenant_id)')
+    .eq('documents.tenant_id', tenantId)
+
+  const currentStorageBytes = files?.reduce((sum, f) => sum + (f.file_size || 0), 0) || 0
+  const currentStorageGB = currentStorageBytes / (1024 * 1024 * 1024)
+
+  const plan = billingData?.plan || 'trial'
+  const storageLimitGB = billingData?.storage_limit_gb || 1
+
+  // Parse search params into filters
+  const filters: AdvancedSearchFilters = {
+    searchQuery: searchParams.q,
+    createdAfter: searchParams.createdAfter,
+    createdBefore: searchParams.createdBefore,
+    updatedAfter: searchParams.updatedAfter,
+    updatedBefore: searchParams.updatedBefore,
+    releasedAfter: searchParams.releasedAfter,
+    releasedBefore: searchParams.releasedBefore,
+    documentTypes: searchParams.types ? searchParams.types.split(',') : undefined,
+    statuses: searchParams.statuses ? searchParams.statuses.split(',') : ['Draft', 'In Approval', 'Released'],
+    projectCodes: searchParams.projects ? searchParams.projects.split(',') : undefined,
+    createdBy: searchParams.createdBy,
+    releasedBy: searchParams.releasedBy,
+    isProduction: searchParams.isProduction ? searchParams.isProduction === 'true' : null,
+    hasAttachments: searchParams.hasAttachments ? searchParams.hasAttachments === 'true' : null,
+    myDocumentsOnly: searchParams.myDocs === 'true',
+    page: searchParams.page ? parseInt(searchParams.page) : 1,
+    pageSize: 50,
+    sortBy: (searchParams.sortBy as any) || 'updated_at',
+    sortOrder: (searchParams.sortOrder as any) || 'desc'
   }
 
-  // Verify tenant access - document must belong to CURRENT SUBDOMAIN's tenant
-  if (document.tenant_id !== subdomainTenantId) {
-    notFound()
-  }
-
-  // Fetch all versions of this document
-  const documentData = await fetchDocumentVersions(document.document_number, user.id)
-
-  if (!documentData) {
-    notFound()
-  }
-
-  // Get available users for approver assignment (if admin or creator)
-  const { data: availableUsers } = await supabase
-    .from('users')
-    .select('id, email, full_name')
-    .eq('tenant_id', subdomainTenantId)
-    .eq('is_active', true)
-    .order('full_name')
-
-  // Fetch audit logs for ALL versions of this document (cross-version history)
-  const { data: auditLogs, error: auditError } = await supabase
-    .from('audit_log')
-    .select('*')
-    .eq('document_number', document.document_number)
-    .eq('tenant_id', document.tenant_id)
-    .order('created_at', { ascending: false })
-    .limit(50)
-  
-  // Log for debugging
-  if (auditError) {
-    console.error('Audit log query error:', auditError)
-  } else {
-    console.log('Audit logs fetched:', {
-      documentNumber: document.document_number,
-      tenantId: document.tenant_id,
-      count: auditLogs?.length || 0
-    })
-  }
-
-  // ── BaselineReqs badge: fetch reference count for the most relevant version.
-  // Use the latest released version if one exists, otherwise fall back to the
-  // latest draft — so the badge shows even on draft-only documents.
-  // Cached for 5 minutes via Next.js fetch cache.
-  let baselineReqsRefs = null
-  const badgeDocumentId = documentData.latestReleased?.id ?? documentData.wipVersions[0]?.id ?? null
-  if (subdomain && badgeDocumentId) {
-    baselineReqsRefs = await checkBaselineReqsReferences(subdomain, badgeDocumentId, 300)
-  }
+  // Fetch data in parallel
+  const [searchResults, users, projectCodes, documentTypes] = await Promise.all([
+    searchDocuments(filters),
+    getUsersForFilters(),
+    getProjectCodesForFilters(),
+    getDocumentTypesForFilters()
+  ])
 
   return (
-    <div className="min-h-screen bg-gray-50">
-      {/* Header with back button */}
-      <div className="bg-white border-b sticky top-0 z-10">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
-          <Button
-            variant="ghost"
-            asChild
-            className="mb-0"
-          >
-            <Link href="/documents" className="flex items-center gap-2">
-              <ArrowLeft className="h-4 w-4" />
-              Back to Documents
-            </Link>
-          </Button>
-        </div>
-      </div>
+    <>
+      {/* ⭐ STORAGE BANNER ⭐ */}
+      <StorageLimitBanner 
+        currentStorageGB={currentStorageGB}
+        storageLimitGB={storageLimitGB}
+        plan={plan}
+      />
 
-      {/* Main content */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Left: Document Details */}
-          <div>
-            <DocumentDetailPanel
-              documentData={documentData}
-              availableUsers={availableUsers || []}
-              isAdmin={isAdmin}
-              currentUserId={user.id}
-              currentUserEmail={user.email || ''}
-              baselineReqsRefs={baselineReqsRefs}
-            />
-          </div>
-
-          {/* Right: Actions & History */}
-          <div>
-            <DocumentActionsPanel
-              documentData={documentData}
-              auditLogs={auditLogs || []}
-              isAdmin={isAdmin}
-              currentUserId={user.id}
-              currentUserEmail={user.email || ''}
-            />
-          </div>
-        </div>
-      </div>
-    </div>
+      <DocumentsSearchPage
+        initialFilters={filters}
+        initialResults={searchResults}
+        documentTypes={documentTypes}
+        users={users}
+        projectCodes={projectCodes}
+        isAdmin={isAdmin}
+        currentUserId={user.id}
+      />
+    </>
   )
 }
